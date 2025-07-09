@@ -529,6 +529,24 @@ class EnhancedFigmaExtractor:
                 blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
         return blocks
 
+    def _extract_slide_colors(self, slide_node):
+        """Extract slideColors from the hidden slideColors table in the slide node, including fill for each color layer."""
+        colors = {}
+        if not slide_node or not slide_node.get('children'):
+            return colors
+        for child in slide_node['children']:
+            if child.get('name') == 'slideColors':
+                for block in child.get('children', []):
+                    block_type = block.get('name')
+                    block_colors = {}
+                    for color_node in block.get('children', []):
+                        color_hex = color_node.get('characters')
+                        fill_hex, _ = self.extract_color_from_fills(color_node)
+                        if color_hex:
+                            block_colors[color_hex] = {"fill": fill_hex}
+                    colors[block_type] = block_colors
+        return colors
+
     def traverse_and_extract(self, node: Dict[str, Any], parent_name: str = "") -> List[ExtractedSlide]:
         """Enhanced traversal with filtering"""
         slides = []
@@ -568,6 +586,8 @@ class EnhancedFigmaExtractor:
                         'h': FIGMA_CONFIG['TARGET_HEIGHT']
                     }
                 )
+                # Attach the original node for color extraction
+                slide._figma_node = node
                 slides.append(slide)
                 print(f"Slide {slide_number} ({slide_type}) with {len(blocks)} blocks")
             
@@ -657,7 +677,7 @@ class EnhancedFigmaExtractor:
             }
 
     def _slide_to_dict(self, slide: ExtractedSlide) -> Dict[str, Any]:
-        """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs."""
+        """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs. Add slideColors extraction."""
         # Find the text block with the longest text_content
         max_text_block = None
         max_len = 0
@@ -677,6 +697,11 @@ class EnhancedFigmaExtractor:
             sentence_count = n
         if sentence_count == 0:
             sentence_count = 1
+        # Extract slideColors if available
+        slide_colors = {}
+        figma_node = getattr(slide, '_figma_node', None)
+        if figma_node:
+            slide_colors = self._extract_slide_colors(figma_node)
         return {
             'slide_number': slide.number,
             'container_name': slide.container_name,
@@ -687,7 +712,8 @@ class EnhancedFigmaExtractor:
             'dimensions': slide.dimensions,
             'folder_name': config.SLIDE_NUMBER_TO_FOLDER.get(slide.number, 'other'),
             'blocks': [self._block_to_dict(block) for block in slide.blocks],
-            'block_count': len(slide.blocks)
+            'block_count': len(slide.blocks),
+            'slideColors': slide_colors
         }
 
     def _block_to_dict(self, block: ExtractedBlock) -> Dict[str, Any]:
