@@ -156,6 +156,7 @@ class ExtractedBlock:
     is_target: bool = False
     has_corner_radius: bool = False
     corner_radius: List[int] = field(default_factory=lambda: [0, 0, 0, 0])
+    text_content: str = None  # NEW: store actual text content for TEXT nodes
 
 @dataclass
 class ExtractedSlide:
@@ -443,7 +444,7 @@ class EnhancedFigmaExtractor:
 
     def collect_enhanced_blocks(self, node: Dict[str, Any], frame_origin: Dict[str, int], 
                               slide_number: int, parent_container: str) -> List[ExtractedBlock]:
-        """Collect blocks with enhanced information"""
+        """Collect blocks with enhanced information, including text content for TEXT nodes"""
         blocks = []
         if not node.get('absoluteBoundingBox'):
             return blocks
@@ -497,6 +498,10 @@ class EnhancedFigmaExtractor:
                 if fills_variable:
                     styles['colorVariable'] = fills_variable
                 has_corner_radius, corner_radius = self.extract_corner_radius(node)
+                # NEW: extract text content for TEXT nodes
+                text_content = None
+                if sql_type == 'text' and node.get('type') == 'TEXT':
+                    text_content = node.get('characters', None)
                 block = ExtractedBlock(
                     id=node['id'],
                     figma_type=figma_type,
@@ -509,13 +514,14 @@ class EnhancedFigmaExtractor:
                     is_target=True,
                     has_corner_radius=has_corner_radius,
                     corner_radius=corner_radius,
+                    text_content=text_content  # Pass text content
                 )
                 if self.should_include_block(block):
                     blocks.append(block)
                     print(f"Added {sql_type} block: {name}")
                     # Log block details
                     block_logger.info(
-                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles}"
+                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}"
                     )
         # Recursively process children
         if node.get('children'):
@@ -651,12 +657,32 @@ class EnhancedFigmaExtractor:
             }
 
     def _slide_to_dict(self, slide: ExtractedSlide) -> Dict[str, Any]:
-        """Convert slide object to dictionary"""
+        """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs."""
+        # Find the text block with the longest text_content
+        max_text_block = None
+        max_len = 0
+        for block in slide.blocks:
+            if block.sql_type == 'text':
+                text_content = getattr(block, 'text_content', None)
+                if text_content and len(text_content) > max_len:
+                    max_text_block = block
+                    max_len = len(text_content)
+        sentence_count = 0
+        if max_text_block:
+            text_content = getattr(max_text_block, 'text_content', None)
+            split_result = [s for s in re.split(r'[.!?]', text_content)]
+            n = len([s for s in split_result if s.strip()])
+            if n == 0:
+                n = 1
+            sentence_count = n
+        if sentence_count == 0:
+            sentence_count = 1
         return {
             'slide_number': slide.number,
             'container_name': slide.container_name,
             'frame_name': slide.frame_name,
             'slide_type': slide.slide_type,
+            'sentences': sentence_count,
             'frame_id': slide.frame_id,
             'dimensions': slide.dimensions,
             'folder_name': config.SLIDE_NUMBER_TO_FOLDER.get(slide.number, 'other'),
@@ -665,7 +691,7 @@ class EnhancedFigmaExtractor:
         }
 
     def _block_to_dict(self, block: ExtractedBlock) -> Dict[str, Any]:
-        """Convert block object to dictionary"""
+        """Convert block object to dictionary, include text_content for debugging/auditing"""
         block_dict = {
             'id': block.id,
             'name': block.name,
@@ -676,7 +702,8 @@ class EnhancedFigmaExtractor:
             'is_target': block.is_target,
             'needs_null_styles': block.sql_type in NULL_STYLE_TYPES,
             'needs_z_index': block.sql_type in Z_INDEX_TYPES,
-            'corner_radius': block.corner_radius if block.has_corner_radius else None
+            'corner_radius': block.corner_radius if block.has_corner_radius else None,
+            'text_content': block.text_content  # NEW: include text content in output
         }
         if block.sql_type == 'figure':
             # Extract figure name from block.name (e.g., 'figure (rectangleVerticalOutlineRfsThree) z-index 1')
