@@ -529,11 +529,11 @@ class EnhancedFigmaExtractor:
                 blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
         return blocks
 
-    def _extract_slide_colors(self, slide_node):
-        """Extract slideColors from the hidden slideColors table in the slide node, including fill for each color layer."""
-        colors = {}
+    def _extract_slide_config(self, slide_node):
+        """Extract slideConfig from the hidden slideColors table in the slide node, including fill and fontFamily for each color layer."""
+        config_dict = {}
         if not slide_node or not slide_node.get('children'):
-            return colors
+            return config_dict
         for child in slide_node['children']:
             if child.get('name') == 'slideColors':
                 for block in child.get('children', []):
@@ -542,10 +542,13 @@ class EnhancedFigmaExtractor:
                     for color_node in block.get('children', []):
                         color_hex = color_node.get('characters')
                         fill_hex, _ = self.extract_color_from_fills(color_node)
+                        font_family = None
+                        if 'style' in color_node and 'fontFamily' in color_node['style']:
+                            font_family = color_node['style']['fontFamily']
                         if color_hex:
-                            block_colors[color_hex] = {"fill": fill_hex}
-                    colors[block_type] = block_colors
-        return colors
+                            block_colors[color_hex] = {"fill": fill_hex, "fontFamily": font_family}
+                    config_dict[block_type] = block_colors
+        return config_dict
 
     def traverse_and_extract(self, node: Dict[str, Any], parent_name: str = "") -> List[ExtractedSlide]:
         """Enhanced traversal with filtering"""
@@ -697,11 +700,11 @@ class EnhancedFigmaExtractor:
             sentence_count = n
         if sentence_count == 0:
             sentence_count = 1
-        # Extract slideColors if available
-        slide_colors = {}
+        # Extract slideConfig if available
+        slide_config = {}
         figma_node = getattr(slide, '_figma_node', None)
         if figma_node:
-            slide_colors = self._extract_slide_colors(figma_node)
+            slide_config = self._extract_slide_config(figma_node)
         return {
             'slide_number': slide.number,
             'container_name': slide.container_name,
@@ -713,7 +716,7 @@ class EnhancedFigmaExtractor:
             'folder_name': config.SLIDE_NUMBER_TO_FOLDER.get(slide.number, 'other'),
             'blocks': [self._block_to_dict(block) for block in slide.blocks],
             'block_count': len(slide.blocks),
-            'slideColors': slide_colors
+            'slideConfig': slide_config
         }
 
     def _block_to_dict(self, block: ExtractedBlock) -> Dict[str, Any]:
