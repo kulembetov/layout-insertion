@@ -467,15 +467,18 @@ class EnhancedFigmaExtractor:
                 'w': self.round_to_nearest_five(abs_box['width']),
                 'h': self.round_to_nearest_five(abs_box['height'])
             }
-            # Skip full-slide background images
+            # Skip full-slide background or image unless 'precompiled' is in the name
+            name_lower = name.lower()
+            is_precompiled = 'precompiled' in name_lower
             if (
                 sql_type in ['image', 'background'] and
                 dimensions['x'] == 0 and
                 dimensions['y'] == 0 and
                 dimensions['w'] == 1200 and
-                dimensions['h'] == 675
+                dimensions['h'] == 675 and
+                not is_precompiled
             ):
-                print(f"Skipping {sql_type} block {name} (full background 1200x675)")
+                print(f"Skipping {sql_type} block {name} (full background/image 1200x675)")
             else:
                 styles = self.extract_text_styles(node, sql_type)
                 z_index = self.extract_z_index(name)
@@ -531,7 +534,7 @@ class EnhancedFigmaExtractor:
         return blocks
 
     def _extract_slide_config(self, slide_node):
-        """Extract slideConfig from the hidden slideColors table in the slide node, including fill and fontFamily for each color layer. All color hex codes are normalized to lowercase."""
+        """Extract slideConfig from the hidden slideColors table in the slide node, including fill and fontFamily for each color layer. For 'figure', each color group is a dict with 'fill', 'fontFamily', 'text_nodes', and 'font_families'."""
         config_dict = {}
         if not slide_node or not slide_node.get('children'):
             return config_dict
@@ -539,19 +542,126 @@ class EnhancedFigmaExtractor:
             if child.get('name') == 'slideColors':
                 for block in child.get('children', []):
                     block_type = block.get('name')
-                    block_colors = {}
-                    for color_node in block.get('children', []):
-                        color_hex = color_node.get('characters')
-                        if color_hex and color_hex.startswith('#'):
-                            color_hex = color_hex.lower()
-                        fill_hex, _ = self.extract_color_from_fills(color_node)
-                        font_family = None
-                        if 'style' in color_node and 'fontFamily' in color_node['style']:
-                            font_family = color_node['style']['fontFamily']
-                        if color_hex:
-                            block_colors[color_hex] = {"fill": fill_hex, "fontFamily": font_family}
-                    config_dict[block_type] = block_colors
+                    if block_type == "figure":
+                        block_colors = {}
+                        for color_group in block.get('children', []):
+                            color_hex = color_group.get('name')  # Use 'name' for the color group layer (e.g., "#E9EAEA")
+                            
+                            # Extract fill from the color group layer itself first
+                            fill_hex, _ = self.extract_color_from_fills(color_group)
+                            
+                            # If no fill on the group layer, look in nested layers
+                            if not fill_hex:
+                                for nested_layer in color_group.get('children', []):
+                                    fill_hex, _ = self.extract_color_from_fills(nested_layer)
+                                    if fill_hex:
+                                        break
+                            
+                            # Extract font family from the color group layer
+                            font_family = None
+                            if 'style' in color_group and 'fontFamily' in color_group['style']:
+                                font_family = color_group['style']['fontFamily']
+                            
+                            # Extract text nodes and their font families
+                            text_nodes = []
+                            font_families = {}
+                            all_text_nodes_found = []  # Track all text nodes for debugging
+                            
+                            def extract_text_from_children(node):
+                                # Debug: Print every node's type, name, and characters
+                                print(f"DEBUG: Node type: {node.get('type')}, name: {node.get('name', '')}, characters: {node.get('characters', '')}")
+                                if node.get('type') == 'TEXT':
+                                    node_str = node.get('characters', '').strip()
+                                    all_text_nodes_found.append(node_str)  # Track all text nodes
+                                    print(f"DEBUG: Found TEXT node: '{node_str}'")
+                                    
+                                    # Skip the color hex text nodes (e.g., '#E9EAEA')
+                                    if node_str.startswith('#') and node_str.upper() == color_hex.upper():
+                                        print(f"DEBUG: Skipping color hex text node: '{node_str}'")
+                                    elif node_str.isdigit() or (len(node_str) == 2 and node_str.isdigit()):
+                                        text_nodes.append(node_str)
+                                        
+                                        # Extract fontFamily from this text node
+                                        node_font_family = None
+                                        if 'style' in node and 'fontFamily' in node['style']:
+                                            node_font_family = node['style']['fontFamily']
+                                        elif 'style' in node and 'fontPostScriptName' in node['style']:
+                                            node_font_family = node['style']['fontPostScriptName']
+                                        elif 'style' in node and 'fontName' in node['style']:
+                                            # Check if fontName has family property
+                                            font_name = node['style']['fontName']
+                                            if isinstance(font_name, dict) and 'family' in font_name:
+                                                node_font_family = font_name['family']
+                                            else:
+                                                node_font_family = str(font_name)
+                                        
+                                        font_families[node_str] = node_font_family
+                                        print(f"DEBUG: Added text_node: '{node_str}' with fontFamily: '{node_font_family}'")
+                                    else:
+                                        print(f"DEBUG: Skipping non-numeric text node: '{node_str}'")
+                                
+                                # Recursively check children
+                                for child in node.get('children', []):
+                                    extract_text_from_children(child)
+                            
+                            # Extract from direct children and nested children
+                            for child in color_group.get('children', []):
+                                extract_text_from_children(child)
+                            
+                            print(f"DEBUG: All text nodes found in {color_hex}: {all_text_nodes_found}")
+                            print(f"DEBUG: Numeric text nodes extracted: {text_nodes}")
+                            
+                            block_colors[color_hex] = {
+                                "fill": fill_hex,
+                                "fontFamily": font_family,
+                                "text_nodes": text_nodes,
+                                "font_families": font_families
+                            }
+                        config_dict[block_type] = block_colors
+                    else:
+                        block_colors = {}
+                        for color_node in block.get('children', []):
+                            color_hex = color_node.get('characters')
+                            if color_hex and color_hex.startswith('#'):
+                                color_hex = color_hex.lower()
+                            fill_hex, _ = self.extract_color_from_fills(color_node)
+                            font_family = None
+                            if 'style' in color_node and 'fontFamily' in color_node['style']:
+                                font_family = color_node['style']['fontFamily']
+                            if color_hex:
+                                block_colors[color_hex] = {"fill": fill_hex, "fontFamily": font_family}
+                        config_dict[block_type] = block_colors
         return config_dict
+
+    def _update_figure_config_with_names(self, slide_config, blocks):
+        """Update the figure config to store each figure instance as a separate object under each color, even if names repeat."""
+        import re
+        # Collect all figure blocks with their info
+        figure_blocks_info = []
+        for block in blocks:
+            if block.sql_type == 'figure':
+                name_match = re.search(r'\(([^)]+)\)', block.name)
+                if name_match:
+                    base_name = name_match.group(1)
+                    figure_blocks_info.append({
+                        'base_name': base_name,
+                        'block': block
+                    })
+        new_figure_config = {}
+        for color_hex, color_info in slide_config['figure'].items():
+            fill_color = color_info.get('fill')
+            default_font_family = color_info.get('fontFamily', 'Inter')
+            # List all figure blocks for this color
+            figure_objects = []
+            for fig in figure_blocks_info:
+                figure_obj = {
+                    "fill": fill_color,
+                    "fontFamily": default_font_family,
+                    "figureName": fig['base_name']
+                }
+                figure_objects.append(figure_obj)
+            new_figure_config[color_hex] = figure_objects
+        slide_config['figure'] = new_figure_config
 
     def traverse_and_extract(self, node: Dict[str, Any], parent_name: str = "") -> List[ExtractedSlide]:
         """Enhanced traversal with filtering"""
@@ -708,6 +818,10 @@ class EnhancedFigmaExtractor:
         figma_node = getattr(slide, '_figma_node', None)
         if figma_node:
             slide_config = self._extract_slide_config(figma_node)
+            
+            # Build mapping from figure numbers to actual figure names and update slideConfig
+            if 'figure' in slide_config:
+                self._update_figure_config_with_names(slide_config, slide.blocks)
         return {
             'slide_number': slide.number,
             'container_name': slide.container_name,
@@ -717,13 +831,12 @@ class EnhancedFigmaExtractor:
             'frame_id': slide.frame_id,
             'dimensions': slide.dimensions,
             'folder_name': config.SLIDE_NUMBER_TO_FOLDER.get(slide.number, 'other'),
-            'blocks': [self._block_to_dict(block) for block in slide.blocks],
+            'blocks': [self._block_to_dict(block, slide_config) for block in slide.blocks],
             'block_count': len(slide.blocks),
             'slideConfig': slide_config
         }
 
-    def _block_to_dict(self, block: ExtractedBlock) -> Dict[str, Any]:
-        """Convert block object to dictionary, include text_content for debugging/auditing"""
+    def _block_to_dict(self, block: ExtractedBlock, slide_config=None) -> Dict[str, Any]:
         block_dict = {
             'id': block.id,
             'name': block.name,
@@ -734,17 +847,27 @@ class EnhancedFigmaExtractor:
             'is_target': block.is_target,
             'needs_null_styles': block.sql_type in NULL_STYLE_TYPES,
             'needs_z_index': block.sql_type in Z_INDEX_TYPES,
-            'corner_radius': block.corner_radius if block.has_corner_radius else None,
-            'text_content': block.text_content  # NEW: include text content in output
+            'corner_radius': block.corner_radius if block.corner_radius is not None else None,
         }
-        if block.sql_type == 'figure':
-            # Extract figure name from block.name (e.g., 'figure (rectangleVerticalOutlineRfsThree) z-index 1')
+        
+        # Handle figure blocks with color extraction from slideConfig
+        if block.sql_type == 'figure' and slide_config and 'figure' in slide_config:
+            # Extract clean name from block name (e.g., "figure (iconOvalOutlineRfs) z-index 2" -> "iconOvalOutlineRfs")
             import re
-            match = re.search(r'figure[\s\(]*([\w\d_]+)[\)]?', block.name, re.IGNORECASE)
-            if match:
-                block_dict['figure_name'] = match.group(1)
-            else:
-                block_dict['figure_name'] = block.name
+            name_match = re.search(r'\(([^)]+)\)', block.name)
+            if name_match:
+                clean_name = name_match.group(1)
+                
+                # Look through all color groups in the figure config to find this figure
+                for color_hex, figure_objects in slide_config['figure'].items():
+                    # Check if this figure is in this color group's array
+                    for figure_obj in figure_objects:
+                        if figure_obj.get('figureName') == clean_name:
+                            block_dict['figureName'] = clean_name
+                            block_dict['fill'] = figure_obj.get('fill')
+                            block_dict['fontFamily'] = figure_obj.get('fontFamily')
+                            break
+        
         return block_dict
 
     def save_results(self, data: Dict[str, Any], output_file: str | None) -> str:
