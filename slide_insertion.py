@@ -1054,29 +1054,33 @@ class SQLGenerator:
                 block_config_fonts = {}
                 for block_type, color_dict in candidate_config.items():
                     for color_hex, color_info in color_dict.items():
-                        color_hex_lc = normalize_color(color_hex)
-                        fill_color = color_info.get('fill')
-                        if fill_color:
-                            fill_color = normalize_color(fill_color)
-                        font_raw = color_info.get('fontFamily', 'roboto')
-                        font_norm = normalize_font_family(font_raw)
-                        if color_hex_lc not in palette_colors:
-                            color_sql_lines.append(f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES (gen_random_uuid(), '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;")
-                            palette_colors.add(color_hex_lc)
-                        if block_type not in block_config_colors:
-                            block_config_colors[block_type] = set()
-                        if color_hex_lc not in block_config_colors[block_type]:
-                            color_sql_lines.append(f"-- Ensure color {color_hex_lc} is in BlockLayoutConfig.{block_type}")
-                            color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET {block_type} = array_append({block_type}, '{color_hex_lc}') WHERE NOT ('{color_hex_lc}' = ANY({block_type}));")
-                            block_config_colors[block_type].add(color_hex_lc)
-                        if block_type not in block_config_fonts:
-                            block_config_fonts[block_type] = set()
-                        if font_norm not in block_config_fonts[block_type]:
-                            color_sql_lines.append(f"-- Ensure font {font_norm} is in BlockLayoutConfig.font")
-                            color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET font = array_append(font, '{font_norm}') WHERE NOT ('{font_norm}' = ANY(font));")
-                            block_config_fonts[block_type].add(font_norm)
-                        color_sql_lines.append(f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}') - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
-                        color_sql_lines.append(f"-- Get font index: SELECT array_position(font, '{font_norm}') - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
+                        # Fix: Ensure color_info is a dict before using .get()
+                        if isinstance(color_info, dict):
+                            color_hex_lc = normalize_color(color_hex)
+                            fill_color = color_info.get('fill')
+                            if fill_color:
+                                fill_color = normalize_color(fill_color)
+                            font_raw = color_info.get('fontFamily', 'roboto')
+                            font_norm = normalize_font_family(font_raw)
+                            if color_hex_lc not in palette_colors:
+                                color_sql_lines.append(f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES (gen_random_uuid(), '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;")
+                                palette_colors.add(color_hex_lc)
+                            if block_type not in block_config_colors:
+                                block_config_colors[block_type] = set()
+                            if color_hex_lc not in block_config_colors[block_type]:
+                                color_sql_lines.append(f"-- Ensure color {color_hex_lc} is in BlockLayoutConfig.{block_type}")
+                                color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET {block_type} = array_append({block_type}, '{color_hex_lc}') WHERE NOT ('{color_hex_lc}' = ANY({block_type}));")
+                                block_config_colors[block_type].add(color_hex_lc)
+                            if block_type not in block_config_fonts:
+                                block_config_fonts[block_type] = set()
+                            if font_norm not in block_config_fonts[block_type]:
+                                color_sql_lines.append(f"-- Ensure font {font_norm} is in BlockLayoutConfig.font")
+                                color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET font = array_append(font, '{font_norm}') WHERE NOT ('{font_norm}' = ANY(font));")
+                                block_config_fonts[block_type].add(font_norm)
+                            color_sql_lines.append(f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}') - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
+                            color_sql_lines.append(f"-- Get font index: SELECT array_position(font, '{font_norm}') - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
+                        else:
+                            logger.warning(f"color_info for block_type={block_type}, color_hex={color_hex} is not a dict: {color_info}")
         if not found_any:
             logger.warning(f"No slideConfig found for slide {slide_layout.number} ('{slide_layout.name}') in sql_generator_input.json")
             return '', output_dir
