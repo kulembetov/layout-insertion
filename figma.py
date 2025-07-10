@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import config
 import logging
+import shutil
 
 # Set up block logger dynamically based on output directory
 block_logger = None
@@ -530,7 +531,7 @@ class EnhancedFigmaExtractor:
         return blocks
 
     def _extract_slide_config(self, slide_node):
-        """Extract slideConfig from the hidden slideColors table in the slide node, including fill and fontFamily for each color layer."""
+        """Extract slideConfig from the hidden slideColors table in the slide node, including fill and fontFamily for each color layer. All color hex codes are normalized to lowercase."""
         config_dict = {}
         if not slide_node or not slide_node.get('children'):
             return config_dict
@@ -541,6 +542,8 @@ class EnhancedFigmaExtractor:
                     block_colors = {}
                     for color_node in block.get('children', []):
                         color_hex = color_node.get('characters')
+                        if color_hex and color_hex.startswith('#'):
+                            color_hex = color_hex.lower()
                         fill_hex, _ = self.extract_color_from_fills(color_node)
                         font_family = None
                         if 'style' in color_node and 'fontFamily' in color_node['style']:
@@ -827,7 +830,7 @@ class FigmaToSQLIntegrator:
         return extractor.extract_data()
     
     def prepare_sql_generator_input(self, figma_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Convert Figma data to format suitable for SQL Generator with config compatibility"""
+        """Convert Figma data to format suitable for SQL Generator with config compatibility. Now includes slideConfig for each slide."""
         sql_input = []
         for slide in figma_data.get('slides', []):
             is_last = slide['slide_number'] == -1
@@ -846,7 +849,9 @@ class FigmaToSQLIntegrator:
                     'needs_watermark': config.AUTO_BLOCKS.get('add_watermark', False) or is_last,
                     'default_color': config.DEFAULT_COLOR,
                     'color_settings_id': config.DEFAULT_COLOR_SETTINGS_ID
-                }
+                },
+                # Add slideConfig from the Figma slide if present
+                'slideConfig': slide.get('slideConfig', {})
             }
             for block in slide['blocks']:
                 styles = dict(block['styles']) if block.get('styles') else {}
@@ -927,6 +932,13 @@ class FigmaToSQLIntegrator:
     def generate_sql_for_slides(self, slide_numbers: List[int], output_dir: str = "sql_output"):
         """Complete pipeline: extract from Figma and generate SQL with config compatibility"""
         print(f"Extracting slides {slide_numbers} from Figma...")
+        # Remove output directory if it exists
+        if os.path.exists(output_dir):
+            print(f"Removing existing output directory: {output_dir}")
+            shutil.rmtree(output_dir)
+            print(f"Removed output directory: {output_dir}")
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Created output directory: {output_dir}")
         # Set up block logger in the output directory
         setup_block_logger(output_dir)
         # Extract from Figma
@@ -935,7 +947,6 @@ class FigmaToSQLIntegrator:
             print("Failed to extract data from Figma")
             return
         # Save extracted data
-        os.makedirs(output_dir, exist_ok=True)
         with open(f"{output_dir}/figma_extract.json", 'w') as f:
             json.dump(figma_data, f, indent=2)
         # Prepare for SQL Generator

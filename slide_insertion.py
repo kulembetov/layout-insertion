@@ -25,7 +25,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, List, Tuple, TypedDict, Literal
 from dataclasses import dataclass, field
-import re
+import json
+import shutil
+import argparse
 
 # Helper to set up the logger file handler in any mode
 def setup_slide_insertion_logger(output_dir):
@@ -986,6 +988,15 @@ class SQLGenerator:
     def generate_sql(self) -> str:
         """Generate SQL based on user input"""
         logger.info("Starting SQL generation process.")
+        # Load sql_generator_input.json for color/font extraction
+        output_config = self.config_manager.get_output_config()
+        base_output_dir = output_config['output_dir']
+        sql_input_path = os.path.join(base_output_dir, 'sql_generator_input.json')
+        if not os.path.exists(sql_input_path):
+            logger.error(f"sql_generator_input.json not found at {sql_input_path}")
+            return None
+        with open(sql_input_path, 'r', encoding='utf-8') as f:
+            sql_input_data = json.load(f)
         # Collect slide layout information
         slide_layout = self._collect_slide_information()
         logger.info(f"Collected slide layout: name={slide_layout.name}, number={slide_layout.number}, type={slide_layout.type}, is_last={slide_layout.is_last}")
@@ -997,13 +1008,211 @@ class SQLGenerator:
         # Update slide type based on content
         self._update_slide_type(slide_layout, blocks)
         logger.info(f"Final slide type: {slide_layout.type}")
+        # Color extraction and SQL generation from sql_generator_input.json ---
+        color_sql, color_folder = self._generate_color_sql_from_sql_input(slide_layout, sql_input_data)
         # Generate SQL
         sql = self._generate_sql_queries(slide_layout, blocks, figure_blocks, precompiled_image_blocks)
         # Write SQL to file
         output_file = self._write_sql_to_file(sql, slide_layout)
+        # Write color SQL to a separate file in the same folder
+        color_sql_file = self._write_color_sql_to_file(color_sql, color_folder, slide_layout)
         logger.info(f"SQL written to {output_file}")
+        logger.info(f"Color SQL written to {color_sql_file}")
         logger.info("SQL generation process completed.")
         return output_file
+
+    def _generate_color_sql_from_sql_input(self, slide_layout, sql_input_data):
+        """Generate SQL for color and font insertions and index configs, using sql_generator_input.json."""
+        logger.info(f"Starting color/font SQL generation for slide: name={slide_layout.name}, number={slide_layout.number}")
+        available_numbers = [slide.get('slide_layout_number') for slide in sql_input_data]
+        logger.debug(f"Available slide_layout_number values in input: {available_numbers}")
+        output_config = self.config_manager.get_output_config()
+        base_output_dir = output_config['output_dir']
+        folder_name = self.config_manager.get_folder_for_slide_number(slide_layout.number)
+        output_dir = os.path.join(base_output_dir, folder_name)
+        def normalize_name(name):
+            return re.sub(r'\s*z-index\s*\d+\s*$', '', name or '').strip().lower()
+        slide_layout_name_norm = normalize_name(slide_layout.name)
+        # Find all slides in sql_input_data matching this slide_layout (by number and normalized name)
+        matching_slides = []
+        for slide in sql_input_data:
+            slide_num = str(slide.get('slide_layout_number'))
+            slide_name_norm = normalize_name(slide.get('slide_layout_name'))
+            logger.debug(f"Comparing input slide_layout_number={slide_num}, name='{slide_name_norm}' to current number={slide_layout.number}, name='{slide_layout_name_norm}'")
+            if slide_num == str(slide_layout.number) and slide_name_norm == slide_layout_name_norm:
+                matching_slides.append(slide)
+        found_any = False
+        color_sql_lines = []
+        for slide in matching_slides:
+            candidate_config = slide.get('slideConfig', None)
+            logger.debug(f"Found candidate slideConfig for slide_layout_number={slide.get('slide_layout_number')}, name='{slide.get('slide_layout_name')}': {candidate_config}")
+            if candidate_config and len(candidate_config) > 0:
+                found_any = True
+                # --- original color/font SQL generation logic here ---
+                palette_colors = set()
+                block_config_colors = {}
+                block_config_fonts = {}
+                for block_type, color_dict in candidate_config.items():
+                    for color_hex, color_info in color_dict.items():
+                        color_hex_lc = normalize_color(color_hex)
+                        fill_color = color_info.get('fill')
+                        if fill_color:
+                            fill_color = normalize_color(fill_color)
+                        font_raw = color_info.get('fontFamily', 'roboto')
+                        font_norm = normalize_font_family(font_raw)
+                        if color_hex_lc not in palette_colors:
+                            color_sql_lines.append(f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES (gen_random_uuid(), '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;")
+                            palette_colors.add(color_hex_lc)
+                        if block_type not in block_config_colors:
+                            block_config_colors[block_type] = set()
+                        if color_hex_lc not in block_config_colors[block_type]:
+                            color_sql_lines.append(f"-- Ensure color {color_hex_lc} is in BlockLayoutConfig.{block_type}")
+                            color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET {block_type} = array_append({block_type}, '{color_hex_lc}') WHERE NOT ('{color_hex_lc}' = ANY({block_type}));")
+                            block_config_colors[block_type].add(color_hex_lc)
+                        if block_type not in block_config_fonts:
+                            block_config_fonts[block_type] = set()
+                        if font_norm not in block_config_fonts[block_type]:
+                            color_sql_lines.append(f"-- Ensure font {font_norm} is in BlockLayoutConfig.font")
+                            color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET font = array_append(font, '{font_norm}') WHERE NOT ('{font_norm}' = ANY(font));")
+                            block_config_fonts[block_type].add(font_norm)
+                        color_sql_lines.append(f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}') - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
+                        color_sql_lines.append(f"-- Get font index: SELECT array_position(font, '{font_norm}') - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
+        if not found_any:
+            logger.warning(f"No slideConfig found for slide {slide_layout.number} ('{slide_layout.name}') in sql_generator_input.json")
+            return '', output_dir
+        return '\n'.join(color_sql_lines), output_dir
+
+    def _parse_ids_from_sql_files(self, sql_dir):
+        """Parse BlockLayoutId and SlideLayoutId from existing generated SQL files."""
+        blocklayout_id_map = {}  # block_name -> block_layout_id
+        slidelayout_id_map = {}  # slide_name -> slide_layout_id
+        block_pattern = re.compile(r"INSERT INTO \"BlockLayout\" \(id,.*?name.*?\) VALUES \('([\w-]+)'.*?'(.*?)'\)", re.DOTALL)
+        slide_pattern = re.compile(r"INSERT INTO \"SlideLayout\" \(id,.*?name.*?\) VALUES \('([\w-]+)'.*?'(.*?)'\)", re.DOTALL)
+        for fname in os.listdir(sql_dir):
+            if not fname.endswith('.sql'):
+                continue
+            with open(os.path.join(sql_dir, fname), 'r', encoding='utf-8') as f:
+                content = f.read()
+                for m in block_pattern.finditer(content):
+                    blocklayout_id, block_name = m.groups()
+                    blocklayout_id_map[block_name] = blocklayout_id
+                for m in slide_pattern.finditer(content):
+                    slidelayout_id, slide_name = m.groups()
+                    slidelayout_id_map[slide_name] = slidelayout_id
+        return blocklayout_id_map, slidelayout_id_map
+
+    def _generate_color_font_index_sql(self, slide_layout, sql_input_data):
+        """Generate SQL for BlockLayoutConfig, BlockLayoutIndexConfig, and SlideLayoutIndexConfig, using real IDs from generated SQLs."""
+        output_config = self.config_manager.get_output_config()
+        base_output_dir = output_config['output_dir']
+        folder_name = self.config_manager.get_folder_for_slide_number(slide_layout.number)
+        output_dir = os.path.join(base_output_dir, folder_name)
+        slide_name = slide_layout.name
+        sql_dir = output_dir  # Assume block/slide SQLs are in the same folder
+        blocklayout_id_map, slidelayout_id_map = self._parse_ids_from_sql_files(sql_dir)
+        def normalize_name(name):
+            return re.sub(r'\s*z-index\s*\d+\s*$', '', name or '').strip().lower()
+        slide_layout_name_norm = normalize_name(slide_layout.name)
+        # Find all slides in sql_input_data matching this slide_layout (by number and normalized name)
+        matching_slides = []
+        for slide in sql_input_data:
+            slide_num = str(slide.get('slide_layout_number'))
+            slide_name_norm = normalize_name(slide.get('slide_layout_name'))
+            logger.debug(f"Comparing input slide_layout_number={slide_num}, name='{slide_name_norm}' to current number={slide_layout.number}, name='{slide_layout_name_norm}'")
+            if slide_num == str(slide_layout.number) and slide_name_norm == slide_layout_name_norm:
+                matching_slides.append(slide)
+        found_any = False
+        sql_lines = []
+        for slide in matching_slides:
+            candidate_config = slide.get('slideConfig', None)
+            logger.debug(f"Found candidate slideConfig for slide_layout_number={slide.get('slide_layout_number')}, name='{slide.get('slide_layout_name')}': {candidate_config}")
+            if candidate_config and len(candidate_config) > 0:
+                found_any = True
+                blocklayout_configs = {}  # (block_type, tuple(colors), tuple(fonts)) -> config_id
+                blocklayout_index_configs = set()  # (block_layout_id, config_id, color_index, font_index)
+                slidelay_index_configs = set()  # (slide_layout_id, ...)
+                for block_type, color_dict in candidate_config.items():
+                    color_array = []
+                    font_array = []
+                    color_to_index = {}
+                    font_to_index = {}
+                    for color_hex, color_info in color_dict.items():
+                        color_hex_lc = normalize_color(color_hex)
+                        if color_hex_lc not in color_to_index:
+                            color_to_index[color_hex_lc] = len(color_array)
+                            color_array.append(color_hex_lc)
+                        font_norm = normalize_font_family(color_info.get('fontFamily', 'roboto'))
+                        if font_norm not in font_to_index:
+                            font_to_index[font_norm] = len(font_array)
+                            font_array.append(font_norm)
+                    config_key = (block_type, tuple(color_array), tuple(font_array))
+                    if config_key not in blocklayout_configs:
+                        config_id = str(uuid.uuid4())
+                        blocklayout_configs[config_key] = config_id
+                        sql_lines.append(f"INSERT INTO \"BlockLayoutConfig\" (id, {block_type}, font) VALUES ('{config_id}', ARRAY{color_array}, ARRAY{font_array}) ON CONFLICT DO NOTHING;")
+                    else:
+                        config_id = blocklayout_configs[config_key]
+                    for color_hex, color_info in color_dict.items():
+                        color_hex_lc = normalize_color(color_hex)
+                        font_norm = normalize_font_family(color_info.get('fontFamily', 'roboto'))
+                        color_index = color_to_index[color_hex_lc]
+                        font_index = font_to_index[font_norm]
+                        block_name = color_info.get('blockName') or color_info.get('name') or block_type  # Try to get block name
+                        block_layout_id = blocklayout_id_map.get(block_name)
+                        if not block_layout_id:
+                            block_layout_id = str(uuid.uuid4())  # fallback
+                        blocklayout_index_key = (block_layout_id, config_id, color_index, font_index)
+                        if blocklayout_index_key not in blocklayout_index_configs:
+                            blocklayout_index_config_id = str(uuid.uuid4())
+                            blocklayout_index_configs.add(blocklayout_index_key)
+                            sql_lines.append(f"INSERT INTO \"BlockLayoutIndexConfig\" (id, blockLayoutId, indexColorId, indexFontId) VALUES ('{blocklayout_index_config_id}', '{block_layout_id}', {color_index}, {font_index});")
+                            slidelay_index_key = (slide_layout.id, blocklayout_index_config_id, config_id)
+                            if slidelay_index_key not in slidelay_index_configs:
+                                slidelay_index_config_id = str(uuid.uuid4())
+                                slidelay_index_configs.add(slidelay_index_key)
+                                slide_layout_id = slidelayout_id_map.get(slide_name, slide_layout.id)
+                                presentation_palette_id = str(uuid.uuid4())  # In real use, get or create as above
+                                sql_lines.append(f"INSERT INTO \"SlideLayoutIndexConfig\" (id, presentationPaletteId, configNumber, slideLayoutId, blockLayoutIndexConfigId, blockLayoutConfigId) VALUES ('{slidelay_index_config_id}', '{presentation_palette_id}', 0, '{slide_layout_id}', '{blocklayout_index_config_id}', '{config_id}');")
+        if not found_any:
+            logger.warning(f"No slideConfig found for slide {slide_layout.number} ('{slide_layout.name}') in sql_generator_input.json")
+            return '', output_dir
+        readable_time = datetime.now().strftime(output_config['timestamp_format'])
+        file_name = f"{slide_name}_color_font_index_{readable_time}.sql"
+        sql_file = os.path.join(output_dir, file_name)
+        with open(sql_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(sql_lines))
+        return sql_file, output_dir
+
+    def _write_color_sql_to_file(self, color_sql, output_dir, slide_layout):
+        """Write color SQL to a separate file in the color_insertion subfolder of the output folder, and log record counts."""
+        if not color_sql:
+            return None
+        # Use a subdirectory for color/font SQL
+        color_dir = os.path.join(output_dir, 'color_insertion')
+        readable_time = datetime.now().strftime(self.config_manager.get_output_config()['timestamp_format'])
+        file_name = f"{slide_layout.name}_colors_{readable_time}.sql"
+        color_sql_file = os.path.join(color_dir, file_name)
+        # Ensure the color_insertion output directory exists
+        try:
+            if not os.path.exists(color_dir):
+                logger.info(f"Creating directory for color SQL: {color_dir}")
+                os.makedirs(color_dir, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Failed to create directory {color_dir}: {e}")
+            raise
+        with open(color_sql_file, 'w', encoding='utf-8') as f:
+            f.write(color_sql)
+        logger.info(f"Color SQL successfully written to {color_sql_file}")
+        # Count records for each table
+        table_counts = {}
+        for line in color_sql.splitlines():
+            m = re.match(r'(INSERT INTO|UPDATE)\s+"?([A-Za-z0-9_]+)"?', line)
+            if m:
+                table = m.group(2)
+                table_counts[table] = table_counts.get(table, 0) + 1
+        for table, count in table_counts.items():
+            logger.info(f"Color SQL: {count} records for table {table}")
+        return color_sql_file
 
     def _collect_slide_information(self) -> SlideLayout:
         """Collect slide layout information"""
@@ -1281,21 +1490,17 @@ class SQLGenerator:
         return "\n\n".join(sql_queries)
 
     def _write_sql_to_file(self, sql, slide_layout):
-        """Write SQL to output file, with folder based on slide number"""
+        """Write SQL to output file, with folder based on slide number, in slide_insertion subdirectory."""
         output_config = self.config_manager.get_output_config()
         base_output_dir = output_config['output_dir']
-
         # Get the folder name based on slide number
         folder_name = self.config_manager.get_folder_for_slide_number(slide_layout.number)
-
-        # Create the full output directory path
-        output_dir = os.path.join(base_output_dir, folder_name)
-
+        # Create the full output directory path (slide_insertion subdir)
+        output_dir = os.path.join(base_output_dir, 'slide_insertion', folder_name)
         # Create output directory if it doesn't exist
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
             logger.info(f"Created directory: {output_dir}")
-
         # Generate filename with timestamp
         readable_time = datetime.now().strftime(output_config['timestamp_format'])
         file_name = output_config['filename_template'].format(
@@ -1303,13 +1508,17 @@ class SQLGenerator:
             timestamp=readable_time
         )
         output_file = os.path.join(output_dir, file_name)
-
         # Write SQL to file
         with open(output_file, 'w') as f:
             f.write(sql)
-
         logger.info(f"\nSQL has been generated and saved to {output_file}")
         return output_file
+
+def normalize_font_family(font_name: str) -> str:
+    return re.sub(r'[^a-z0-9_]', '', font_name.strip().lower().replace(' ', '_').replace('-', '_'))
+
+def normalize_color(color: str) -> str:
+    return color.strip().lower()
 
 def auto_generate_sql_from_figma(json_path, output_dir=None):
     """
@@ -1319,9 +1528,28 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
     import json
     from datetime import datetime
     import config
+    import os
+    import shutil
+    import logging
 
     generator = SQLGenerator(config, output_dir=output_dir)
     output_dir = output_dir or config.OUTPUT_CONFIG['output_dir']
+    # Remove output directory if it exists
+    if os.path.exists(output_dir):
+        logger.info(f"Preparing to remove existing output directory: {output_dir}")
+        # Close all file handlers for loggers to avoid PermissionError
+        loggers = [logging.getLogger(), logger]
+        for log in loggers:
+            handlers = log.handlers[:]
+            for handler in handlers:
+                logger.info(f"Closing logger handler: {handler}")
+                handler.close()
+                log.removeHandler(handler)
+        logger.info(f"All logger handlers closed. Removing directory: {output_dir}")
+        shutil.rmtree(output_dir)
+        logger.info(f"Removed output directory: {output_dir}")
+    os.makedirs(output_dir, exist_ok=True)
+    logger.info(f"Created output directory: {output_dir}")
     setup_slide_insertion_logger(output_dir)
     logger.info(f"Starting auto SQL generation from {json_path} to {output_dir}")
     def strip_zindex(name: str) -> str:
@@ -1510,25 +1738,46 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
         # Use SQLGenerator's internal methods to generate SQL and write to file
         sql = generator._generate_sql_queries(slide_layout, blocks, figure_blocks, precompiled_images)
         folder_name = generator.config_manager.get_folder_for_slide_number(slide_layout.number)
-        output_path = os.path.join(output_dir, folder_name)
-        os.makedirs(output_path, exist_ok=True)
+        # Write slide SQL to <output_dir>/<group>/slide_insertion/
+        slide_insertion_dir = os.path.join(output_dir, folder_name, 'slide_insertion')
+        os.makedirs(slide_insertion_dir, exist_ok=True)
         timestamp = datetime.now().strftime(config.OUTPUT_CONFIG['timestamp_format'])
         filename = f"{clean_slide_layout_name}_{timestamp}.sql"
-        sql_file_path = os.path.join(output_path, filename)
+        sql_file_path = os.path.join(slide_insertion_dir, filename)
         with open(sql_file_path, 'w', encoding='utf-8') as f:
             f.write(sql)
         logger.info(f"Generated SQL for slide {clean_slide_layout_name} at {sql_file_path}")
+        # --- Add color/font SQL generation in auto mode ---
+        logger.info(f"Calling color/font SQL generation for slide: name={slide_layout.name}, number={slide_layout.number}")
+        color_sql, color_folder = generator._generate_color_sql_from_sql_input(slide_layout, slides)
+        color_sql_file = generator._write_color_sql_to_file(color_sql, color_folder, slide_layout)
+        logger.info(f"Color SQL written to {color_sql_file}")
     logger.info("Auto SQL generation process completed.")
 
 def main():
     """Main entry point for interactive mode"""
-    import config
+    output_dir = config.OUTPUT_CONFIG['output_dir']
+    # Remove output directory if it exists
+    if os.path.exists(output_dir):
+        logger.info(f"Preparing to remove existing output directory: {output_dir}")
+        # Close all file handlers for loggers to avoid PermissionError
+        loggers = [logging.getLogger(), logger]
+        for log in loggers:
+            handlers = log.handlers[:]
+            for handler in handlers:
+                logger.info(f"Closing logger handler: {handler}")
+                handler.close()
+                log.removeHandler(handler)
+        logger.info(f"All logger handlers closed. Removing directory: {output_dir}")
+        shutil.rmtree(output_dir)
+        logger.info(f"Removed output directory: {output_dir}")
+    os.makedirs(output_dir, exist_ok=True)
+    logger.info(f"Created output directory: {output_dir}")
     generator = SQLGenerator(config)
     generator.run()
 
 # Extend CLI to support --auto-from-figma
 if __name__ == "__main__":
-    import argparse
     parser = argparse.ArgumentParser(description="SQL Generator for Layout and Blocks (interactive or auto mode)")
     parser.add_argument('--auto-from-figma', type=str, help='Path to sql_generator_input.json from figma.py for non-interactive SQL generation')
     parser.add_argument('--output-dir', type=str, default=None, help='Output directory for SQL files (optional, overrides config)')

@@ -331,7 +331,7 @@ RETURNING *;"""
 
 # Output configuration
 OUTPUT_CONFIG = {
-    "output_dir": "../new_standard",
+    "output_dir": "my_sql_output",
     "filename_template": "{slide_layout_name}_{timestamp}.sql",
     "timestamp_format": "%b%d_%H-%M",  # e.g., Mar10_14-23
 }
