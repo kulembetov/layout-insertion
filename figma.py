@@ -546,6 +546,8 @@ class EnhancedFigmaExtractor:
                         block_colors = {}
                         for color_group in block.get('children', []):
                             color_hex = color_group.get('name')
+                            if color_hex:
+                                color_hex = color_hex.lower()  # Ensure lowercase
                             # Build index_to_font_fill from text children
                             index_to_font_fill = {}
                             text_children_debug = []
@@ -555,6 +557,8 @@ class EnhancedFigmaExtractor:
                                     font_family = None
                                     if 'style' in text_child and 'fontFamily' in text_child['style']:
                                         font_family = text_child['style']['fontFamily']
+                                        if font_family:
+                                            font_family = font_family.lower()
                                     fill, _ = self.extract_color_from_fills(text_child)
                                     index_to_font_fill[idx] = {
                                         'fontFamily': font_family,
@@ -581,6 +585,8 @@ class EnhancedFigmaExtractor:
                             font_family = None
                             if 'style' in color_node and 'fontFamily' in color_node['style']:
                                 font_family = color_node['style']['fontFamily']
+                                if font_family:
+                                    font_family = font_family.lower()
                             if color_hex:
                                 block_colors[color_hex] = {"fill": fill_hex, "fontFamily": font_family}
                         config_dict[block_type] = block_colors
@@ -607,8 +613,12 @@ class EnhancedFigmaExtractor:
                 # Extract the index from the figure name (e.g., iconOvalOutlineRfs_3 → 3)
                 index_match = re.search(r'_(\d+)$', fig['base_name'])
                 index = index_match.group(1) if index_match else None
+                # Remove the trailing _<number> from the base_name for figureName
+                clean_figure_name = re.sub(r'_(\d+)$', '', fig['base_name'])
                 if index and index in index_to_font_fill:
                     font_family = index_to_font_fill[index]['fontFamily']
+                    if font_family:
+                        font_family = font_family.lower()
                     fill = index_to_font_fill[index]['fill']
                 else:
                     font_family = None
@@ -618,7 +628,7 @@ class EnhancedFigmaExtractor:
                 figure_obj = {
                     "fill": fill,
                     "fontFamily": font_family,
-                    "figureName": fig['base_name']
+                    "figureName": clean_figure_name  # Store without index suffix
                 }
                 figure_objects.append(figure_obj)
             new_figure_config[color_hex] = figure_objects
