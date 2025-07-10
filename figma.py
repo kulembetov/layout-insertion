@@ -482,27 +482,20 @@ class EnhancedFigmaExtractor:
             else:
                 styles = self.extract_text_styles(node, sql_type)
                 z_index = self.extract_z_index(name)
-                # If no z-index found in name, use default
                 if z_index == 0:
                     z_index = Z_INDEX_DEFAULTS.get(sql_type, Z_INDEX_DEFAULTS['default'])
                 styles['zIndex'] = z_index
-                if 'z_index' in styles:
-                    del styles['z_index']
                 color = None
-                color_variable = None
                 color_match = re.search(r'(#[0-9a-fA-F]{3,6})', name)
-                fills_color, fills_variable = self.extract_color_from_fills(node)
+                fills_color, _ = self.extract_color_from_fills(node)
                 if color_match:
                     color = color_match.group(1)
                 elif fills_color:
                     color = fills_color
                 if not color:
                     color = '#ffffff'
-                styles['color'] = color
-                if fills_variable:
-                    styles['colorVariable'] = fills_variable
-                has_corner_radius, corner_radius = self.extract_corner_radius(node)
-                # NEW: extract text content for TEXT nodes
+                has_corner_radius = False
+                corner_radius = [0, 0, 0, 0]
                 text_content = None
                 if sql_type == 'text' and node.get('type') == 'TEXT':
                     text_content = node.get('characters', None)
@@ -542,54 +535,30 @@ class EnhancedFigmaExtractor:
             if child.get('name') == 'slideColors':
                 for block in child.get('children', []):
                     block_type = block.get('name')
-                    if block_type == "figure":
-                        block_colors = {}
-                        for color_group in block.get('children', []):
-                            color_hex = color_group.get('name')
-                            if color_hex:
-                                color_hex = color_hex.lower()  # Ensure lowercase
-                            # Build index_to_font_fill from text children
-                            index_to_font_fill = {}
-                            text_children_debug = []
-                            for text_child in color_group.get('children', []):
-                                if text_child.get('type') == 'TEXT':
+                    block_colors = {}
+                    for color_group in block.get('children', []):
+                        color_hex = color_group.get('name')
+                        if color_hex:
+                            color_hex = color_hex.lower()  # Ensure lowercase
+                        block_objs = []
+                        for text_child in color_group.get('children', []):
+                            if text_child.get('type') == 'TEXT':
+                                obj = {}
+                                fill, _ = self.extract_color_from_fills(text_child)
+                                obj['fill'] = fill
+                                font_family = None
+                                if 'style' in text_child and 'fontFamily' in text_child['style']:
+                                    font_family = text_child['style']['fontFamily']
+                                    if font_family:
+                                        # Normalize to snake_case
+                                        font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
+                                obj['fontFamily'] = font_family
+                                if block_type == 'figure':
                                     idx = text_child.get('name', '').strip()
-                                    font_family = None
-                                    if 'style' in text_child and 'fontFamily' in text_child['style']:
-                                        font_family = text_child['style']['fontFamily']
-                                        if font_family:
-                                            font_family = font_family.lower()
-                                    fill, _ = self.extract_color_from_fills(text_child)
-                                    index_to_font_fill[idx] = {
-                                        'fontFamily': font_family,
-                                        'fill': fill
-                                    }
-                                    text_children_debug.append(f"TEXT child: idx='{idx}', fontFamily='{font_family}', fill='{fill}'")
-                            # Log the color group and its text children
-                            if block_logger:
-                                block_logger.info(f"[slideConfig] Color group: {color_hex}")
-                                for line in text_children_debug:
-                                    block_logger.info(f"[slideConfig]   {line}")
-                                block_logger.info(f"[slideConfig]   index_to_font_fill: {index_to_font_fill}")
-                            block_colors[color_hex] = {
-                                'index_to_font_fill': index_to_font_fill
-                            }
-                        config_dict[block_type] = block_colors
-                    else:
-                        block_colors = {}
-                        for color_node in block.get('children', []):
-                            color_hex = color_node.get('characters')
-                            if color_hex and color_hex.startswith('#'):
-                                color_hex = color_hex.lower()
-                            fill_hex, _ = self.extract_color_from_fills(color_node)
-                            font_family = None
-                            if 'style' in color_node and 'fontFamily' in color_node['style']:
-                                font_family = color_node['style']['fontFamily']
-                                if font_family:
-                                    font_family = font_family.lower()
-                            if color_hex:
-                                block_colors[color_hex] = {"fill": fill_hex, "fontFamily": font_family}
-                        config_dict[block_type] = block_colors
+                                    obj['figureName'] = idx
+                                block_objs.append(obj)
+                        block_colors[color_hex] = block_objs
+                    config_dict[block_type] = block_colors
         return config_dict
 
     def _update_figure_config_with_names(self, slide_config, blocks):
@@ -606,25 +575,28 @@ class EnhancedFigmaExtractor:
                         'block': block
                     })
         new_figure_config = {}
-        for color_hex, color_info in slide_config['figure'].items():
-            index_to_font_fill = color_info.get('index_to_font_fill', {})
+        for color_hex, obj_list in slide_config['figure'].items():
             figure_objects = []
             for fig in figure_blocks_info:
-                # Extract the index from the figure name (e.g., iconOvalOutlineRfs_3 → 3)
-                index_match = re.search(r'_(\d+)$', fig['base_name'])
-                index = index_match.group(1) if index_match else None
                 # Remove the trailing _<number> from the base_name for figureName
                 clean_figure_name = re.sub(r'_(\d+)$', '', fig['base_name'])
-                if index and index in index_to_font_fill:
-                    font_family = index_to_font_fill[index]['fontFamily']
+                # Find the matching object in obj_list by figureName
+                match_obj = None
+                for obj in obj_list:
+                    if obj.get('figureName') == fig['base_name']:
+                        match_obj = obj
+                        break
+                if match_obj:
+                    font_family = match_obj.get('fontFamily')
                     if font_family:
-                        font_family = font_family.lower()
-                    fill = index_to_font_fill[index]['fill']
+                        # Normalize to snake_case
+                        font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
+                    fill = match_obj.get('fill')
                 else:
                     font_family = None
                     fill = None
                     if block_logger:
-                        block_logger.info(f"[figureConfig] For color {color_hex}, figure '{fig['base_name']}' index '{index}' NOT FOUND in index_to_font_fill: {list(index_to_font_fill.keys())}")
+                        block_logger.info(f"[figureConfig] For color {color_hex}, figure '{fig['base_name']}' NOT FOUND in color group")
                 figure_obj = {
                     "fill": fill,
                     "fontFamily": font_family,
@@ -814,7 +786,6 @@ class EnhancedFigmaExtractor:
             'figma_type': block.figma_type,
             'sql_type': block.sql_type,
             'dimensions': block.dimensions,
-            'styles': block.styles,
             'is_target': block.is_target,
             'needs_null_styles': block.sql_type in NULL_STYLE_TYPES,
             'needs_z_index': block.sql_type in Z_INDEX_TYPES,
