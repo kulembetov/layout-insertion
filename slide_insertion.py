@@ -1063,7 +1063,8 @@ class SQLGenerator:
                             font_raw = color_info.get('fontFamily', 'roboto')
                             font_norm = normalize_font_family(font_raw)
                             if color_hex_lc not in palette_colors:
-                                color_sql_lines.append(f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES (gen_random_uuid(), '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;")
+                                palette_id = self.id_generator.generate_uuid7()
+                                color_sql_lines.append(f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES ('{palette_id}', '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;")
                                 palette_colors.add(color_hex_lc)
                             if block_type not in block_config_colors:
                                 block_config_colors[block_type] = set()
