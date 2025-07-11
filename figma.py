@@ -281,10 +281,8 @@ class EnhancedFigmaExtractor:
         return 'text', 'text'
 
     def extract_text_styles(self, node: Dict[str, Any], sql_type: str) -> Dict[str, Any]:
-        """Extract text styling information with config defaults"""
-        # Start with defaults for this block type
+        """Extract text styling information with config defaults (no color)."""
         defaults = config.DEFAULT_STYLES.get(sql_type, config.DEFAULT_STYLES['default'])
-        
         styles = {
             'textVertical': defaults['text_vertical'],
             'textHorizontal': defaults['text_horizontal'],
@@ -292,27 +290,20 @@ class EnhancedFigmaExtractor:
             'weight': defaults['weight'],
             'textTransform': defaults['text_transform']
         }
-        
-        # Override with actual Figma styles if available
         style = node.get('style', {})
         if style:
-            # Map Figma text alignment to SQL values
             text_align_vertical = style.get('textAlignVertical', '').lower()
             if text_align_vertical in ['top', 'middle', 'bottom']:
                 styles['textVertical'] = text_align_vertical
             elif text_align_vertical == 'center':
                 styles['textVertical'] = 'middle'
-            
             text_align_horizontal = style.get('textAlignHorizontal', '').lower()
             if text_align_horizontal in ['left', 'center', 'right']:
                 styles['textHorizontal'] = text_align_horizontal
-            
             if 'fontSize' in style:
                 styles['fontSize'] = round(style['fontSize'])
-            
             if 'fontWeight' in style:
                 styles['weight'] = self.normalize_font_weight(style['fontWeight'])
-        
         return styles
 
     def extract_corner_radius(self, node: Dict[str, Any]) -> Tuple[bool, List[int]]:
@@ -485,15 +476,6 @@ class EnhancedFigmaExtractor:
                 if z_index == 0:
                     z_index = Z_INDEX_DEFAULTS.get(sql_type, Z_INDEX_DEFAULTS['default'])
                 styles['zIndex'] = z_index
-                color = None
-                color_match = re.search(r'(#[0-9a-fA-F]{3,6})', name)
-                fills_color, _ = self.extract_color_from_fills(node)
-                if color_match:
-                    color = color_match.group(1)
-                elif fills_color:
-                    color = fills_color
-                if not color:
-                    color = '#ffffff'
                 has_corner_radius = False
                 corner_radius = [0, 0, 0, 0]
                 text_content = None
@@ -527,7 +509,7 @@ class EnhancedFigmaExtractor:
         return blocks
 
     def _extract_slide_config(self, slide_node):
-        """Extract slideConfig from the hidden slideColors table in the slide node, including fill and fontFamily for each color layer. For 'figure', each color group is a dict with 'index_to_font_fill' mapping index (1,2,3) to fill/fontFamily."""
+        """Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer. For 'figure', each color group is a dict with 'index_to_font_fill' mapping index (1,2,3) to color/fontFamily."""
         config_dict = {}
         if not slide_node or not slide_node.get('children'):
             return config_dict
@@ -544,14 +526,14 @@ class EnhancedFigmaExtractor:
                         for text_child in color_group.get('children', []):
                             if text_child.get('type') == 'TEXT':
                                 obj = {}
-                                fill, _ = self.extract_color_from_fills(text_child)
-                                obj['fill'] = fill
+                                color_val, _ = self.extract_color_from_fills(text_child)
+                                obj['color'] = color_val  # Use 'color' instead of 'fill'
                                 font_family = None
                                 if 'style' in text_child and 'fontFamily' in text_child['style']:
                                     font_family = text_child['style']['fontFamily']
-                                    if font_family:
-                                        # Normalize to snake_case
-                                        font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
+                                if font_family:
+                                    # Normalize to snake_case
+                                    font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
                                 obj['fontFamily'] = font_family
                                 if block_type == 'figure':
                                     idx = text_child.get('name', '').strip()
@@ -591,14 +573,14 @@ class EnhancedFigmaExtractor:
                     if font_family:
                         # Normalize to snake_case
                         font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
-                    fill = match_obj.get('fill')
+                    fill = match_obj.get('color') # Use 'color' instead of 'fill'
                 else:
                     font_family = None
                     fill = None
                     if block_logger:
                         block_logger.info(f"[figureConfig] For color {color_hex}, figure '{fig['base_name']}' NOT FOUND in color group")
                 figure_obj = {
-                    "fill": fill,
+                    "color": fill,
                     "fontFamily": font_family,
                     "figureName": clean_figure_name  # Store without index suffix
                 }
@@ -806,7 +788,7 @@ class EnhancedFigmaExtractor:
                     for figure_obj in figure_objects:
                         if figure_obj.get('figureName') == clean_name:
                             block_dict['figureName'] = clean_name
-                            block_dict['fill'] = figure_obj.get('fill')
+                            block_dict['color'] = figure_obj.get('color') # Use 'color' instead of 'fill'
                             block_dict['fontFamily'] = figure_obj.get('fontFamily')
                             break
         
@@ -920,12 +902,6 @@ class FigmaToSQLIntegrator:
             }
             for block in slide['blocks']:
                 styles = dict(block['styles']) if block.get('styles') else {}
-                # Ensure color is present in styles
-                if 'color' not in styles:
-                    if 'color' in block and block['color']:
-                        styles['color'] = block['color']
-                    else:
-                        styles['color'] = config.DEFAULT_COLOR
                 block_input = {
                     'id': block['id'],
                     'type': block['sql_type'],
@@ -1131,8 +1107,10 @@ class FigmaToSQLIntegrator:
                 
                 if not block['needs_null_styles']:
                     styles = block['styles']
-                    instructions.append(f"     - Font: {styles['fontSize']}px, weight {styles['weight']}")
-                    instructions.append(f"     - Alignment: {styles['textVertical']} / {styles['textHorizontal']}")
+                    font_size = styles.get('fontSize') or styles.get('font_size') or '-'
+                    weight = styles.get('weight') or '-'
+                    instructions.append(f"     - Font: {font_size}px, weight {weight}")
+                    instructions.append(f"     - Alignment: {styles.get('textVertical', '-') } / {styles.get('textHorizontal', '-')}")
                 
                 if block.get('corner_radius'):
                     instructions.append(f"     - Corner Radius: {block['corner_radius']}")
