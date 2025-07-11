@@ -143,6 +143,7 @@ class FilterConfig:
     require_z_index: bool = True
     min_area: int = 0
     exclude_hidden: bool = True
+    ready_to_dev_marker: Optional[str] = None  # marker for 'ready to dev' (e.g., '[ready]')
 
 @dataclass
 class ExtractedBlock:
@@ -338,28 +339,28 @@ class EnhancedFigmaExtractor:
         return has_corner_radius, corner_radius
 
     def is_target_frame(self, node: Dict[str, Any]) -> bool:
-        """Check if node is a target frame"""
+        """Check if node is a target frame, now supports 'ready to dev' marker"""
         if not node.get('absoluteBoundingBox'):
             return False
-        
+        # Check for 'ready to dev' marker if set
+        marker = getattr(self.filter_config, 'ready_to_dev_marker', None)
+        if marker:
+            name = node.get('name', '').lower()
+            if marker.lower() not in name:
+                return False
         # Check z-index requirement
         if self.filter_config.require_z_index and not self.has_z_index_in_name(node.get('name', '')):
             return False
-        
         abs_box = node['absoluteBoundingBox']
-        
         # Check dimensions
         width_match = abs(abs_box['width'] - FIGMA_CONFIG['TARGET_WIDTH']) < 1
         height_match = abs(abs_box['height'] - FIGMA_CONFIG['TARGET_HEIGHT']) < 1
-        
         if not (width_match and height_match):
             return False
-        
         # Check minimum area
         area = abs_box['width'] * abs_box['height']
         if area < self.filter_config.min_area:
             return False
-        
         return True
 
     def should_include_block(self, block: ExtractedBlock) -> bool:
@@ -446,15 +447,19 @@ class EnhancedFigmaExtractor:
 
     def collect_enhanced_blocks(self, node: Dict[str, Any], frame_origin: Dict[str, int], 
                               slide_number: int, parent_container: str) -> List[ExtractedBlock]:
-        """Collect blocks with enhanced information, including text content for TEXT nodes"""
+        """Collect blocks with enhanced information, including text content for TEXT nodes. Now supports 'ready to dev' marker."""
         blocks = []
         if not node.get('absoluteBoundingBox'):
             return blocks
-        
         # Skip hidden nodes if exclude_hidden is enabled
         if self.filter_config.exclude_hidden and node.get('visible') is False:
             return blocks
-            
+        # Check for 'ready to dev' marker if set (for blocks)
+        marker = getattr(self.filter_config, 'ready_to_dev_marker', None)
+        if marker:
+            name = node.get('name', '').lower()
+            if marker.lower() not in name:
+                return blocks
         name = node.get('name', '')
         has_z = self.has_z_index_in_name(name)
         # Only process nodes with z-index in the name
@@ -537,10 +542,12 @@ class EnhancedFigmaExtractor:
         """Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer. For 'figure', each color group is a dict with 'index_to_font_fill' mapping index (1,2,3) to color/fontFamily.
         
         Note: This method specifically processes the hidden 'slideColors' table regardless of visibility,
-        as it's intentionally hidden but contains necessary configuration data."""
+        as it's intentionally hidden but contains necessary configuration data.
+        Now also returns a set of all color hexes (presentation palette colors) found in the slideColors table."""
         config_dict = {}
+        palette_colors = set()
         if not slide_node or not slide_node.get('children'):
-            return config_dict
+            return config_dict, []
         for child in slide_node['children']:
             if child.get('name') == 'slideColors':
                 if block_logger:
@@ -554,6 +561,7 @@ class EnhancedFigmaExtractor:
                         color_hex = color_group.get('name')
                         if color_hex:
                             color_hex = color_hex.lower()  # Ensure lowercase
+                            palette_colors.add(color_hex)
                         if block_logger:
                             block_logger.info(f"[slideColors] Processing color group: {color_hex}")
                         block_objs = []
@@ -577,7 +585,7 @@ class EnhancedFigmaExtractor:
                                 block_objs.append(obj)
                         block_colors[color_hex] = block_objs
                     config_dict[block_type] = block_colors
-        return config_dict
+        return config_dict, sorted(palette_colors)
 
     def _update_figure_config_with_names(self, slide_config, blocks):
         import re
@@ -799,12 +807,12 @@ class EnhancedFigmaExtractor:
             sentence_count = n
         if sentence_count == 0:
             sentence_count = 1
-        # Extract slideConfig if available
+        # Extract slideConfig and palette colors if available
         slide_config = {}
+        presentation_palette_colors = []
         figma_node = getattr(slide, '_figma_node', None)
         if figma_node:
-            slide_config = self._extract_slide_config(figma_node)
-            
+            slide_config, presentation_palette_colors = self._extract_slide_config(figma_node)
             # Build mapping from figure numbers to actual figure names and update slideConfig
             if 'figure' in slide_config:
                 self._update_figure_config_with_names(slide_config, slide.blocks)
@@ -819,7 +827,8 @@ class EnhancedFigmaExtractor:
             'folder_name': config.SLIDE_NUMBER_TO_FOLDER.get(slide.number, 'other'),
             'blocks': [self._block_to_dict(block, slide_config) for block in slide.blocks],
             'block_count': len(slide.blocks),
-            'slideConfig': slide_config
+            'slideConfig': slide_config,
+            'presentationPaletteColors': presentation_palette_colors
         }
 
     def _block_to_dict(self, block: ExtractedBlock, slide_config=None) -> Dict[str, Any]:
@@ -975,7 +984,7 @@ class FigmaToSQLIntegrator:
         return extractor.extract_data()
     
     def prepare_sql_generator_input(self, figma_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Convert Figma data to format suitable for SQL Generator with config compatibility. Now includes slideConfig for each slide."""
+        """Convert Figma data to format suitable for SQL Generator with config compatibility. Now includes slideConfig and presentationPaletteColors for each slide."""
         sql_input = []
         for slide in figma_data.get('slides', []):
             is_last = slide['slide_number'] == -1
@@ -995,8 +1004,9 @@ class FigmaToSQLIntegrator:
                     'default_color': config.DEFAULT_COLOR,
                     'color_settings_id': config.DEFAULT_COLOR_SETTINGS_ID
                 },
-                # Add slideConfig from the Figma slide if present
-                'slideConfig': slide.get('slideConfig', {})
+                # Add slideConfig and presentationPaletteColors from the Figma slide if present
+                'slideConfig': slide.get('slideConfig', {}),
+                'presentationPaletteColors': slide.get('presentationPaletteColors', [])
             }
             for block in slide['blocks']:
                 styles = dict(block['styles']) if block.get('styles') else {}
