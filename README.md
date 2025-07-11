@@ -62,15 +62,18 @@ All these tables are created and maintained in your company's presentation datab
 
 ```bash
 # 1. Extract from Figma
-py figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+py figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
 
 # 2. Generate SQL
 py slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
-# 3. Validate SQL
+# 3. Insert into PresentationPalette
+py insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
+# 4. Validate SQL
 py sql_validator.py --input-dir my_sql_output
 
-# 4. Apply SQL to DB
+# 5. Apply SQL to DB
 py sql_pollution.py --input-dir my_sql_output --db-config database.ini
 ```
 
