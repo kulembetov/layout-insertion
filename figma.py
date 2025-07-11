@@ -229,8 +229,12 @@ class EnhancedFigmaExtractor:
         # Remove z-index suffix for cleaner pattern matching
         clean_name = re.sub(r'\s*z-index.*$', '', name)
         
-        # Check for explicit mappings first
-        for pattern, sql_type in config.FIGMA_TO_SQL_BLOCK_MAPPING.items():
+        # Check for explicit mappings first, but prioritize longer/more specific patterns
+        # Sort patterns by length (descending) to match more specific patterns first
+        sorted_patterns = sorted(config.FIGMA_TO_SQL_BLOCK_MAPPING.items(), 
+                               key=lambda x: len(x[0]), reverse=True)
+        
+        for pattern, sql_type in sorted_patterns:
             if pattern in clean_name:
                 print(f"Detected '{sql_type}' from pattern '{pattern}' in name '{clean_name}'")
                 return pattern, sql_type
@@ -257,12 +261,18 @@ class EnhancedFigmaExtractor:
             return 'text', 'text'
             
         elif node_type == 'RECTANGLE':
+            # Priority order: background > icon > image > figure
+            # This ensures "image_bottom background" is detected as background, not image
             if any(keyword in clean_name for keyword in ['background', 'bg', 'backdrop']):
+                print(f"Detected 'background' from heuristic keywords in '{clean_name}'")
                 return 'background', 'background'
-            elif any(keyword in clean_name for keyword in ['image', 'img', 'photo', 'picture']):
-                return 'image', 'image'
             elif any(keyword in clean_name for keyword in ['icon', 'symbol']):
+                print(f"Detected 'icon' from heuristic keywords in '{clean_name}'")
                 return 'icon', 'icon'
+            elif any(keyword in clean_name for keyword in ['image', 'img', 'photo', 'picture']):
+                print(f"Detected 'image' from heuristic keywords in '{clean_name}'")
+                return 'image', 'image'
+            print(f"Defaulting to 'figure' for RECTANGLE: '{clean_name}'")
             return 'figure', 'figure'
             
         elif node_type in ['FRAME', 'GROUP']:
@@ -277,7 +287,7 @@ class EnhancedFigmaExtractor:
             return 'figure', 'figure'
         
         # Default fallback
-        print(f"Using default 'text' type for node: {name} (type: {node_type})")
+        print(f"Using default 'text' type for node: {name} (type: {node_type}, clean_name: {clean_name})")
         return 'text', 'text'
 
     def extract_text_styles(self, node: Dict[str, Any], sql_type: str) -> Dict[str, Any]:
@@ -440,6 +450,11 @@ class EnhancedFigmaExtractor:
         blocks = []
         if not node.get('absoluteBoundingBox'):
             return blocks
+        
+        # Skip hidden nodes if exclude_hidden is enabled
+        if self.filter_config.exclude_hidden and node.get('visible') is False:
+            return blocks
+            
         name = node.get('name', '')
         has_z = self.has_z_index_in_name(name)
         # Only process nodes with z-index in the name
@@ -458,18 +473,19 @@ class EnhancedFigmaExtractor:
                 'w': self.round_to_nearest_five(abs_box['width']),
                 'h': self.round_to_nearest_five(abs_box['height'])
             }
-            # Skip full-slide background or image unless 'precompiled' is in the name
+            # Skip full-slide images unless 'precompiled' is in the name, but always include background blocks
             name_lower = name.lower()
             is_precompiled = 'precompiled' in name_lower
-            if (
-                sql_type in ['image', 'background'] and
+            should_skip = (
+                sql_type == 'image' and  # Only skip images, not backgrounds
                 dimensions['x'] == 0 and
                 dimensions['y'] == 0 and
                 dimensions['w'] == 1200 and
                 dimensions['h'] == 675 and
                 not is_precompiled
-            ):
-                print(f"Skipping {sql_type} block {name} (full background/image 1200x675)")
+            )
+            if should_skip:
+                print(f"Skipping {sql_type} block {name} (full image 1200x675)")
             else:
                 styles = self.extract_text_styles(node, sql_type)
                 z_index = self.extract_z_index(name)
@@ -481,6 +497,12 @@ class EnhancedFigmaExtractor:
                 text_content = None
                 if sql_type == 'text' and node.get('type') == 'TEXT':
                     text_content = node.get('characters', None)
+                
+                # Extract color information for background and other relevant blocks
+                node_color = None
+                if sql_type in ['background', 'figure', 'image']:
+                    node_color, _ = self.extract_color_from_fills(node)
+                
                 block = ExtractedBlock(
                     id=node['id'],
                     figma_type=figma_type,
@@ -495,33 +517,45 @@ class EnhancedFigmaExtractor:
                     corner_radius=corner_radius,
                     text_content=text_content  # Pass text content
                 )
+                # Store the extracted color for later use
+                block.node_color = node_color
                 if self.should_include_block(block):
                     blocks.append(block)
                     print(f"Added {sql_type} block: {name}")
                     # Log block details
+                    color_info = f" | Color: {node_color}" if node_color else ""
                     block_logger.info(
-                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}"
+                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{color_info}"
                     )
-        # Recursively process children
-        if node.get('children'):
+        # Recursively process children (skip children of hidden nodes)
+        if node.get('children') and not (self.filter_config.exclude_hidden and node.get('visible') is False):
             for child in node['children']:
                 blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
         return blocks
 
     def _extract_slide_config(self, slide_node):
-        """Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer. For 'figure', each color group is a dict with 'index_to_font_fill' mapping index (1,2,3) to color/fontFamily."""
+        """Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer. For 'figure', each color group is a dict with 'index_to_font_fill' mapping index (1,2,3) to color/fontFamily.
+        
+        Note: This method specifically processes the hidden 'slideColors' table regardless of visibility,
+        as it's intentionally hidden but contains necessary configuration data."""
         config_dict = {}
         if not slide_node or not slide_node.get('children'):
             return config_dict
         for child in slide_node['children']:
             if child.get('name') == 'slideColors':
+                if block_logger:
+                    block_logger.info(f"[slideColors] Found slideColors table in slide")
                 for block in child.get('children', []):
                     block_type = block.get('name')
+                    if block_logger:
+                        block_logger.info(f"[slideColors] Processing block type: {block_type}")
                     block_colors = {}
                     for color_group in block.get('children', []):
                         color_hex = color_group.get('name')
                         if color_hex:
                             color_hex = color_hex.lower()  # Ensure lowercase
+                        if block_logger:
+                            block_logger.info(f"[slideColors] Processing color group: {color_hex}")
                         block_objs = []
                         for text_child in color_group.get('children', []):
                             if text_child.get('type') == 'TEXT':
@@ -538,6 +572,8 @@ class EnhancedFigmaExtractor:
                                 if block_type == 'figure':
                                     idx = text_child.get('name', '').strip()
                                     obj['figureName'] = idx
+                                    if block_logger:
+                                        block_logger.info(f"[slideColors] Found figure in {color_hex}: name='{idx}', color={color_val}, font={font_family}")
                                 block_objs.append(obj)
                         block_colors[color_hex] = block_objs
                     config_dict[block_type] = block_colors
@@ -556,37 +592,62 @@ class EnhancedFigmaExtractor:
                         'base_name': base_name,
                         'block': block
                     })
+                    if block_logger:
+                        block_logger.info(f"[figureBlocks] Found figure block: '{block.name}' -> base_name: '{base_name}'")
         new_figure_config = {}
         for color_hex, obj_list in slide_config['figure'].items():
             figure_objects = []
             for fig in figure_blocks_info:
-                # Remove the trailing _<number> from the base_name for figureName
-                clean_figure_name = re.sub(r'_(\d+)$', '', fig['base_name'])
-                # Find the matching object in obj_list by figureName
+                # Extract index from figure name (e.g., "iconOvalOutlineRfs_2" -> "2")
+                base_name = fig['base_name']
+                clean_figure_name = re.sub(r'_(\d+)$', '', base_name)  # Remove suffix for storage
+                index_match = re.search(r'_(\d+)$', base_name)
+                
+                # Find the matching object by index in slideColors
                 match_obj = None
-                for obj in obj_list:
-                    if obj.get('figureName') == fig['base_name']:
-                        match_obj = obj
-                        break
-                if match_obj:
-                    font_family = match_obj.get('fontFamily')
-                    if font_family:
-                        # Normalize to snake_case
-                        font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
-                    fill = match_obj.get('color') # Use 'color' instead of 'fill'
+                if index_match:
+                    figure_index = index_match.group(1)  # Extract "2" from "iconOvalOutlineRfs_2"
+                    for obj in obj_list:
+                        if obj.get('figureName') == figure_index:  # Look for "2" in slideColors
+                            match_obj = obj
+                            break
+                    
+                    if match_obj:
+                        font_family = match_obj.get('fontFamily')
+                        if font_family:
+                            # Normalize to snake_case
+                            font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
+                        fill = match_obj.get('color')
+                        if block_logger:
+                            block_logger.info(f"[figureConfig] MATCHED: color {color_hex}, figure '{base_name}' using index '{figure_index}' -> color: {fill}, font: {font_family}")
+                    else:
+                        font_family = None
+                        fill = None
+                        if block_logger:
+                            available_indices = [obj.get('figureName', 'UNNAMED') for obj in obj_list]
+                            block_logger.info(f"[figureConfig] NOT FOUND: color {color_hex}, figure '{base_name}' looking for index '{figure_index}' in slideColors, available: {available_indices}")
                 else:
+                    # No index found in figure name
                     font_family = None
                     fill = None
                     if block_logger:
-                        block_logger.info(f"[figureConfig] For color {color_hex}, figure '{fig['base_name']}' NOT FOUND in color group")
+                        block_logger.info(f"[figureConfig] NO INDEX: figure '{base_name}' has no index suffix")
+                
                 figure_obj = {
                     "color": fill,
                     "fontFamily": font_family,
-                    "figureName": clean_figure_name  # Store without index suffix
+                    "figureName": clean_figure_name  # Store base name without suffix
                 }
                 figure_objects.append(figure_obj)
             new_figure_config[color_hex] = figure_objects
         slide_config['figure'] = new_figure_config
+        
+        # Summary logging
+        if block_logger:
+            block_logger.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_info)} figure blocks")
+            for fig_info in figure_blocks_info:
+                clean_name = re.sub(r'_(\d+)$', '', fig_info['base_name'])
+                block_logger.info(f"[figureConfig] Block '{fig_info['base_name']}' -> looking for '{clean_name}' in slideColors")
 
     def traverse_and_extract(self, node: Dict[str, Any], parent_name: str = "") -> List[ExtractedSlide]:
         """Enhanced traversal with filtering"""
@@ -774,23 +835,60 @@ class EnhancedFigmaExtractor:
             'corner_radius': block.corner_radius if block.corner_radius is not None else None,
         }
         
-        # Handle figure blocks with color extraction from slideConfig
-        if block.sql_type == 'figure' and slide_config and 'figure' in slide_config:
-            # Extract clean name from block name (e.g., "figure (iconOvalOutlineRfs) z-index 2" -> "iconOvalOutlineRfs")
+        # Handle background blocks with color extraction
+        if block.sql_type == 'background':
+            # First try to get color from slideConfig, then fallback to node color
+            color_found = False
+            if slide_config and 'background' in slide_config:
+                for color_hex, background_objects in slide_config['background'].items():
+                    if background_objects:  # If there are objects for this color
+                        background_obj = background_objects[0]  # Take the first (should be only one for background)
+                        block_dict['color'] = background_obj.get('color')
+                        block_dict['fontFamily'] = background_obj.get('fontFamily')
+                        color_found = True
+                        break  # Use the first color found
+            
+            # Fallback to direct node color extraction if not found in slideConfig
+            if not color_found and hasattr(block, 'node_color') and block.node_color:
+                block_dict['color'] = block.node_color
+        
+        # Handle figure blocks with color extraction - prioritize direct node color
+        elif block.sql_type == 'figure':
             import re
+            clean_name = block.name  # Default to full block name
             name_match = re.search(r'\(([^)]+)\)', block.name)
             if name_match:
                 clean_name = name_match.group(1)
-                
-                # Look through all color groups in the figure config to find this figure
-                for color_hex, figure_objects in slide_config['figure'].items():
-                    # Check if this figure is in this color group's array
-                    for figure_obj in figure_objects:
-                        if figure_obj.get('figureName') == clean_name:
-                            block_dict['figureName'] = clean_name
-                            block_dict['color'] = figure_obj.get('color') # Use 'color' instead of 'fill'
-                            block_dict['fontFamily'] = figure_obj.get('fontFamily')
+                block_dict['figureName'] = clean_name
+            
+            # Primary: Use direct node color extraction
+            if hasattr(block, 'node_color') and block.node_color:
+                block_dict['color'] = block.node_color
+                if block_logger:
+                    block_logger.info(f"[figureColor] Using direct node color for '{clean_name}': {block.node_color}")
+            
+            # Secondary: Try slideConfig (though it seems to only contain indices)
+            elif slide_config and 'figure' in slide_config and name_match:
+                # Extract figure index from name (e.g., "iconOvalOutlineRfs_2" -> "2")
+                index_match = re.search(r'_(\d+)$', clean_name)
+                if index_match:
+                    figure_index = index_match.group(1)
+                    
+                    # Look for this index in slideColors
+                    for color_hex, figure_objects in slide_config['figure'].items():
+                        for figure_obj in figure_objects:
+                            if figure_obj.get('figureName') == figure_index:
+                                block_dict['color'] = figure_obj.get('color')
+                                block_dict['fontFamily'] = figure_obj.get('fontFamily')
+                                if block_logger:
+                                    block_logger.info(f"[figureColor] Using slideConfig index match for '{clean_name}' index '{figure_index}': color={figure_obj.get('color')}")
+                                break
+                        if 'color' in block_dict:
                             break
+        
+        # Handle image blocks with color extraction
+        elif block.sql_type == 'image' and hasattr(block, 'node_color') and block.node_color:
+            block_dict['color'] = block.node_color
         
         return block_dict
 

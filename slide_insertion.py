@@ -1014,8 +1014,6 @@ class SQLGenerator:
         sql = self._generate_sql_queries(slide_layout, blocks, figure_blocks, precompiled_image_blocks)
         # Write SQL to file
         output_file = self._write_sql_to_file(sql, slide_layout)
-        # Write color SQL to a separate file in the same folder
-        color_sql_file = self._write_color_sql_to_file(color_sql, color_folder, slide_layout)
         logger.info(f"SQL written to {output_file}")
         logger.info(f"Color SQL written to {color_sql_file}")
         logger.info("SQL generation process completed.")
@@ -1048,40 +1046,41 @@ class SQLGenerator:
             logger.debug(f"Found candidate slideConfig for slide_layout_number={slide.get('slide_layout_number')}, name='{slide.get('slide_layout_name')}': {candidate_config}")
             if candidate_config and len(candidate_config) > 0:
                 found_any = True
-                # --- original color/font SQL generation logic here ---
+                # --- updated color/font SQL generation logic for new structure ---
                 palette_colors = set()
                 block_config_colors = {}
                 block_config_fonts = {}
                 for block_type, color_dict in candidate_config.items():
-                    for color_hex, color_info in color_dict.items():
-                        # Fix: Ensure color_info is a dict before using .get()
-                        if isinstance(color_info, dict):
-                            color_hex_lc = normalize_color(color_hex)
-                            fill_color = color_info.get('fill')
+                    for color_hex, obj_list in color_dict.items():
+                        color_hex_lc = normalize_color(color_hex)
+                        # For each object in the list, extract fill and fontFamily
+                        for obj in obj_list:
+                            fill_color = obj.get('fill')
                             if fill_color:
                                 fill_color = normalize_color(fill_color)
-                            font_raw = color_info.get('fontFamily', 'roboto')
+                            font_raw = obj.get('fontFamily', 'roboto')
                             font_norm = normalize_font_family(font_raw)
+                            # Insert color into PresentationPalette
                             if color_hex_lc not in palette_colors:
                                 palette_id = self.id_generator.generate_uuid7()
                                 color_sql_lines.append(f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES ('{palette_id}', '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;")
                                 palette_colors.add(color_hex_lc)
+                            # Insert color into BlockLayoutConfig for this block type
                             if block_type not in block_config_colors:
                                 block_config_colors[block_type] = set()
                             if color_hex_lc not in block_config_colors[block_type]:
                                 color_sql_lines.append(f"-- Ensure color {color_hex_lc} is in BlockLayoutConfig.{block_type}")
-                                color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET {block_type} = array_append({block_type}, '{color_hex_lc}') WHERE NOT ('{color_hex_lc}' = ANY({block_type}));")
+                                color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET {block_type} = array_append({block_type}, '{color_hex_lc}'::text) WHERE NOT ('{color_hex_lc}'::text = ANY({block_type}));")
                                 block_config_colors[block_type].add(color_hex_lc)
+                            # Insert font into BlockLayoutConfig.font
                             if block_type not in block_config_fonts:
                                 block_config_fonts[block_type] = set()
                             if font_norm not in block_config_fonts[block_type]:
                                 color_sql_lines.append(f"-- Ensure font {font_norm} is in BlockLayoutConfig.font")
-                                color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET font = array_append(font, '{font_norm}') WHERE NOT ('{font_norm}' = ANY(font));")
+                                color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET font = array_append(font, '{font_norm}'::\"FontFamilyType\") WHERE NOT ('{font_norm}'::\"FontFamilyType\" = ANY(font));")
                                 block_config_fonts[block_type].add(font_norm)
-                            color_sql_lines.append(f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}') - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
-                            color_sql_lines.append(f"-- Get font index: SELECT array_position(font, '{font_norm}') - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
-                        else:
-                            logger.warning(f"color_info for block_type={block_type}, color_hex={color_hex} is not a dict: {color_info}")
+                            color_sql_lines.append(f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}'::text) - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
+                            color_sql_lines.append(f"-- Get font index: SELECT array_position(font, '{font_norm}'::\"FontFamilyType\") - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
         if not found_any:
             logger.warning(f"No slideConfig found for slide {slide_layout.number} ('{slide_layout.name}') in sql_generator_input.json")
             return '', output_dir
@@ -1141,15 +1140,17 @@ class SQLGenerator:
                     font_array = []
                     color_to_index = {}
                     font_to_index = {}
-                    for color_hex, color_info in color_dict.items():
+                    # Collect all unique colors and fonts from the list of objects
+                    for color_hex, obj_list in color_dict.items():
                         color_hex_lc = normalize_color(color_hex)
                         if color_hex_lc not in color_to_index:
                             color_to_index[color_hex_lc] = len(color_array)
                             color_array.append(color_hex_lc)
-                        font_norm = normalize_font_family(color_info.get('fontFamily', 'roboto'))
-                        if font_norm not in font_to_index:
-                            font_to_index[font_norm] = len(font_array)
-                            font_array.append(font_norm)
+                        for obj in obj_list:
+                            font_norm = normalize_font_family(obj.get('fontFamily', 'roboto'))
+                            if font_norm not in font_to_index:
+                                font_to_index[font_norm] = len(font_array)
+                                font_array.append(font_norm)
                     config_key = (block_type, tuple(color_array), tuple(font_array))
                     if config_key not in blocklayout_configs:
                         config_id = str(uuid.uuid4())
@@ -1157,27 +1158,28 @@ class SQLGenerator:
                         sql_lines.append(f"INSERT INTO \"BlockLayoutConfig\" (id, {block_type}, font) VALUES ('{config_id}', ARRAY{color_array}, ARRAY{font_array}) ON CONFLICT DO NOTHING;")
                     else:
                         config_id = blocklayout_configs[config_key]
-                    for color_hex, color_info in color_dict.items():
+                    for color_hex, obj_list in color_dict.items():
                         color_hex_lc = normalize_color(color_hex)
-                        font_norm = normalize_font_family(color_info.get('fontFamily', 'roboto'))
-                        color_index = color_to_index[color_hex_lc]
-                        font_index = font_to_index[font_norm]
-                        block_name = color_info.get('blockName') or color_info.get('name') or block_type  # Try to get block name
-                        block_layout_id = blocklayout_id_map.get(block_name)
-                        if not block_layout_id:
-                            block_layout_id = str(uuid.uuid4())  # fallback
-                        blocklayout_index_key = (block_layout_id, config_id, color_index, font_index)
-                        if blocklayout_index_key not in blocklayout_index_configs:
-                            blocklayout_index_config_id = str(uuid.uuid4())
-                            blocklayout_index_configs.add(blocklayout_index_key)
-                            sql_lines.append(f"INSERT INTO \"BlockLayoutIndexConfig\" (id, blockLayoutId, indexColorId, indexFontId) VALUES ('{blocklayout_index_config_id}', '{block_layout_id}', {color_index}, {font_index});")
-                            slidelay_index_key = (slide_layout.id, blocklayout_index_config_id, config_id)
-                            if slidelay_index_key not in slidelay_index_configs:
-                                slidelay_index_config_id = str(uuid.uuid4())
-                                slidelay_index_configs.add(slidelay_index_key)
-                                slide_layout_id = slidelayout_id_map.get(slide_name, slide_layout.id)
-                                presentation_palette_id = str(uuid.uuid4())  # In real use, get or create as above
-                                sql_lines.append(f"INSERT INTO \"SlideLayoutIndexConfig\" (id, presentationPaletteId, configNumber, slideLayoutId, blockLayoutIndexConfigId, blockLayoutConfigId) VALUES ('{slidelay_index_config_id}', '{presentation_palette_id}', 0, '{slide_layout_id}', '{blocklayout_index_config_id}', '{config_id}');")
+                        for obj in obj_list:
+                            font_norm = normalize_font_family(obj.get('fontFamily', 'roboto'))
+                            color_index = color_to_index[color_hex_lc]
+                            font_index = font_to_index[font_norm]
+                            block_name = obj.get('blockName') or obj.get('name') or block_type  # Try to get block name
+                            block_layout_id = blocklayout_id_map.get(block_name)
+                            if not block_layout_id:
+                                block_layout_id = str(uuid.uuid4())  # fallback
+                            blocklayout_index_key = (block_layout_id, config_id, color_index, font_index)
+                            if blocklayout_index_key not in blocklayout_index_configs:
+                                blocklayout_index_config_id = str(uuid.uuid4())
+                                blocklayout_index_configs.add(blocklayout_index_key)
+                                sql_lines.append(f"INSERT INTO \"BlockLayoutIndexConfig\" (id, blockLayoutId, indexColorId, indexFontId) VALUES ('{blocklayout_index_config_id}', '{block_layout_id}', {color_index}, {font_index});")
+                                slidelay_index_key = (slide_layout.id, blocklayout_index_config_id, config_id)
+                                if slidelay_index_key not in slidelay_index_configs:
+                                    slidelay_index_config_id = str(uuid.uuid4())
+                                    slidelay_index_configs.add(slidelay_index_key)
+                                    slide_layout_id = slidelayout_id_map.get(slide_name, slide_layout.id)
+                                    presentation_palette_id = str(uuid.uuid4())  # In real use, get or create as above
+                                    sql_lines.append(f"INSERT INTO \"SlideLayoutIndexConfig\" (id, presentationPaletteId, configNumber, slideLayoutId, blockLayoutIndexConfigId, blockLayoutConfigId) VALUES ('{slidelay_index_config_id}', '{presentation_palette_id}', 0, '{slide_layout_id}', '{blocklayout_index_config_id}', '{config_id}');")
         if not found_any:
             logger.warning(f"No slideConfig found for slide {slide_layout.number} ('{slide_layout.name}') in sql_generator_input.json")
             return '', output_dir
@@ -1187,37 +1189,6 @@ class SQLGenerator:
         with open(sql_file, 'w', encoding='utf-8') as f:
             f.write('\n'.join(sql_lines))
         return sql_file, output_dir
-
-    def _write_color_sql_to_file(self, color_sql, output_dir, slide_layout):
-        """Write color SQL to a separate file in the color_insertion subfolder of the output folder, and log record counts."""
-        if not color_sql:
-            return None
-        # Use a subdirectory for color/font SQL
-        color_dir = os.path.join(output_dir, 'color_insertion')
-        readable_time = datetime.now().strftime(self.config_manager.get_output_config()['timestamp_format'])
-        file_name = f"{slide_layout.name}_colors_{readable_time}.sql"
-        color_sql_file = os.path.join(color_dir, file_name)
-        # Ensure the color_insertion output directory exists
-        try:
-            if not os.path.exists(color_dir):
-                logger.info(f"Creating directory for color SQL: {color_dir}")
-                os.makedirs(color_dir, exist_ok=True)
-        except Exception as e:
-            logger.error(f"Failed to create directory {color_dir}: {e}")
-            raise
-        with open(color_sql_file, 'w', encoding='utf-8') as f:
-            f.write(color_sql)
-        logger.info(f"Color SQL successfully written to {color_sql_file}")
-        # Count records for each table
-        table_counts = {}
-        for line in color_sql.splitlines():
-            m = re.match(r'(INSERT INTO|UPDATE)\s+"?([A-Za-z0-9_]+)"?', line)
-            if m:
-                table = m.group(2)
-                table_counts[table] = table_counts.get(table, 0) + 1
-        for table, count in table_counts.items():
-            logger.info(f"Color SQL: {count} records for table {table}")
-        return color_sql_file
 
     def _collect_slide_information(self) -> SlideLayout:
         """Collect slide layout information"""
@@ -1520,6 +1491,8 @@ class SQLGenerator:
         return output_file
 
 def normalize_font_family(font_name: str) -> str:
+    if not font_name:
+        return 'roboto'
     return re.sub(r'[^a-z0-9_]', '', font_name.strip().lower().replace(' ', '_').replace('-', '_'))
 
 def normalize_color(color: str) -> str:
@@ -1676,35 +1649,11 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
             logger.info(f"Block: type={block_obj.type}, name={block_obj.name}, dimensions={block_obj.dimensions}, styles={block_obj.styles}")
         # Ensure a background block is present
         has_background = any(b.type == 'background' for b in blocks)
-        if not has_background:
-            bg_config = config.AUTO_BLOCKS['background']
-            bg_styles = {
-                "textVertical": None,
-                "textHorizontal": None,
-                "fontSize": None,
-                "weight": None,
-                "zIndex": bg_config['z_index'],
-                "textTransform": None,
-                "color": bg_config['color']
-            }
-            bg_block = Block(
-                id=generator.id_generator.generate_uuid7(),
-                type='background',
-                dimensions=bg_config['dimensions'],
-                styles=bg_styles,
-                needs_null_styles=True,
-                needs_z_index=True,
-                is_figure=False,
-                is_background=True,
-                is_precompiled_image=False,
-                color=None,
-                figure_info=None,
-                precompiled_image_info=None,
-                border_radius=[0, 0, 0, 0],
-                name="background"
-            )
-            blocks.insert(0, bg_block)
-            logger.info(f"Automatically added background block: {bg_block}")
+        logger.info(f"Background block present from Figma: {has_background}")
+        if has_background:
+            logger.info("Using background block(s) extracted from Figma with original colors")
+        else:
+            logger.info("No background block found in Figma extraction - slide will use default background handling")
         # Add watermark block if specified in config
         add_watermark = False
         if hasattr(config, 'WATERMARK_SLIDES'):
@@ -1754,9 +1703,6 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
         logger.info(f"Generated SQL for slide {clean_slide_layout_name} at {sql_file_path}")
         # --- Add color/font SQL generation in auto mode ---
         logger.info(f"Calling color/font SQL generation for slide: name={slide_layout.name}, number={slide_layout.number}")
-        color_sql, color_folder = generator._generate_color_sql_from_sql_input(slide_layout, slides)
-        color_sql_file = generator._write_color_sql_to_file(color_sql, color_folder, slide_layout)
-        logger.info(f"Color SQL written to {color_sql_file}")
     logger.info("Auto SQL generation process completed.")
 
 def main():
