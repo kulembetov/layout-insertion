@@ -1531,8 +1531,11 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
     setup_slide_insertion_logger(output_dir)
     logger.info(f"Starting auto SQL generation from {json_path} to {output_dir}")
     def strip_zindex(name: str) -> str:
-        # Remove ' z-index N' (case-insensitive, with or without leading/trailing spaces)
-        return re.sub(r'\s*z-index\s*\d+\s*$', '', name, flags=re.IGNORECASE)
+        # Remove 'background_N' and ' z-index N' (case-insensitive, with or without leading/trailing spaces)
+        name = re.sub(r'\s*background_\d+\s*', ' ', name, flags=re.IGNORECASE)
+        name = re.sub(r'\s*z-index\s*\d+\s*$', '', name, flags=re.IGNORECASE)
+        # Clean up any extra spaces
+        return name.strip()
     color_pattern = re.compile(r'(#[0-9a-fA-F]{3,6})')
     precompiled_image_pattern = re.compile(r'^image precompiled ([^\s]+) z-index \d+ (#[0-9a-fA-F]{3,6})$', re.IGNORECASE)
     with open(json_path, 'r', encoding='utf-8') as f:

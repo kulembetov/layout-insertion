@@ -68,12 +68,24 @@ py figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-
 py slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 3. Insert into PresentationPalette
-py insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+# manual mode
+python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+# auto mode
+python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
-# 4. Validate SQL
+# 4. Insert into BlockLayoutConfig
+# manual mode
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# auto mode
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
+# 5. Match BlockLayoutConfig with PresentationPalette
+python match_block_layout_presentation_palette.py
+
+# 6. Validate SQL
 py sql_validator.py --input-dir my_sql_output
 
-# 5. Apply SQL to DB
+# 7. Apply SQL to DB
 py sql_pollution.py --input-dir my_sql_output --db-config database.ini
 ```
 
