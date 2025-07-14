@@ -303,11 +303,13 @@ class EnhancedFigmaExtractor:
         }
         style = node.get('style', {})
         if style:
+            # Prefer Figma's actual values if present
             text_align_vertical = style.get('textAlignVertical', '').lower()
             if text_align_vertical in ['top', 'middle', 'bottom']:
                 styles['textVertical'] = text_align_vertical
             elif text_align_vertical == 'center':
                 styles['textVertical'] = 'middle'
+            # Figma's textAlignHorizontal: 'LEFT', 'CENTER', 'RIGHT' (case-insensitive)
             text_align_horizontal = style.get('textAlignHorizontal', '').lower()
             if text_align_horizontal in ['left', 'center', 'right']:
                 styles['textHorizontal'] = text_align_horizontal
@@ -838,6 +840,7 @@ class EnhancedFigmaExtractor:
             'figma_type': block.figma_type,
             'sql_type': block.sql_type,
             'dimensions': block.dimensions,
+            'styles': block.styles,  # <-- Add styles at the top level
             'is_target': block.is_target,
             'needs_null_styles': block.sql_type in NULL_STYLE_TYPES,
             'needs_z_index': block.sql_type in Z_INDEX_TYPES,

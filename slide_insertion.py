@@ -745,11 +745,14 @@ class FigureCommand(SQLCommand):
         )
 
     def _format_figure_values(self) -> str:
-        """Format the values for Figure SQL"""
+        """Format the values for Figure SQL, omitting trailing _<digits> from the name"""
         values = []
         for figure in self.figure_blocks:
             figure_id = self.id_generator.generate_uuid7()
-            values.append(f"    ('{figure_id}', '{figure['block_id']}', '{figure['name']}')")
+            # Remove trailing _<digits> from the name
+            name = figure['name']
+            name = re.sub(r'_\d+$', '', name)
+            values.append(f"    ('{figure_id}', '{figure['block_id']}', '{name}')")
         return ",\n".join(values)
 
 
