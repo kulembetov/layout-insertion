@@ -5,8 +5,31 @@ import csv
 import ast
 from typing import Dict, List, Tuple, Optional
 import glob
-import uuid
 import shutil
+# --- UUIDv7 generator from slide_insertion.py ---
+import time
+import uuid
+
+def generate_uuid7() -> str:
+    """
+    Generate a UUID version 7 (time-ordered UUID)
+    Implementation based on the draft RFC for UUID v7 - time-ordered
+    """
+    unix_ts_ms = int(time.time() * 1000)
+    ts_bytes = unix_ts_ms.to_bytes(6, byteorder='big')
+    random_bytes = uuid.uuid4().bytes[6:]
+    uuid_bytes = ts_bytes + random_bytes
+    uuid_bytes = (
+        uuid_bytes[0:6] +
+        bytes([((uuid_bytes[6] & 0x0F) | 0x70)]) +
+        uuid_bytes[7:]
+    )
+    uuid_bytes = (
+        uuid_bytes[0:8] +
+        bytes([((uuid_bytes[8] & 0x3F) | 0x80)]) +
+        uuid_bytes[9:]
+    )
+    return str(uuid.UUID(bytes=uuid_bytes))
 
 class BlockLayoutIndexConfigPopulator:
     def __init__(self, json_input_path: str, mapping_csv_path: str, slide_insertion_dir: str):
@@ -187,36 +210,32 @@ class BlockLayoutIndexConfigPopulator:
         return None
     
     def parse_block_layouts(self, content: str) -> List[Dict]:
-        """Parse BlockLayout entries from SQL content"""
+        """Parse BlockLayout entries from SQL content, extracting block name if available"""
         blocks = []
-        
-        # Look for BlockLayout INSERT with more flexible pattern
-        patterns = [
-            r'INSERT INTO "BlockLayout"[^V]*VALUES\s*(.*?)(?=RETURNING|\s*;)',
-            r'-- Create BlockLayouts.*?VALUES\s*(.*?)(?=RETURNING|\s*;)'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, content, re.DOTALL)
-            if match:
-                values_section = match.group(1)
-                
-                # Parse each BlockLayout entry
-                value_pattern = r"\('([^']+)',\s*'([^']+)',\s*'([^']+)'::[^)]*\)"
-                
-                for block_match in re.finditer(value_pattern, values_section):
-                    block_id = block_match.group(1)
-                    slide_layout_id = block_match.group(2)
-                    block_type = block_match.group(3)
-                    
-                    blocks.append({
-                        'blockLayoutId': block_id,
-                        'slideLayoutId': slide_layout_id,
-                        'blockLayoutType': block_type
-                    })
-                
-                break  # Stop after first successful match
-        
+        # Find the BlockLayout INSERT section with flexible pattern
+        pattern = r'-- Create BlockLayouts.*?INSERT INTO "BlockLayout".*?VALUES\s*(.*?)(?=RETURNING|\s*;)'  # as before
+        match = re.search(pattern, content, re.DOTALL)
+        if match:
+            values_section = match.group(1)
+            # Pattern to match each value line: ('id', 'slideLayoutId', 'blockType'::"BlockLayoutType")
+            # Optionally, try to extract block name if present in a comment or in a known format
+            value_pattern = r"\('([^']+)',\s*'([^']+)',\s*'([^']+)'::[^)]*\)"  # id, slideLayoutId, blockType
+            for match in re.finditer(value_pattern, values_section):
+                block_id = match.group(1)
+                slide_layout_id = match.group(2)
+                block_type = match.group(3)
+                # Try to extract block name from a comment on the same line (e.g., -- blockName)
+                line = match.group(0)
+                block_name = None
+                comment_match = re.search(r"--\\s*([a-zA-Z0-9_]+)", line)
+                if comment_match:
+                    block_name = comment_match.group(1)
+                blocks.append({
+                    'blockLayoutId': block_id,
+                    'slideLayoutId': slide_layout_id,
+                    'blockLayoutType': block_type,
+                    'blockName': block_name
+                })
         return blocks
     
     def load_json_data(self):
@@ -310,70 +329,85 @@ class BlockLayoutIndexConfigPopulator:
         print(f"        Extracted: color='{text_color}' -> {color_index}, font='{font_family}' -> {font_index}")
         return color_index, font_index
     
+    def get_color_index_for_block(self, slide_id, block_type, color_value):
+        """Get the color index for a block from CSV mapping (preferred) or JSON config (fallback), with detailed logging"""
+        print(f"[DEBUG] get_color_index_for_block: slide_id={slide_id}, block_type={block_type}, color_value={color_value}")
+        # Try CSV mapping first
+        if self.mapping_data and slide_id in self.mapping_data:
+            color_list_str = self.mapping_data[slide_id].get(block_type)
+            print(f"[DEBUG] CSV color_list_str for {block_type}: {color_list_str}")
+            if color_list_str:
+                try:
+                    color_list = ast.literal_eval(color_list_str)
+                    print(f"[DEBUG] Parsed color_list: {color_list}")
+                    if color_value in color_list:
+                        idx = color_list.index(color_value)
+                        print(f"[DEBUG] Found color_value in CSV color_list at index {idx}")
+                        return idx
+                    else:
+                        print(f"[DEBUG] color_value {color_value} not found in CSV color_list")
+                except Exception as e:
+                    print(f"Error parsing color list for {block_type} in slide {slide_id}: {e}")
+        # Fallback: try to get from JSON config
+        print(f"[DEBUG] No CSV match, fallback to JSON or default")
+        return None  # Will fallback to previous logic if not found
+
     def match_slides_and_generate_config(self):
-        """Match slides between SQL and JSON, then generate BlockLayoutIndexConfig entries"""
         print("Matching slides and generating BlockLayoutIndexConfig entries...")
-        
         print(f"SQL slides found: {len(self.slides_from_sql)}")
         print(f"JSON slides found: {len(self.slides_from_json)}")
-        
         if not self.slides_from_sql:
             print("ERROR: No SQL slides found! Check SQL file parsing.")
             return []
-        
         if not self.slides_from_json:
             print("ERROR: No JSON slides found! Check JSON file format.")
             return []
-        
         index_config_entries = []
         matched_count = 0
-        
-        # Show some sample keys for debugging
         print(f"Sample SQL slide keys: {list(self.slides_from_sql.keys())[:3]}")
         print(f"Sample JSON slide keys: {list(self.slides_from_json.keys())[:3]}")
-        
         for sql_slide_key, sql_data in self.slides_from_sql.items():
             print(f"  Looking for SQL slide: {sql_slide_key}")
-            
-            # Try to find matching JSON slide
             json_slide_data = self.slides_from_json.get(sql_slide_key)
-            
             if json_slide_data:
                 matched_count += 1
                 print(f"  ✓ Matched slide: {sql_slide_key}")
-                
-                # Get slide configuration from JSON
                 slide_config = json_slide_data['slideConfig']
-                
-                # Process each block in the SQL slide
+                slide_id = sql_slide_key.split('_')[0]  # Use slide number as id for CSV lookup
+                # For each block type in the config, get the color list
                 for sql_block in sql_data['blocks']:
                     block_id = sql_block['blockLayoutId']
                     block_type = sql_block['blockLayoutType']
-                    
-                    print(f"    Processing SQL block: {block_id} ({block_type})")
-                    
-                    # Extract color and font indices from slideConfig
-                    color_index, font_index = self.extract_color_and_font_indices(block_type, slide_config)
-                    
-                    # Apply mapping corrections if available
-                    corrected_color_index, corrected_font_index = self.apply_mapping_correction(
-                        block_type, color_index, font_index
-                    )
-                    
-                    index_config_entries.append({
-                        'blockLayoutId': block_id,
-                        'indexColorId': corrected_color_index,
-                        'indexFontId': corrected_font_index
-                    })
-                    
-                    print(f"      ✓ Added block {block_id} ({block_type}): color={color_index}->{corrected_color_index}, font={font_index}->{corrected_font_index}")
+                    color_list = []
+                    if block_type in slide_config:
+                        block_type_dict = slide_config[block_type]
+                        if isinstance(block_type_dict, dict):
+                            color_list = list(block_type_dict.keys())
+                    if not color_list:
+                        print(f"[DEBUG] No color list found for block_type={block_type} in slideConfig, generating one entry with color_index=0")
+                        color_list = [None]
+                    for color_index, color_value in enumerate(color_list):
+                        csv_color_index = self.get_color_index_for_block(slide_id, block_type, color_value)
+                        if csv_color_index is not None:
+                            used_color_index = csv_color_index
+                        else:
+                            used_color_index = color_index
+                        font_index = 0  # keep font index fallback for now
+                        corrected_color_index, corrected_font_index = self.apply_mapping_correction(
+                            block_type, used_color_index, font_index
+                        )
+                        print(f"[DEBUG] Block: block_id={block_id}, block_type={block_type}, color_value={color_value}, color_index={color_index}, used_color_index={used_color_index}, corrected_color_index={corrected_color_index}")
+                        index_config_entries.append({
+                            'blockLayoutId': block_id,
+                            'indexColorId': corrected_color_index,
+                            'indexFontId': corrected_font_index
+                        })
+                        print(f"      ✓ Added block {block_id} ({block_type}): color={color_index}-> {corrected_color_index}, font={font_index}->{corrected_font_index}")
             else:
                 print(f"  ✗ Warning: No matching JSON slide found for SQL slide: {sql_slide_key}")
-                # Try to find partial matches
                 partial_matches = [key for key in self.slides_from_json.keys() if sql_data['slideName'] in key]
                 if partial_matches:
                     print(f"    Possible partial matches: {partial_matches[:3]}")
-        
         print(f"Matched {matched_count} slides out of {len(self.slides_from_sql)} SQL slides")
         return index_config_entries
     
@@ -447,16 +481,7 @@ class BlockLayoutIndexConfigPopulator:
         # Load JSON data
         self.load_json_data()
 
-        # Match slides and generate config entries
-        index_config_entries = self.match_slides_and_generate_config()
-
-        # Build a mapping from blockLayoutId to slide key for grouping
-        block_to_slide = {}
-        for slide_key, sql_data in self.slides_from_sql.items():
-            for block in sql_data['blocks']:
-                block_to_slide[block['blockLayoutId']] = slide_key
-
-        # Build a mapping from slide name prefix to group folder by matching *.sql files in slide_insertion subfolders
+        # Build mapping for output as before
         slide_name_to_group = {}
         for group_dir in os.listdir(self.slide_insertion_dir):
             group_path = os.path.join(self.slide_insertion_dir, group_dir)
@@ -468,44 +493,106 @@ class BlockLayoutIndexConfigPopulator:
                     base_name = fname[:-len('.sql')]
                     slide_name_to_group[base_name] = group_path
 
-        # Group entries by slide key
-        slide_entries = {}
-        for entry in index_config_entries:
-            block_id = entry['blockLayoutId']
-            slide_key = block_to_slide.get(block_id, None)
-            if slide_key is not None:
-                if slide_key not in slide_entries:
-                    slide_entries[slide_key] = []
-                slide_entries[slide_key].append(entry)
-            else:
-                print(f"Warning: blockLayoutId {block_id} not found in any slide, skipping.")
-
         total_entries = 0
-        for slide_key, entries in slide_entries.items():
-            # Get slide name (not number)
-            slide_name = self.slides_from_sql[slide_key]['slideName']
+        for sql_slide_key, sql_data in self.slides_from_sql.items():
+            slide_name = sql_data['slideName']
             # Find the group folder for this slide using prefix matching
             matched_group_folder = None
+            matched_base_name = None
             for base_name, group_folder in slide_name_to_group.items():
                 if base_name.startswith(slide_name):
                     matched_group_folder = group_folder
                     matched_base_name = base_name
                     break
             if not matched_group_folder:
-                print(f"Warning: Could not find group folder for slide {slide_name} (key: {slide_key}), skipping.")
+                print(f"Warning: Could not find group folder for slide {slide_name}, skipping.")
                 continue
             color_insertion_dir = os.path.join(matched_group_folder, 'color_insertion')
             os.makedirs(color_insertion_dir, exist_ok=True)
-            sql_output = self.generate_sql(entries)
-            # Use just the matched base_name for the output filename
+            # Get JSON slide data
+            json_slide_data = self.slides_from_json.get(sql_slide_key)
+            if not json_slide_data:
+                print(f"  ✗ Warning: No matching JSON slide found for SQL slide: {sql_slide_key}")
+                continue
+            slide_config = json_slide_data['slideConfig']
+            sql_blocks = sql_data['blocks']
+            # Build a mapping: block_type -> list of SQL blocks (in order)
+            sql_blocks_by_type = {}
+            for block in sql_blocks:
+                sql_blocks_by_type.setdefault(block['blockLayoutType'], []).append(block)
+            # Build a list of (block_type, type_index, color/font indices) from slideConfig
+            entries = []
+            comments = []
+            block_type_counters = {}
+            for block_type in slide_config:
+                # For each block_type, get the number of blocks of this type in the config
+                # We assume the order in slideConfig matches the order in SQL for that type
+                type_blocks = slide_config[block_type]
+                for type_index, _ in enumerate(type_blocks):
+                    # Find the corresponding SQL block for this type and index
+                    sql_block_list = sql_blocks_by_type.get(block_type, [])
+                    if type_index >= len(sql_block_list):
+                        print(f"Warning: Not enough SQL blocks of type {block_type} for slide {slide_name} (needed {type_index+1}, found {len(sql_block_list)})")
+                        continue
+                    sql_block = sql_block_list[type_index]
+                    # Extract textVertical and textHorizontal from the block's styles if present
+                    json_blocks = json_slide_data.get('blocks', [])
+                    matching_json_block = None
+                    for jb in json_blocks:
+                        if jb.get('type') == block_type and json_blocks.index(jb) == type_index:
+                            matching_json_block = jb
+                            break
+                    text_vertical = None
+                    text_horizontal = None
+                    if matching_json_block:
+                        styles = matching_json_block.get('styles', {})
+                        text_vertical = styles.get('textVertical')
+                        text_horizontal = styles.get('textHorizontal')
+                    color_index, font_index = self.extract_color_and_font_indices(block_type, slide_config)
+                    corrected_color_index, corrected_font_index = self.apply_mapping_correction(
+                        block_type, color_index, font_index
+                    )
+                    block_id = sql_block['blockLayoutId']
+                    entries.append({
+                        'blockLayoutId': block_id,
+                        'indexColorId': corrected_color_index,
+                        'indexFontId': corrected_font_index,
+                        'slideName': slide_name,
+                        'blockType': block_type,
+                        'blockTypeIndex': type_index,
+                        'textVertical': text_vertical,
+                        'textHorizontal': text_horizontal
+                    })
+                    comments.append(f"-- {slide_name} | {block_type} | index {type_index} | textVertical={text_vertical} | textHorizontal={text_horizontal}")
+            # Write SQL file
             safe_base_name = re.sub(r'[^a-zA-Z0-9_-]', '_', matched_base_name)
             output_file = os.path.join(color_insertion_dir, f"{safe_base_name}.sql")
+            sql_lines = [
+                "-- Generated BlockLayoutIndexConfig entries",
+                "-- Based on slideConfig extraction and CSV mapping",
+                ""
+            ]
+            sql_lines.append('INSERT INTO "BlockLayoutIndexConfig" (')
+            sql_lines.append('    "id", "blockLayoutId", "indexColorId", "indexFontId"')
+            sql_lines.append(') VALUES')
+            for j, (entry, comment) in enumerate(zip(entries, comments)):
+                record_id = generate_uuid7()
+                sql_line = f"    ('{record_id}', '{entry['blockLayoutId']}', {entry['indexColorId']}, {entry['indexFontId']})"
+                if j < len(entries) - 1:
+                    sql_line += ","
+                sql_lines.append(comment)
+                sql_lines.append(sql_line)
+            sql_lines.extend([
+                "RETURNING *;",
+                "",
+                f"-- Total: {len(entries)} entries"
+            ])
             with open(output_file, 'w', encoding='utf-8') as file:
-                file.write(sql_output)
-            print(f"Generated SQL for slide {slide_name} saved to: {output_file}")
+                file.write("\n".join(sql_lines))
+            print(f"Generated SQL for slide {matched_base_name} saved to: {output_file}")
             total_entries += len(entries)
 
-        print(f"Process completed. Generated {total_entries} BlockLayoutIndexConfig entries across {len(slide_entries)} slides.")
+        print(f"Process completed. Generated {total_entries} BlockLayoutIndexConfig entries across slides.")
 
 if __name__ == "__main__":
     # Configuration
