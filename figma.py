@@ -42,34 +42,6 @@ FIGMA_CONFIG = {
     'OUTPUT_FILE': 'extracted_data'
 }
 
-# Exact mappings from config.py
-SLIDE_LAYOUT_TYPES = {
-    "classic": "classic",
-    "many_text": "manyText",
-    "few_text": "fewText",
-    "optimal_text": "optimalText",
-    "chart": "chart",
-    "table": "table",
-    "infographics": "infographics",
-    "title": "title",
-    "last": "last",
-    "other": "other"
-}
-
-# Valid block types from config
-VALID_BLOCK_TYPES = [
-    'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name',
-    'percentage', 'image', 'infographik', 'table', 'figure', 
-    'background', 'watermark', 'icon', 'subTitle', 'number'
-]
-
-NULL_STYLE_TYPES = ['infographik', 'figure', 'table', 'background', 'image', 'icon']
-Z_INDEX_TYPES = [
-    'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name',
-    'percentage', 'image', 'infographik', 'table', 'figure', 
-    'background', 'icon', 'subTitle', 'number'
-]
-
 # Valid font weights - ONLY these are allowed
 VALID_FONT_WEIGHTS = [300, 400, 700]
 
@@ -382,44 +354,17 @@ class EnhancedFigmaExtractor:
         return True
 
     def detect_slide_type(self, container_name: str, slide_number: int) -> str:
-        """Detect slide type from container name and slide number"""
-        container_lower = container_name.lower()
-        
-        # Check explicit patterns first
-        for slide_type, patterns in SLIDE_TYPE_PATTERNS.items():
-            if any(pattern in container_lower for pattern in patterns):
-                return slide_type
-        
-        # Use slide number mapping from config
-        if slide_number == 1:
-            return 'title'
-        elif slide_number == -1:
-            return 'last'
-        elif slide_number in [2, 3]:
-            return 'few_text'
-        elif slide_number in [4]:
-            return 'optimal_text'
-        elif slide_number in [6, 7, 9, 10, 11, 12, 13]:
-            return 'many_text'
-        elif slide_number == 5:
-            return 'infographics'
-        elif slide_number == 8:
-            return 'table'
-        elif slide_number == 14:
-            return 'chart'
-        
-        return 'classic'  # Default
+        """Detect slide type using only config.py as the source of truth."""
+        # Use config mapping for container name to slide number
+        key = container_name.strip().lower()
+        number = config.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, slide_number)
+        # Use config mapping for slide number to type
+        return config.SLIDE_NUMBER_TO_TYPE.get(number, 'classic')
 
     def get_slide_number(self, parent_name: str) -> int:
-        """Get slide number from parent container name (case-insensitive, trimmed)"""
+        """Get slide number from parent container name (case-insensitive, trimmed). Use config.py as the only source of truth."""
         key = parent_name.strip().lower()
-        # Find the slide number whose folder matches the container name
-        for num, folder in config.SLIDE_NUMBER_TO_FOLDER.items():
-            if folder == key:
-                print(f"Container \"{parent_name}\" -> slide #{num}")
-                return num
-        print(f"Unknown container \"{parent_name}\", assigning -1")
-        return -1
+        return config.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, None)
 
     def extract_color_from_fills(self, node: dict) -> tuple[str | None, str | None]:
         fills = node.get('fills')
@@ -468,7 +413,7 @@ class EnhancedFigmaExtractor:
         if has_z:
             figma_type, sql_type = self.detect_block_type(node)
             # Validate sql_type is in our allowed list
-            if sql_type not in VALID_BLOCK_TYPES:
+            if sql_type not in config.BLOCK_TYPES['block_layout_type_options']:
                 print(f"Invalid block type '{sql_type}', defaulting to 'text'")
                 sql_type = 'text'
             abs_box = node['absoluteBoundingBox']
@@ -497,7 +442,7 @@ class EnhancedFigmaExtractor:
                 styles = self.extract_text_styles(node, sql_type)
                 z_index = self.extract_z_index(name)
                 if z_index == 0:
-                    z_index = Z_INDEX_DEFAULTS.get(sql_type, Z_INDEX_DEFAULTS['default'])
+                    z_index = config.Z_INDEX_DEFAULTS.get(sql_type, config.Z_INDEX_DEFAULTS['default'])
                 styles['zIndex'] = z_index
                 has_corner_radius = False
                 corner_radius = [0, 0, 0, 0]
@@ -507,7 +452,7 @@ class EnhancedFigmaExtractor:
                 
                 # Extract color information for background and other relevant blocks
                 node_color = None
-                if sql_type in ['background', 'figure', 'image']:
+                if sql_type in config.BLOCK_TYPES['null_style_types']:
                     node_color, _ = self.extract_color_from_fills(node)
                 
                 block = ExtractedBlock(
@@ -761,9 +706,9 @@ class EnhancedFigmaExtractor:
                         'target_containers': self.filter_config.target_containers
                     },
                     'sql_generator_compatibility': {
-                        'valid_block_types': VALID_BLOCK_TYPES,
+                        'valid_block_types': config.BLOCK_TYPES['block_layout_type_options'],
                         'valid_font_weights': VALID_FONT_WEIGHTS,
-                        'slide_layout_types': SLIDE_LAYOUT_TYPES
+                        'slide_layout_types': config.SLIDE_LAYOUT_TYPES
                     }
                 },
                 'slides': [self._slide_to_dict(slide) for slide in all_slides]
@@ -842,8 +787,8 @@ class EnhancedFigmaExtractor:
             'dimensions': block.dimensions,
             'styles': block.styles,  # <-- Add styles at the top level
             'is_target': block.is_target,
-            'needs_null_styles': block.sql_type in NULL_STYLE_TYPES,
-            'needs_z_index': block.sql_type in Z_INDEX_TYPES,
+            'needs_null_styles': block.sql_type in config.BLOCK_TYPES['null_style_types'],
+            'needs_z_index': block.sql_type in config.BLOCK_TYPES['z_index_types'],
             'corner_radius': block.corner_radius if block.corner_radius is not None else None,
         }
         

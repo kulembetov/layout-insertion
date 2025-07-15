@@ -11,7 +11,7 @@ FIGMA_FILE_ID = os.environ.get("FIGMA_FILE_ID", "")
 FIGMA_TOKEN = os.environ.get("FIGMA_TOKEN", "")
 
 # Base path for slide layout miniatures
-MINIATURES_BASE_PATH = "/assets/miniatures/rfs"
+MINIATURES_BASE_PATH = "/assets/miniatures/raiffeisen"
 
 # Default ColorSettings ID to use for all blocks
 DEFAULT_COLOR_SETTINGS_ID = "019565bd-99ce-792c-86fd-0188712beb9b"
@@ -364,7 +364,8 @@ SLIDE_NUMBER_TO_FOLDER = {
     9: "table",
     10: "6cols",
     11: "7cols",
-    12: "chart",
+    12: "8cols",
+    13: "chart",
     -1: "last"
 }
 
@@ -375,12 +376,13 @@ SLIDE_NUMBER_TO_NUMBER = {
     4: 3,           # 3cols
     5: None,        # infographics
     6: 4,           # 4cols
-    7: None,        # 5cols
+    7: 5,           # 5cols
     8: None,        # divider
     9: None,        # table
     10: 6,          # 6cols
     11: 7,          # 7cols
-    12: None,       # chart
+    12: 8,          # 8cols
+    13: None,       # chart
     -1: None        # last
 }
 
@@ -394,9 +396,10 @@ SLIDE_NUMBER_TO_TYPE = {
     7: 'other',         # 6cols
     8: 'other',         # 7cols
     9: 'table',         # table
-    10: 'chart',        # chart
-    11: 'infographics', # infographics
-    12: 'other',        # divider (if needed)
+    10: 'other',        # 6cols
+    11: 'other',        # 7cols
+    12: 'other',        # 8cols
+    13: 'chart',        # chart
     -1: 'last'          # last
 }
 
@@ -414,7 +417,8 @@ CONTAINER_NAME_TO_SLIDE_NUMBER = {
     "table": 9,
     "6cols": 10,
     "7cols": 11,
-    "chart": 12,
+    "8cols": 12,
+    "chart": 13,
     "last": -1
 }
 

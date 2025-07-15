@@ -1723,10 +1723,9 @@ def _process_figma_slide(slide: dict, generator: 'SQLGenerator', output_dir: str
     sql = generator._generate_sql_queries(
         slide_layout, blocks, figure_blocks, precompiled_images
     )
-    folder_name = generator.config_manager.get_folder_for_slide_number(
-        slide_layout.number
-    )
-    # Write slide SQL to <output_dir>/<group>/slide_insertion/
+    # Always use the folder from get_folder_for_slide_number for this slide number
+    folder_name = generator.config_manager.get_folder_for_slide_number(slide_layout.number)
+    # Write slide SQL to <output_dir>/<folder_name>/slide_insertion/
     slide_insertion_dir = os.path.join(output_dir, folder_name, "slide_insertion")
     os.makedirs(slide_insertion_dir, exist_ok=True)
     timestamp = datetime.now().strftime(config.OUTPUT_CONFIG["timestamp_format"])
