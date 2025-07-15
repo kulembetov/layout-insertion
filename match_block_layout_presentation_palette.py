@@ -14,6 +14,14 @@ def generate_uuid7() -> str:
     uuid_bytes[8] = (uuid_bytes[8] & 0x3F) | 0x80
     return str(uuid.UUID(bytes=bytes(uuid_bytes)))
 
+def parse_pg_array(array_str):
+    """Parse a Postgres curly-brace array string into a Python list of strings."""
+    array_str = array_str.strip()
+    if array_str.startswith("{") and array_str.endswith("}"):
+        items = array_str[1:-1].split(",")
+        return [item.strip().lower() for item in items if item.strip()]
+    return []
+
 def read_palette_mapping(path):
     """Read PresentationPalette CSV and return color -> palette_id mapping"""
     palette_map = {}
@@ -26,36 +34,19 @@ def read_palette_mapping(path):
     return palette_map
 
 def read_block_layout_mapping(path):
-    """Read BlockLayoutConfig CSV and return config_id -> background_colors mapping"""
+    """Read BlockLayoutConfig CSV and return config_id -> background_colors mapping (curly-brace arrays)."""
     block_configs = []
     with open(path, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             config_id = row['id']
-            
-            # Parse the background color array safely
             background_str = row['background'].strip()
-            try:
-                if background_str.startswith("[") and background_str.endswith("]"):
-                    # Use ast.literal_eval for safe parsing
-                    background_colors = ast.literal_eval(background_str)
-                    if isinstance(background_colors, list):
-                        # Convert to lowercase for comparison
-                        background_colors = [c.lower() for c in background_colors]
-                    else:
-                        background_colors = []
-                else:
-                    background_colors = []
-            except (ValueError, SyntaxError) as e:
-                print(f"Warning: Could not parse background colors for config {config_id}: {background_str}")
-                background_colors = []
-            
+            background_colors = parse_pg_array(background_str)
             block_configs.append({
                 'id': config_id,
                 'background_colors': background_colors,
                 'raw_background': background_str
             })
-    
     return block_configs
 
 def find_matches(palette_map, block_configs):
