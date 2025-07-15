@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 import json
 import shutil
 import argparse
+import config
 
 # Helper to set up the logger file handler in any mode
 def setup_slide_insertion_logger(output_dir):
@@ -316,7 +317,7 @@ class BlockFactory:
     def create_block(self, block_type, index, user_input, total_blocks):
         """Create a block of the specified type"""
 
-        if block_type == "watermark":
+        if block_type == self.BLOCK_TYPE_WATERMARK:
             logger.info("Note: Watermark elements will be ignored as per requirements.")
             return None
 
@@ -325,9 +326,9 @@ class BlockFactory:
 
         needs_null_styles = self.config.is_null_style_type(block_type)
         needs_z_index = self.config.is_z_index_type(block_type)
-        is_figure = block_type == "figure"
-        is_background = block_type == "background"
-        is_image = block_type == "image"
+        is_figure = block_type == self.BLOCK_TYPE_FIGURE
+        is_background = block_type == self.BLOCK_TYPE_BACKGROUND
+        is_image = block_type == self.BLOCK_TYPE_IMAGE
 
         # Initialize data
         color = None
@@ -440,7 +441,7 @@ class BlockFactory:
             0,
             0,
         ]  # Default: top-left, top-right, bottom-right, bottom-left
-        if block_type == "image":
+        if block_type == self.BLOCK_TYPE_IMAGE:
             logger.info(
                 f"Specify border radius for image (4 integers for top-left, top-right, bottom-right, bottom-left corners)"
             )
@@ -487,7 +488,7 @@ class BlockFactory:
 
         return Block(
             id=wm_id,
-            type="watermark",
+            type=self.BLOCK_TYPE_WATERMARK,
             needs_null_styles=True,
             needs_z_index=False,
             is_figure=False,
@@ -518,7 +519,7 @@ class BlockFactory:
 
         return Block(
             id=bg_id,
-            type="background",
+            type=self.BLOCK_TYPE_BACKGROUND,
             needs_null_styles=True,
             needs_z_index=True,
             is_figure=False,
@@ -684,9 +685,10 @@ class BlockLayoutCommand(SQLCommand):
 class BlockStylesCommand(SQLCommand):
     """Generates BlockLayoutStyles SQL"""
 
-    def __init__(self, config: ConfigManager, blocks: List[Block]):
+    def __init__(self, config: ConfigManager, blocks: List[Block], block_type_image: str):
         self.config = config
         self.blocks = blocks
+        self.BLOCK_TYPE_IMAGE = block_type_image
 
     def execute(self) -> str:
         """Generate BlockLayoutStyles SQL"""
@@ -701,7 +703,7 @@ class BlockStylesCommand(SQLCommand):
 
         for block in self.blocks:
             # Only set border radius for image blocks, use null for all others
-            if block.type == "image" and block.border_radius:
+            if block.type == self.BLOCK_TYPE_IMAGE and block.border_radius:
                 border_radius_str = f"ARRAY[{', '.join(map(str, block.border_radius))}]"
             else:
                 border_radius_str = "null"
@@ -997,8 +999,11 @@ class NumberBasedSlideTypeStrategy(SlideTypeStrategy):
 class ContentBasedSlideTypeStrategy(SlideTypeStrategy):
     """Determines slide type based on content blocks"""
 
-    def __init__(self, config: ConfigManager):
+    def __init__(self, config: ConfigManager, block_type_table: str, block_type_infographik: str, block_type_chart: str):
         self.config = config
+        self.BLOCK_TYPE_TABLE = block_type_table
+        self.BLOCK_TYPE_INFOGRAPHIK = block_type_infographik
+        self.BLOCK_TYPE_CHART = block_type_chart
 
     def determine_slide_type(
         self, slide_layout: SlideLayout, blocks: List[Block]
@@ -1013,9 +1018,9 @@ class ContentBasedSlideTypeStrategy(SlideTypeStrategy):
             )
 
         # Check for special block types
-        has_table_block = any(block.type == "table" for block in blocks)
-        has_infographik_block = any(block.type == "infographik" for block in blocks)
-        has_chart_block = any(block.type == "chart" for block in blocks)
+        has_table_block = any(block.type == self.BLOCK_TYPE_TABLE for block in blocks)
+        has_infographik_block = any(block.type == self.BLOCK_TYPE_INFOGRAPHIK for block in blocks)
+        has_chart_block = any(block.type == self.BLOCK_TYPE_CHART for block in blocks)
 
         old_type_key = slide_layout.type_key
 
@@ -1061,8 +1066,6 @@ class SQLGenerator:
 
         # Initialize strategies
         self.number_strategy = NumberBasedSlideTypeStrategy(self.config_manager)
-        self.content_strategy = ContentBasedSlideTypeStrategy(self.config_manager)
-
         # Define canonical block type variables for clarity, robust to missing types
         block_types = self.config_manager.config.BLOCK_TYPES["block_layout_type_options"]
         def safe_block_type(name):
@@ -1078,6 +1081,13 @@ class SQLGenerator:
         self.BLOCK_TYPE_TABLE = safe_block_type("table")
         self.BLOCK_TYPE_INFOGRAPHIK = safe_block_type("infographik")
         self.BLOCK_TYPE_CHART = safe_block_type("chart")
+
+        self.content_strategy = ContentBasedSlideTypeStrategy(
+            self.config_manager,
+            self.BLOCK_TYPE_TABLE,
+            self.BLOCK_TYPE_INFOGRAPHIK,
+            self.BLOCK_TYPE_CHART,
+        )
 
         # Set up logging to file in the output directory
         if output_dir is None:
@@ -1393,7 +1403,7 @@ class SQLGenerator:
                 watermark_dimensions = self.config_manager.config.AUTO_BLOCKS["watermark"]["dimensions"]
             watermark_block = Block(
                 id=self.id_generator.generate_uuid7(),
-                type="watermark",
+                type=self.BLOCK_TYPE_WATERMARK,
                 dimensions=watermark_dimensions,
                 styles={
                     "textVertical": None,
@@ -1413,21 +1423,18 @@ class SQLGenerator:
                 figure_info=None,
                 precompiled_image_info=None,
                 border_radius=[0, 0, 0, 0],
-                name="watermark",
+                name=self.BLOCK_TYPE_WATERMARK,
             )
             blocks.append(watermark_block)
         return blocks
 
     def _collect_blocks(self, slide_layout) -> tuple:
         """Collect all blocks for the given slide layout, including auto and user-defined blocks."""
-        blocks = []
-        # Add auto blocks (background, watermark, etc)
-        blocks += self._auto_blocks(slide_layout)
-        # Collect user-defined blocks
+        blocks = self._auto_blocks(slide_layout)
         user_blocks, figure_blocks, precompiled_image_blocks = self._collect_user_defined_blocks()
         blocks += user_blocks
         # Ensure a background block is present
-        if not any(b.type == "background" for b in blocks):
+        if not any(b.type == self.BLOCK_TYPE_BACKGROUND for b in blocks):
             bg_config = self.config_manager.config.AUTO_BLOCKS["background"]
             bg_styles = {
                 "textVertical": None,
@@ -1440,7 +1447,7 @@ class SQLGenerator:
             }
             bg_block = Block(
                 id=self.id_generator.generate_uuid7(),
-                type="background",
+                type=self.BLOCK_TYPE_BACKGROUND,
                 dimensions=bg_config["dimensions"],
                 styles=bg_styles,
                 needs_null_styles=True,
@@ -1452,7 +1459,7 @@ class SQLGenerator:
                 figure_info=None,
                 precompiled_image_info=None,
                 border_radius=[0, 0, 0, 0],
-                name="background",
+                name=self.BLOCK_TYPE_BACKGROUND,
             )
             blocks.insert(0, bg_block)
         return blocks, figure_blocks, precompiled_image_blocks
@@ -1538,7 +1545,7 @@ class SQLGenerator:
             # 2. BlockLayout
             BlockLayoutCommand(self.config_manager, blocks, slide_layout.id),
             # 3. BlockLayoutStyles
-            BlockStylesCommand(self.config_manager, blocks),
+            BlockStylesCommand(self.config_manager, blocks, self.BLOCK_TYPE_IMAGE),
             # 4. BlockLayoutDimensions
             BlockDimensionsCommand(self.config_manager, blocks),
         ]
@@ -1626,12 +1633,6 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
     Automatically generate SQL files from a Figma JSON export (as produced by figma.py's sql_generator_input.json),
     without any user interaction. Each slide in the JSON will be processed and SQL files will be written to the appropriate output directory.
     """
-    import json
-    from datetime import datetime
-    import config
-    import os
-    import shutil
-    import logging
 
     generator = SQLGenerator(config, output_dir=output_dir)
     output_dir = output_dir or config.OUTPUT_CONFIG["output_dir"]
@@ -1663,14 +1664,16 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
 
     with open(json_path, "r", encoding="utf-8") as f:
         slides = json.load(f)
+    slide_count = 0
     for slide in slides:
         _process_figma_slide(slide, generator, output_dir, strip_zindex)
-    logger.info("Auto SQL generation process completed.")
+        slide_count += 1
+    logger.info(f"Auto SQL generation process completed. Total slides processed: {slide_count}")
+    print(f"Auto SQL generation process completed. Total slides processed: {slide_count}")
 
 def _process_figma_slide(slide: dict, generator: 'SQLGenerator', output_dir: str, strip_zindex) -> None:
     """Process a single slide from Figma JSON and generate SQL."""
-    import config
-    from datetime import datetime
+
     # Generate a UUID for the SlideLayout
     slide_layout_id = generator.id_generator.generate_uuid7()
     # Strip z-index from slide layout name
@@ -1740,7 +1743,6 @@ def _process_figma_slide(slide: dict, generator: 'SQLGenerator', output_dir: str
 
 def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) -> tuple:
     """Process blocks from a Figma slide and return blocks, precompiled_images, and figure_blocks lists."""
-    import config
     blocks = []
     block_id_map = {}  # Map Figma block id to generated UUID
     precompiled_images = []
@@ -1793,7 +1795,6 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
 
 def _process_precompiled_image_block(block: dict, block_uuid: str, precompiled_images: list) -> None:
     """Process a precompiled image block and append variants to precompiled_images."""
-    import config
     match = re.match(
         r"image precompiled ([^ ]+)(?: z-index \d+)?(?: (#[0-9a-fA-F]{3,6}))?",
         block["name"],
@@ -1840,8 +1841,7 @@ def _process_figure_block(block: dict, block_uuid: str, clean_block_name: str, c
 
 def _ensure_background_and_watermark_blocks(slide_layout, blocks: list, generator: 'SQLGenerator') -> None:
     """Ensure a background block and watermark block are present if needed."""
-    import config
-    has_background = any(b.type == "background" for b in blocks)
+    has_background = any(b.type == generator.BLOCK_TYPE_BACKGROUND for b in blocks)
     logger.info(f"Background block present from Figma: {has_background}")
     if has_background:
         logger.info(
@@ -1862,7 +1862,7 @@ def _ensure_background_and_watermark_blocks(slide_layout, blocks: list, generato
             watermark_dimensions = config.AUTO_BLOCKS["watermark"]["dimensions"]
         watermark_block = Block(
             id=generator.id_generator.generate_uuid7(),
-            type="watermark",
+            type=generator.BLOCK_TYPE_WATERMARK,
             dimensions=watermark_dimensions,
             styles={
                 "textVertical": None,
@@ -1882,7 +1882,7 @@ def _ensure_background_and_watermark_blocks(slide_layout, blocks: list, generato
             figure_info=None,
             precompiled_image_info=None,
             border_radius=[0, 0, 0, 0],
-            name="watermark",
+            name=generator.BLOCK_TYPE_WATERMARK,
         )
         blocks.append(watermark_block)
 
@@ -1932,7 +1932,6 @@ if __name__ == "__main__":
         auto_generate_sql_from_figma(args.auto_from_figma, args.output_dir)
     else:
         main_output_dir = args.output_dir if args.output_dir else None
-        import config
 
         generator = SQLGenerator(config, output_dir=main_output_dir)
         generator.run()
