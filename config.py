@@ -106,11 +106,27 @@ BLOCK_TYPES = {
     "null_style_types": ['infographik', 'figure', 'table', 'background', 'image', 'icon'],
     "z_index_types": [
         'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name',
-        'percentage', 'image', 'infographik', 'table', 'figure', 'background', 'icon', 'subTitle', 'number'
+        'percentage', 'image', 'infographik', 'table', 'figure', 'background', 'icon', 'subTitle', 'number', 'chart'
     ],
+    # Synced with schema.prisma BlockLayoutType enum
     "block_layout_type_options": [
-        'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name',
-        'percentage', 'image', 'infographik', 'table', 'figure', 'background', 'watermark', 'icon', 'subTitle', 'number'
+        'text',
+        'slideTitle',
+        'blockTitle',
+        'email',
+        'date',
+        'name',
+        'percentage',
+        'image',
+        'infographik',
+        'table',
+        'figure',
+        'icon',
+        'background',
+        'watermark',
+        'subTitle',
+        'number',
+        'chart'
     ],
 }
 
@@ -337,7 +353,7 @@ OUTPUT_CONFIG = {
 }
 
 SLIDE_NUMBER_TO_FOLDER = {
-    1: "hero",
+    1: "title",
     2: "1cols",
     3: "2cols",
     4: "3cols",
@@ -353,7 +369,7 @@ SLIDE_NUMBER_TO_FOLDER = {
 }
 
 SLIDE_NUMBER_TO_NUMBER = {
-    1: None,        # hero
+    1: None,        # title
     2: 1,           # 1cols
     3: 2,           # 2cols
     4: 3,           # 3cols
@@ -369,7 +385,7 @@ SLIDE_NUMBER_TO_NUMBER = {
 }
 
 SLIDE_NUMBER_TO_TYPE = {
-    1: 'title',         # hero
+    1: 'title',         # title
     2: 'few_text',      # 1cols
     3: 'optimal_text',  # 2cols
     4: 'many_text',     # 3cols
@@ -387,7 +403,7 @@ SLIDE_NUMBER_TO_TYPE = {
 WATERMARK_SLIDES = []
 
 CONTAINER_NAME_TO_SLIDE_NUMBER = {
-    "hero": 1,
+    "title": 1,
     "1cols": 2,
     "2cols": 3,
     "3cols": 4,

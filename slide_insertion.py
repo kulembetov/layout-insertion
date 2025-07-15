@@ -1,21 +1,3 @@
-"""
-SQL Generator for Layout and Blocks
-Refactored version using modern design patterns
-Generates SQL insert statements for slide layouts and blocks
-
-Usage:
-    1. Import this module
-    2. Create an instance of SQLGenerator with your config module
-    3. Call the run() method to start the interactive generator
-
-Example:
-    import config
-    from sql_generator import SQLGenerator
-
-    generator = SQLGenerator(config)
-    generator.run()
-"""
-
 import os
 import time
 import uuid
@@ -33,25 +15,28 @@ import argparse
 def setup_slide_insertion_logger(output_dir):
     logger = logging.getLogger(__name__)
     os.makedirs(output_dir, exist_ok=True)
-    log_path = os.path.join(output_dir, 'slide_insertion.log')
-    file_handler = logging.FileHandler(log_path, mode='w', encoding='utf-8')
-    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    log_path = os.path.join(output_dir, "slide_insertion.log")
+    file_handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    )
     # Remove any previous file handlers to avoid duplicate logs
     for h in logger.handlers[:]:
         if isinstance(h, logging.FileHandler):
             logger.removeHandler(h)
     logger.addHandler(file_handler)
     logger.propagate = False
-    logger.info('Logger initialized and writing to %s', log_path)
+    logger.info("Logger initialized and writing to %s", log_path)
+
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # ================ Domain Models ================
+
 
 class Dimensions(TypedDict):
     x: int
@@ -119,6 +104,7 @@ class SlideLayout:
 
 # ================ Configuration ================
 
+
 class ConfigManager:
     """Manages configuration for the SQL generator"""
 
@@ -132,27 +118,28 @@ class ConfigManager:
         return self.config.SLIDE_LAYOUT_TYPES.get(key)
 
     def get_block_type_options(self):
-        return self.config.BLOCK_TYPES['block_layout_type_options']
+        return self.config.BLOCK_TYPES["block_layout_type_options"]
 
     def is_null_style_type(self, block_type):
-        return block_type in self.config.BLOCK_TYPES['null_style_types']
+        return block_type in self.config.BLOCK_TYPES["null_style_types"]
 
     def is_z_index_type(self, block_type):
-        return block_type in self.config.BLOCK_TYPES['z_index_types']
+        return block_type in self.config.BLOCK_TYPES["z_index_types"]
 
     def get_default_z_index(self, block_type):
-        return self.config.Z_INDEX_DEFAULTS.get(block_type,
-               self.config.Z_INDEX_DEFAULTS['default'])
+        return self.config.Z_INDEX_DEFAULTS.get(
+            block_type, self.config.Z_INDEX_DEFAULTS["default"]
+        )
 
     def get_default_dimensions(self, block_type, is_first_block=False):
         if block_type in self.config.DEFAULT_DIMENSIONS:
             return self.config.DEFAULT_DIMENSIONS[block_type]
-        return self.config.DEFAULT_DIMENSIONS['default']
+        return self.config.DEFAULT_DIMENSIONS["default"]
 
     def get_default_styles(self, block_type):
         if block_type in self.config.DEFAULT_STYLES:
             return self.config.DEFAULT_STYLES[block_type]
-        return self.config.DEFAULT_STYLES['default']
+        return self.config.DEFAULT_STYLES["default"]
 
     def get_auto_block_config(self, key):
         return self.config.AUTO_BLOCKS.get(key, {})
@@ -199,6 +186,7 @@ class ConfigManager:
 
 # ================ Utility Services ================
 
+
 class IdGenerator:
     """Generates unique IDs for entities"""
 
@@ -212,7 +200,7 @@ class IdGenerator:
         unix_ts_ms = int(time.time() * 1000)
 
         # Convert to bytes (48 bits for timestamp)
-        ts_bytes = unix_ts_ms.to_bytes(6, byteorder='big')
+        ts_bytes = unix_ts_ms.to_bytes(6, byteorder="big")
 
         # Generate 74 random bits (9 bytes with 2 bits used for version and variant)
         random_bytes = uuid.uuid4().bytes[6:]
@@ -223,16 +211,12 @@ class IdGenerator:
 
         # Set the version (7) in the 6th byte
         uuid_bytes = (
-            uuid_bytes[0:6] +
-            bytes([((uuid_bytes[6] & 0x0F) | 0x70)]) +
-            uuid_bytes[7:]
+            uuid_bytes[0:6] + bytes([((uuid_bytes[6] & 0x0F) | 0x70)]) + uuid_bytes[7:]
         )
 
         # Set the variant (RFC 4122) in the 8th byte
         uuid_bytes = (
-            uuid_bytes[0:8] +
-            bytes([((uuid_bytes[8] & 0x3F) | 0x80)]) +
-            uuid_bytes[9:]
+            uuid_bytes[0:8] + bytes([((uuid_bytes[8] & 0x3F) | 0x80)]) + uuid_bytes[9:]
         )
 
         return str(uuid.UUID(bytes=uuid_bytes))
@@ -256,7 +240,7 @@ class InputValidator:
     @staticmethod
     def validate_color(value: str) -> bool:
         # Add hash if not provided
-        if not value.startswith('#'):
+        if not value.startswith("#"):
             value = f"#{value}"
 
         # Check if valid hex color after potentially adding the hash
@@ -265,7 +249,7 @@ class InputValidator:
     @staticmethod
     def prepare_color(value: str) -> str:
         # Add hash if not provided
-        if not value.startswith('#'):
+        if not value.startswith("#"):
             value = f"#{value}"
         return value
 
@@ -276,7 +260,9 @@ class UserInputService:
     def __init__(self, validator: InputValidator):
         self.validator = validator
 
-    def get_input(self, prompt, default=None, options=None, is_integer=False, is_color=False):
+    def get_input(
+        self, prompt, default=None, options=None, is_integer=False, is_color=False
+    ):
         """Get validated input from user"""
         while True:
             if default is not None:
@@ -301,7 +287,9 @@ class UserInputService:
 
             if is_color and value:
                 if not self.validator.validate_color(value):
-                    logger.error("Please enter a valid hex color (e.g., fff or #fff or ffffff or #ffffff)")
+                    logger.error(
+                        "Please enter a valid hex color (e.g., fff or #fff or ffffff or #ffffff)"
+                    )
                     continue
                 return self.validator.prepare_color(value)
 
@@ -317,6 +305,7 @@ class UserInputService:
 
 # ================ Block Factory ================
 
+
 class BlockFactory:
     """Factory for creating different types of blocks"""
 
@@ -324,25 +313,21 @@ class BlockFactory:
         self.config = config_manager
         self.id_generator = id_generator
 
-    def create_block(self,
-                    block_type,
-                    index,
-                    user_input,
-                    total_blocks):
+    def create_block(self, block_type, index, user_input, total_blocks):
         """Create a block of the specified type"""
 
-        if block_type == 'watermark':
+        if block_type == "watermark":
             logger.info("Note: Watermark elements will be ignored as per requirements.")
             return None
 
-        is_first_block = (index == 0)
+        is_first_block = index == 0
         block_id = self.id_generator.generate_uuid7()
 
         needs_null_styles = self.config.is_null_style_type(block_type)
         needs_z_index = self.config.is_z_index_type(block_type)
-        is_figure = block_type == 'figure'
-        is_background = block_type == 'background'
-        is_image = block_type == 'image'
+        is_figure = block_type == "figure"
+        is_background = block_type == "background"
+        is_image = block_type == "image"
 
         # Initialize data
         color = None
@@ -351,10 +336,14 @@ class BlockFactory:
         is_precompiled_image = False
 
         if needs_null_styles:
-            logger.info(f"Note: For '{block_type}' type, style values will be set to NULL")
+            logger.info(
+                f"Note: For '{block_type}' type, style values will be set to NULL"
+            )
 
         if is_figure:
-            figure_name = user_input.get_input(f"Figure name for Block {index + 1}", "tallOutlineCrOne")
+            figure_name = user_input.get_input(
+                f"Figure name for Block {index + 1}", "tallOutlineCrOne"
+            )
             color = user_input.get_input(f"Figure color", "#ffffff", is_color=True)
             figure_info = {
                 "block_id": block_id,
@@ -367,33 +356,36 @@ class BlockFactory:
 
         if is_image:
             # Ask if this is a precompiled image
-            is_precompiled = user_input.get_input(
-                f"Is this a precompiled image?", 
-                "no", 
-                options=["yes", "no"]
-            ) == "yes"
-            
+            is_precompiled = (
+                user_input.get_input(
+                    f"Is this a precompiled image?", "no", options=["yes", "no"]
+                )
+                == "yes"
+            )
+
             if is_precompiled:
                 is_precompiled_image = True
-                filename = user_input.get_input(f"Image filename (e.g., centerBarChart.png)", 'centerBarChart.png')
-                
+                filename = user_input.get_input(
+                    f"Image filename (e.g., centerBarChart.png)", "centerBarChart.png"
+                )
+
                 if not filename:
                     logger.error("Filename is required for precompiled images")
                     return None
-                
+
                 # Build full URL
                 base_url = self.config.get_precompiled_images_base_url()
                 full_url = f"{base_url}/{filename}"
-                
+
                 # Show available colors and get user choice
                 default_colors = self.config.get_precompiled_images_default_colors()
                 user_input.show_color_options(default_colors)
-                
+
                 # Ask how many variants
                 num_variants = user_input.get_input(
                     f"How many color/name variants for this precompiled image?",
                     1,
-                    is_integer=True
+                    is_integer=True,
                 )
                 precompiled_image_info = []
                 for v in range(num_variants):
@@ -401,7 +393,7 @@ class BlockFactory:
                     # Color for this variant
                     selected_color = user_input.get_input(
                         f"Color for variant {v+1} (enter number or custom hex color)",
-                        "1"
+                        "1",
                     )
                     # Handle color selection
                     if isinstance(selected_color, str) and selected_color.isdigit():
@@ -414,7 +406,9 @@ class BlockFactory:
                     else:
                         # Try to validate as hex color
                         if user_input.validator.validate_color(selected_color):
-                            color_val = user_input.validator.prepare_color(selected_color)
+                            color_val = user_input.validator.prepare_color(
+                                selected_color
+                            )
                         else:
                             logger.error("Invalid color format. Using default color.")
                             color_val = default_colors[0]
@@ -423,26 +417,45 @@ class BlockFactory:
                         f"Name for variant {v+1} (filename without extension)"
                     )
                     # Use the provided name as the filename, keep the original extension
-                    if '.' in filename:
-                        extension = filename.rsplit('.', 1)[1]
+                    if "." in filename:
+                        extension = filename.rsplit(".", 1)[1]
                         url_with_name = f"{base_url}/" + variant_name + f".{extension}"
                     else:
                         url_with_name = f"{base_url}/" + variant_name
-                    precompiled_image_info.append({
-                        "block_layout_id": block_id,  # This is the BlockLayout ID for the image block
-                        "url": url_with_name,
-                        "color": color_val
-                    })
-                logger.info(f"Precompiled image will be created with {num_variants} variants.")
+                    precompiled_image_info.append(
+                        {
+                            "block_layout_id": block_id,  # This is the BlockLayout ID for the image block
+                            "url": url_with_name,
+                            "color": color_val,
+                        }
+                    )
+                logger.info(
+                    f"Precompiled image will be created with {num_variants} variants."
+                )
 
         # Handle border radius for image blocks
-        border_radius = [0, 0, 0, 0]  # Default: top-left, top-right, bottom-right, bottom-left
-        if block_type == 'image':
-            logger.info(f"Specify border radius for image (4 integers for top-left, top-right, bottom-right, bottom-left corners)")
-            top_left = user_input.get_input(f"Top-left corner radius", 0, is_integer=True)
-            top_right = user_input.get_input(f"Top-right corner radius", 0, is_integer=True)
-            bottom_right = user_input.get_input(f"Bottom-right corner radius", 0, is_integer=True)
-            bottom_left = user_input.get_input(f"Bottom-left corner radius", 0, is_integer=True)
+        border_radius = [
+            0,
+            0,
+            0,
+            0,
+        ]  # Default: top-left, top-right, bottom-right, bottom-left
+        if block_type == "image":
+            logger.info(
+                f"Specify border radius for image (4 integers for top-left, top-right, bottom-right, bottom-left corners)"
+            )
+            top_left = user_input.get_input(
+                f"Top-left corner radius", 0, is_integer=True
+            )
+            top_right = user_input.get_input(
+                f"Top-right corner radius", 0, is_integer=True
+            )
+            bottom_right = user_input.get_input(
+                f"Bottom-right corner radius", 0, is_integer=True
+            )
+            bottom_left = user_input.get_input(
+                f"Bottom-left corner radius", 0, is_integer=True
+            )
             border_radius = [top_left, top_right, bottom_right, bottom_left]
 
         # Get styles
@@ -464,13 +477,13 @@ class BlockFactory:
             dimensions=dimensions,
             figure_info=figure_info,
             precompiled_image_info=precompiled_image_info,
-            border_radius=border_radius
+            border_radius=border_radius,
         )
 
     def create_watermark_block(self, dimension_config):
         """Create a watermark block with specified dimensions"""
         wm_id = self.id_generator.generate_uuid7()
-        wm_dims = dimension_config
+        watermark_dimensions = dimension_config
 
         return Block(
             id=wm_id,
@@ -488,14 +501,14 @@ class BlockFactory:
                 "weight": None,
                 "zIndex": self.config.get_default_z_index("watermark"),
                 "textTransform": None,
-                "color": "#ffffff"
+                "color": "#ffffff",
             },
             dimensions={
-                "x": wm_dims["x"],
-                "y": wm_dims["y"],
-                "w": wm_dims["w"],
-                "h": wm_dims["h"]
-            }
+                "x": watermark_dimensions["x"],
+                "y": watermark_dimensions["y"],
+                "w": watermark_dimensions["w"],
+                "h": watermark_dimensions["h"],
+            },
         )
 
     def create_background_block(self, bg_config):
@@ -519,26 +532,24 @@ class BlockFactory:
                 "weight": None,
                 "zIndex": bg_config["z_index"],
                 "textTransform": None,
-                "color": "#ffffff"
+                "color": "#ffffff",
             },
             dimensions={
                 "x": bg_dims["x"],
                 "y": bg_dims["y"],
                 "w": bg_dims["w"],
-                "h": bg_dims["h"]
-            }
+                "h": bg_dims["h"],
+            },
         )
 
-    def _get_styles(self,
-                   block_type,
-                   index,
-                   user_input,
-                   needs_null_styles):
+    def _get_styles(self, block_type, index, user_input, needs_null_styles):
         """Get style information for a block"""
         if needs_null_styles:
             # For null-style blocks, only collect z-index
             default_z_index = self.config.get_default_z_index(block_type)
-            z_index = user_input.get_input(f"Block {index + 1} Z-Index", default_z_index, is_integer=True)
+            z_index = user_input.get_input(
+                f"Block {index + 1} Z-Index", default_z_index, is_integer=True
+            )
 
             return {
                 "textVertical": None,
@@ -547,30 +558,38 @@ class BlockFactory:
                 "weight": None,
                 "zIndex": z_index,
                 "textTransform": None,
-                "color": None
+                "color": None,
             }
         else:
             default_styles = self.config.get_default_styles(block_type)
 
             text_vertical = user_input.get_input(
                 f"Block {index + 1} Text Vertical Alignment",
-                default_styles['text_vertical'],
-                options=['top', 'middle', 'bottom']
+                default_styles["text_vertical"],
+                options=["top", "middle", "bottom"],
             )
 
             text_horizontal = user_input.get_input(
                 f"Block {index + 1} Text Horizontal Alignment",
-                default_styles['text_horizontal'],
-                options=['left', 'center', 'right']
+                default_styles["text_horizontal"],
+                options=["left", "center", "right"],
             )
 
-            font_size = user_input.get_input(f"Block {index + 1} Font Size", default_styles['font_size'], is_integer=True)
-            weight = user_input.get_input(f"Block {index + 1} Weight", default_styles['weight'], is_integer=True)
-            text_transform = default_styles['text_transform']
+            font_size = user_input.get_input(
+                f"Block {index + 1} Font Size",
+                default_styles["font_size"],
+                is_integer=True,
+            )
+            weight = user_input.get_input(
+                f"Block {index + 1} Weight", default_styles["weight"], is_integer=True
+            )
+            text_transform = default_styles["text_transform"]
 
             # Get default z-index based on the block type
             default_z_index = self.config.get_default_z_index(block_type)
-            z_index = user_input.get_input(f"Block {index + 1} Z-Index", default_z_index, is_integer=True)
+            z_index = user_input.get_input(
+                f"Block {index + 1} Z-Index", default_z_index, is_integer=True
+            )
 
             return {
                 "textVertical": text_vertical,
@@ -579,25 +598,30 @@ class BlockFactory:
                 "weight": weight,
                 "zIndex": z_index,
                 "textTransform": text_transform,
-                "color": None
+                "color": None,
             }
 
-    def _get_dimensions(self,
-                        block_type,
-                        index,
-                        user_input,
-                        is_first_block):
+    def _get_dimensions(self, block_type, index, user_input, is_first_block):
         """Get dimensions for a block"""
         default_dims = self.config.get_default_dimensions(block_type, is_first_block)
-        x = user_input.get_input(f"Block {index + 1} X Position", default_dims['x'], is_integer=True)
-        y = user_input.get_input(f"Block {index + 1} Y Position", default_dims['y'], is_integer=True)
-        w = user_input.get_input(f"Block {index + 1} Width", default_dims['w'], is_integer=True)
-        h = user_input.get_input(f"Block {index + 1} Height", default_dims['h'], is_integer=True)
+        x = user_input.get_input(
+            f"Block {index + 1} X Position", default_dims["x"], is_integer=True
+        )
+        y = user_input.get_input(
+            f"Block {index + 1} Y Position", default_dims["y"], is_integer=True
+        )
+        w = user_input.get_input(
+            f"Block {index + 1} Width", default_dims["w"], is_integer=True
+        )
+        h = user_input.get_input(
+            f"Block {index + 1} Height", default_dims["h"], is_integer=True
+        )
 
         return {"x": x, "y": y, "w": w, "h": h}
 
 
 # ================ SQL Command Pattern ================
+
 
 class SQLCommand(ABC):
     """Base class for SQL commands"""
@@ -611,27 +635,31 @@ class SQLCommand(ABC):
 class SlideLayoutCommand(SQLCommand):
     """Generates SlideLayout SQL"""
 
-    def __init__(self, config: ConfigManager, slide_layout: SlideLayout, current_time: str):
+    def __init__(
+        self, config: ConfigManager, slide_layout: SlideLayout, current_time: str
+    ):
         self.config = config
         self.slide_layout = slide_layout
         self.current_time = current_time
 
     def execute(self) -> str:
         """Generate SlideLayout SQL"""
-        return self.config.get_sql_template('slide_layout').format(
+        return self.config.get_sql_template("slide_layout").format(
             slide_layout_id=self.slide_layout.id,
             slide_layout_name=self.slide_layout.name,
             slide_layout_number=self.slide_layout.number,
             presentation_layout_id=self.slide_layout.presentation_layout_id,
             is_last=str(self.slide_layout.is_last).lower(),
-            for_generation = str(self.slide_layout.for_generation).lower()
+            for_generation=str(self.slide_layout.for_generation).lower(),
         )
 
 
 class BlockLayoutCommand(SQLCommand):
     """Generates BlockLayout SQL"""
 
-    def __init__(self, config: ConfigManager, blocks: List[Block], slide_layout_id: str):
+    def __init__(
+        self, config: ConfigManager, blocks: List[Block], slide_layout_id: str
+    ):
         self.config = config
         self.blocks = blocks
         self.slide_layout_id = slide_layout_id
@@ -639,7 +667,7 @@ class BlockLayoutCommand(SQLCommand):
     def execute(self) -> str:
         """Generate BlockLayout SQL"""
         values = self._format_block_layout_values()
-        return self.config.get_sql_template('block_layout').format(
+        return self.config.get_sql_template("block_layout").format(
             block_layout_values=values
         )
 
@@ -648,7 +676,8 @@ class BlockLayoutCommand(SQLCommand):
         values = []
         for block in self.blocks:
             values.append(
-                f"    ('{block.id}', '{self.slide_layout_id}', '{block.type}'::\"BlockLayoutType\")")
+                f"    ('{block.id}', '{self.slide_layout_id}', '{block.type}'::\"BlockLayoutType\")"
+            )
         return ",\n".join(values)
 
 
@@ -662,9 +691,7 @@ class BlockStylesCommand(SQLCommand):
     def execute(self) -> str:
         """Generate BlockLayoutStyles SQL"""
         values = self._format_styles_values()
-        return self.config.get_sql_template('block_styles').format(
-            styles_values=values
-        )
+        return self.config.get_sql_template("block_styles").format(styles_values=values)
 
     def _format_styles_values(self) -> str:
         """Format the values for BlockLayoutStyles SQL"""
@@ -674,26 +701,32 @@ class BlockStylesCommand(SQLCommand):
 
         for block in self.blocks:
             # Only set border radius for image blocks, use null for all others
-            if block.type == 'image' and block.border_radius:
+            if block.type == "image" and block.border_radius:
                 border_radius_str = f"ARRAY[{', '.join(map(str, block.border_radius))}]"
             else:
                 border_radius_str = "null"
 
             # Format the SQL based on block type
-            color_value = block.styles.get('color')
+            color_value = block.styles.get("color")
             if color_value:
                 color_value = str(color_value).strip().lower()
-            if not color_value or not color_value.startswith('#') or len(color_value) not in (4, 7):
+            if (
+                not color_value
+                or not color_value.startswith("#")
+                or len(color_value) not in (4, 7)
+            ):
                 color_value = default_color
             if block.needs_null_styles:
                 if block.is_background or block.is_figure:
                     # For background and figure blocks, use the block's color or default white
                     values.append(
-                        f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', null, {border_radius_str}, '{color_settings_id}')")
+                        f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', null, {border_radius_str}, '{color_settings_id}')"
+                    )
                 else:
                     # For other null style blocks, set color from styles or default
                     values.append(
-                        f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', null, {border_radius_str}, '{color_settings_id}')")
+                        f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', null, {border_radius_str}, '{color_settings_id}')"
+                    )
             else:
                 # For text-based blocks, set color from styles or default
                 styles = block.styles
@@ -713,7 +746,7 @@ class BlockDimensionsCommand(SQLCommand):
     def execute(self) -> str:
         """Generate BlockLayoutDimensions SQL"""
         values = self._format_dimension_values()
-        return self.config.get_sql_template('block_dimensions').format(
+        return self.config.get_sql_template("block_dimensions").format(
             dimension_values=values
         )
 
@@ -722,14 +755,21 @@ class BlockDimensionsCommand(SQLCommand):
         values = []
         for block in self.blocks:
             dim = block.dimensions
-            values.append(f"    ('{block.id}', {dim['x']}, {dim['y']}, {dim['w']}, {dim['h']})")
+            values.append(
+                f"    ('{block.id}', {dim['x']}, {dim['y']}, {dim['w']}, {dim['h']})"
+            )
         return ",\n".join(values)
 
 
 class FigureCommand(SQLCommand):
     """Generates Figure SQL"""
 
-    def __init__(self, config: ConfigManager, id_generator: IdGenerator, figure_blocks: List[Dict[str, str]]):
+    def __init__(
+        self,
+        config: ConfigManager,
+        id_generator: IdGenerator,
+        figure_blocks: List[Dict[str, str]],
+    ):
         self.config = config
         self.id_generator = id_generator
         self.figure_blocks = figure_blocks
@@ -740,9 +780,7 @@ class FigureCommand(SQLCommand):
             return ""
 
         values = self._format_figure_values()
-        return self.config.get_sql_template('figure').format(
-            figure_values=values
-        )
+        return self.config.get_sql_template("figure").format(figure_values=values)
 
     def _format_figure_values(self) -> str:
         """Format the values for Figure SQL, omitting trailing _<digits> from the name"""
@@ -750,8 +788,8 @@ class FigureCommand(SQLCommand):
         for figure in self.figure_blocks:
             figure_id = self.id_generator.generate_uuid7()
             # Remove trailing _<digits> from the name
-            name = figure['name']
-            name = re.sub(r'_\d+$', '', name)
+            name = figure["name"]
+            name = re.sub(r"_\d+$", "", name)
             values.append(f"    ('{figure_id}', '{figure['block_id']}', '{name}')")
         return ",\n".join(values)
 
@@ -759,7 +797,12 @@ class FigureCommand(SQLCommand):
 class PrecompiledImageCommand(SQLCommand):
     """Generates PrecompiledImage SQL"""
 
-    def __init__(self, config: ConfigManager, id_generator: IdGenerator, precompiled_image_blocks: List[Dict[str, str]]):
+    def __init__(
+        self,
+        config: ConfigManager,
+        id_generator: IdGenerator,
+        precompiled_image_blocks: List[Dict[str, str]],
+    ):
         self.config = config
         self.id_generator = id_generator
         self.precompiled_image_blocks = precompiled_image_blocks
@@ -770,7 +813,7 @@ class PrecompiledImageCommand(SQLCommand):
             return ""
 
         values = self._format_precompiled_image_values()
-        return self.config.get_sql_template('precompiled_image').format(
+        return self.config.get_sql_template("precompiled_image").format(
             precompiled_image_values=values
         )
 
@@ -779,8 +822,14 @@ class PrecompiledImageCommand(SQLCommand):
         values = []
         for precompiled_image in self.precompiled_image_blocks:
             precompiled_image_id = self.id_generator.generate_uuid7()
-            color_value = f"'{precompiled_image['color']}'" if precompiled_image['color'] else "null"
-            values.append(f"    ('{precompiled_image_id}', '{precompiled_image['block_layout_id']}', '{precompiled_image['url']}', {color_value})")
+            color_value = (
+                f"'{precompiled_image['color']}'"
+                if precompiled_image["color"]
+                else "null"
+            )
+            values.append(
+                f"    ('{precompiled_image_id}', '{precompiled_image['block_layout_id']}', '{precompiled_image['url']}', {color_value})"
+            )
         return ",\n".join(values)
 
 
@@ -795,13 +844,13 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
         """Generate SlideLayoutAdditionalInfo SQL"""
         additional_info = self.config.get_slide_layout_additional_info()
 
-        return self.config.get_sql_template('slide_layout_additional_info').format(
+        return self.config.get_sql_template("slide_layout_additional_info").format(
             slide_layout_id=self.slide_layout.id,
-            percentesCount=additional_info['percentesCount'],
-            maxSymbolsInBlock=additional_info['maxSymbolsInBlock'],
-            hasHeaders=str(additional_info['hasHeaders']).lower(),
+            percentesCount=additional_info["percentesCount"],
+            maxSymbolsInBlock=additional_info["maxSymbolsInBlock"],
+            hasHeaders=str(additional_info["hasHeaders"]).lower(),
             type=self.slide_layout.type,
-            icon_url=self.slide_layout.icon_url
+            icon_url=self.slide_layout.icon_url,
         )
 
 
@@ -816,12 +865,12 @@ class SlideLayoutDimensionsCommand(SQLCommand):
         """Generate SlideLayoutDimensions SQL"""
         dimensions = self.config.get_slide_layout_dimensions()
 
-        return self.config.get_sql_template('slide_layout_dimensions').format(
+        return self.config.get_sql_template("slide_layout_dimensions").format(
             slide_layout_id=self.slide_layout.id,
-            x=dimensions['x'],
-            y=dimensions['y'],
-            w=dimensions['w'],
-            h=dimensions['h']
+            x=dimensions["x"],
+            y=dimensions["y"],
+            w=dimensions["w"],
+            h=dimensions["h"],
         )
 
 
@@ -834,18 +883,21 @@ class SlideLayoutStylesCommand(SQLCommand):
 
     def execute(self) -> str:
         """Generate SlideLayoutStyles SQL"""
-        return self.config.get_sql_template('slide_layout_styles').format(
+        return self.config.get_sql_template("slide_layout_styles").format(
             slide_layout_id=self.slide_layout.id
         )
 
 
 # ================ Strategy Pattern for Slide Type Determination ================
 
+
 class SlideTypeStrategy(ABC):
     """Base class for slide type determination strategies"""
 
     @abstractmethod
-    def determine_slide_type(self, slide_layout: SlideLayout, blocks: List[Block]) -> Tuple[str, str]:
+    def determine_slide_type(
+        self, slide_layout: SlideLayout, blocks: List[Block]
+    ) -> Tuple[str, str]:
         """Determine the slide type based on layout and blocks"""
         pass
 
@@ -856,7 +908,9 @@ class NumberBasedSlideTypeStrategy(SlideTypeStrategy):
     def __init__(self, config: ConfigManager):
         self.config = config
 
-    def determine_slide_type(self, slide_layout: SlideLayout, blocks: List[Block]) -> Tuple[str, str, bool]:
+    def determine_slide_type(
+        self, slide_layout: SlideLayout, blocks: List[Block]
+    ) -> Tuple[str, str, bool]:
         """Determine the slide type based on slide number"""
         number = slide_layout.number
 
@@ -865,45 +919,71 @@ class NumberBasedSlideTypeStrategy(SlideTypeStrategy):
         # Set forGeneration to False for 5cols, 6cols, 7cols
         if number in [7, 10, 11]:
             for_generation = False
-            logger.info(f"Setting forGeneration to false for slide number {number} (5cols, 6cols, 7cols)")
+            logger.info(
+                f"Setting forGeneration to false for slide number {number} (5cols, 6cols, 7cols)"
+            )
 
         if slide_layout.is_last or number == -1:
             type_key = "last"
-            logger.info(f"Slide type automatically set to 'last' because this is the last slide (number -1)")
+            logger.info(
+                f"Slide type automatically set to 'last' because this is the last slide (number -1)"
+            )
         elif number == 1:
             type_key = "title"
-            logger.info(f"Slide type automatically set to 'title' because this is slide number 1")
+            logger.info(
+                f"Slide type automatically set to 'title' because this is slide number 1"
+            )
         elif number == 2:
             type_key = "few_text"
-            logger.info(f"Slide type automatically set to 'few_text' because this is slide number 2")
+            logger.info(
+                f"Slide type automatically set to 'few_text' because this is slide number 2"
+            )
         elif number == 3:
             type_key = "optimal_text"
-            logger.info(f"Slide type automatically set to 'optimal_text' because this is slide number 3")
+            logger.info(
+                f"Slide type automatically set to 'optimal_text' because this is slide number 3"
+            )
         elif number == 4:
             type_key = "many_text"
-            logger.info(f"Slide type automatically set to 'many_text' because this is slide number 4")
+            logger.info(
+                f"Slide type automatically set to 'many_text' because this is slide number 4"
+            )
         elif number == 5:
             type_key = "infographics"
-            logger.info(f"Slide type automatically set to 'infographics' because this is slide number 5")
+            logger.info(
+                f"Slide type automatically set to 'infographics' because this is slide number 5"
+            )
         elif number == 6:
             type_key = "extra_text"
-            logger.info(f"Slide type automatically set to 'extra_text' because this is slide number 6")
+            logger.info(
+                f"Slide type automatically set to 'extra_text' because this is slide number 6"
+            )
         elif number == 7:
             type_key = "other"
-            logger.info(f"Slide type automatically set to 'other' because this is slide number 7")
+            logger.info(
+                f"Slide type automatically set to 'other' because this is slide number 7"
+            )
         elif number == 8:
             type_key = "table"
-            logger.info(f"Slide type automatically set to 'table' because this is slide number 8")
+            logger.info(
+                f"Slide type automatically set to 'table' because this is slide number 8"
+            )
         elif number == 10:
             type_key = "other"
-            logger.info(f"Slide type automatically set to 'other' because this is slide number 10")
+            logger.info(
+                f"Slide type automatically set to 'other' because this is slide number 10"
+            )
         elif number == 14:
             type_key = "chart"
-            logger.info(f"Slide type automatically set to 'chart' because this is slide number 14")
+            logger.info(
+                f"Slide type automatically set to 'chart' because this is slide number 14"
+            )
         else:
             # Default to classic for other slide numbers
             type_key = "classic"
-            logger.info(f"Slide type automatically set to 'classic' (default for slide number {number})")
+            logger.info(
+                f"Slide type automatically set to 'classic' (default for slide number {number})"
+            )
 
         # If not for_generation, set type to 'other'
         if not for_generation:
@@ -920,38 +1000,54 @@ class ContentBasedSlideTypeStrategy(SlideTypeStrategy):
     def __init__(self, config: ConfigManager):
         self.config = config
 
-    def determine_slide_type(self, slide_layout: SlideLayout, blocks: List[Block]) -> Tuple[str, str, bool]:
+    def determine_slide_type(
+        self, slide_layout: SlideLayout, blocks: List[Block]
+    ) -> Tuple[str, str, bool]:
         """Determine the slide type based on content blocks"""
         # If last slide, don't change the type
         if slide_layout.is_last:
-            return slide_layout.type_key, self.config.get_slide_layout_type(slide_layout.type_key), slide_layout.for_generation
+            return (
+                slide_layout.type_key,
+                self.config.get_slide_layout_type(slide_layout.type_key),
+                slide_layout.for_generation,
+            )
 
         # Check for special block types
-        has_table_block = any(block.type == 'table' for block in blocks)
-        has_infographik_block = any(block.type == 'infographik' for block in blocks)
-        has_chart_block = any(block.type == 'chart' for block in blocks)
+        has_table_block = any(block.type == "table" for block in blocks)
+        has_infographik_block = any(block.type == "infographik" for block in blocks)
+        has_chart_block = any(block.type == "chart" for block in blocks)
 
         old_type_key = slide_layout.type_key
 
         if has_table_block:
             type_key = "table"
-            logger.info(f"Slide type changed from '{old_type_key}' to 'table' because this slide contains a table block")
+            logger.info(
+                f"Slide type changed from '{old_type_key}' to 'table' because this slide contains a table block"
+            )
         elif has_chart_block:
             type_key = "chart"
-            logger.info(f"Slide type changed from '{old_type_key}' to 'chart' because this slide contains a chart block")
+            logger.info(
+                f"Slide type changed from '{old_type_key}' to 'chart' because this slide contains a chart block"
+            )
         elif has_infographik_block:
             type_key = "infographics"
-            logger.info(f"Slide type changed from '{old_type_key}' to 'infographics' because this slide contains an infographik block")
+            logger.info(
+                f"Slide type changed from '{old_type_key}' to 'infographics' because this slide contains an infographik block"
+            )
         else:
             # No need to change
-            return old_type_key, self.config.get_slide_layout_type(old_type_key), slide_layout.for_generation
+            return (
+                old_type_key,
+                self.config.get_slide_layout_type(old_type_key),
+                slide_layout.for_generation,
+            )
 
         slide_type = self.config.get_slide_layout_type(type_key)
         return type_key, slide_type, slide_layout.for_generation
 
 
-
 # ================ Main SQL Generator ================
+
 
 class SQLGenerator:
     """Main SQL Generator class"""
@@ -967,9 +1063,25 @@ class SQLGenerator:
         self.number_strategy = NumberBasedSlideTypeStrategy(self.config_manager)
         self.content_strategy = ContentBasedSlideTypeStrategy(self.config_manager)
 
+        # Define canonical block type variables for clarity, robust to missing types
+        block_types = self.config_manager.config.BLOCK_TYPES["block_layout_type_options"]
+        def safe_block_type(name):
+            if name in block_types:
+                return block_types[block_types.index(name)]
+            logger.warning(f"Block type '{name}' not found in config.BLOCK_TYPES['block_layout_type_options']")
+            return None
+
+        self.BLOCK_TYPE_WATERMARK = safe_block_type("watermark")
+        self.BLOCK_TYPE_FIGURE = safe_block_type("figure")
+        self.BLOCK_TYPE_BACKGROUND = safe_block_type("background")
+        self.BLOCK_TYPE_IMAGE = safe_block_type("image")
+        self.BLOCK_TYPE_TABLE = safe_block_type("table")
+        self.BLOCK_TYPE_INFOGRAPHIK = safe_block_type("infographik")
+        self.BLOCK_TYPE_CHART = safe_block_type("chart")
+
         # Set up logging to file in the output directory
         if output_dir is None:
-            output_dir = self.config_manager.get_output_config()['output_dir']
+            output_dir = self.config_manager.get_output_config()["output_dir"]
         setup_slide_insertion_logger(output_dir)
 
     def run(self) -> None:
@@ -977,14 +1089,26 @@ class SQLGenerator:
         while True:
             output_file = self.generate_sql()
 
-            show_sql = self.user_input.get_input("\nWould you like to see the generated SQL?", "n",
-                                               options=["y", "n"]) == "y"
+            show_sql = (
+                self.user_input.get_input(
+                    "\nWould you like to see the generated SQL?",
+                    "n",
+                    options=["y", "n"],
+                )
+                == "y"
+            )
             if show_sql:
-                with open(output_file, 'r') as f:
+                with open(output_file, "r") as f:
                     logger.info("\n" + f.read())
 
-            again = self.user_input.get_input("\nWould you like to generate another SQL file?", "n",
-                                            options=["y", "n"]) == "y"
+            again = (
+                self.user_input.get_input(
+                    "\nWould you like to generate another SQL file?",
+                    "n",
+                    options=["y", "n"],
+                )
+                == "y"
+            )
             if not again:
                 break
 
@@ -993,237 +1117,193 @@ class SQLGenerator:
         logger.info("Starting SQL generation process.")
         # Load sql_generator_input.json for color/font extraction
         output_config = self.config_manager.get_output_config()
-        base_output_dir = output_config['output_dir']
-        sql_input_path = os.path.join(base_output_dir, 'sql_generator_input.json')
-        if not os.path.exists(sql_input_path):
-            logger.error(f"sql_generator_input.json not found at {sql_input_path}")
-            return None
-        with open(sql_input_path, 'r', encoding='utf-8') as f:
-            sql_input_data = json.load(f)
+        base_output_dir = output_config["output_dir"]
+        sql_input_path = os.path.join(base_output_dir, "sql_generator_input.json")
+        sql_input_data = None
+        if os.path.exists(sql_input_path):
+            with open(sql_input_path, "r", encoding="utf-8") as f:
+                sql_input_data = json.load(f)
+        else:
+            logger.warning(f"sql_generator_input.json not found at {sql_input_path}. Color/font SQL will be skipped.")
         # Collect slide layout information
         slide_layout = self._collect_slide_information()
-        logger.info(f"Collected slide layout: name={slide_layout.name}, number={slide_layout.number}, type={slide_layout.type}, is_last={slide_layout.is_last}")
+        logger.info(
+            f"Collected slide layout: name={slide_layout.name}, number={slide_layout.number}, type={slide_layout.type}, is_last={slide_layout.is_last}"
+        )
         # Collect blocks
-        blocks, figure_blocks, precompiled_image_blocks = self._collect_blocks(slide_layout)
-        logger.info(f"Collected {len(blocks)} blocks for slide '{slide_layout.name}' (number {slide_layout.number})")
+        blocks, figure_blocks, precompiled_image_blocks = self._collect_blocks(
+            slide_layout
+        )
+        logger.info(
+            f"Collected {len(blocks)} blocks for slide '{slide_layout.name}' (number {slide_layout.number})"
+        )
         for block in blocks:
-            logger.info(f"Block: type={block.type}, name={getattr(block, 'name', '')}, dimensions={block.dimensions}, styles={block.styles}")
+            logger.info(
+                f"Block: type={block.type}, name={getattr(block, 'name', '')}, dimensions={block.dimensions}, styles={block.styles}"
+            )
         # Update slide type based on content
         self._update_slide_type(slide_layout, blocks)
         logger.info(f"Final slide type: {slide_layout.type}")
-        # Color extraction and SQL generation from sql_generator_input.json ---
-        color_sql, color_folder = self._generate_color_sql_from_sql_input(slide_layout, sql_input_data)
+        # Color extraction and SQL generation from sql_generator_input.json
+        color_sql = ""
+        color_folder = None
+        if sql_input_data is not None:
+            color_sql, color_folder = self._generate_color_sql_from_sql_input(
+                slide_layout, sql_input_data
+            )
         # Generate SQL
-        sql = self._generate_sql_queries(slide_layout, blocks, figure_blocks, precompiled_image_blocks)
+        sql = self._generate_sql_queries(
+            slide_layout, blocks, figure_blocks, precompiled_image_blocks
+        )
         # Write SQL to file
         output_file = self._write_sql_to_file(sql, slide_layout)
+        if color_sql and color_folder:
+            color_sql_file = os.path.join(color_folder, f"color_insertion_{slide_layout.name}.sql")
+            with open(color_sql_file, "w", encoding="utf-8") as f:
+                f.write(color_sql)
+            logger.info(f"Color SQL written to {color_sql_file}")
         logger.info(f"SQL written to {output_file}")
-        logger.info(f"Color SQL written to {color_sql_file}")
+        logger.info(f"SQL file generated: {os.path.basename(output_file)} (saved at: {os.path.abspath(output_file)})")
+        print(f"\nSQL file generated: {os.path.basename(output_file)}\nSaved at: {os.path.abspath(output_file)}\n")
         logger.info("SQL generation process completed.")
         return output_file
 
-    def _generate_color_sql_from_sql_input(self, slide_layout, sql_input_data):
+    def _generate_color_sql_from_sql_input(self, slide_layout, sql_input_data) -> tuple:
         """Generate SQL for color and font insertions and index configs, using sql_generator_input.json."""
-        logger.info(f"Starting color/font SQL generation for slide: name={slide_layout.name}, number={slide_layout.number}")
-        available_numbers = [slide.get('slide_layout_number') for slide in sql_input_data]
-        logger.debug(f"Available slide_layout_number values in input: {available_numbers}")
+        logger.info(
+            f"Starting color/font SQL generation for slide: name={slide_layout.name}, number={slide_layout.number}"
+        )
         output_config = self.config_manager.get_output_config()
-        base_output_dir = output_config['output_dir']
+        base_output_dir = output_config["output_dir"]
         folder_name = self.config_manager.get_folder_for_slide_number(slide_layout.number)
         output_dir = os.path.join(base_output_dir, folder_name)
-        def normalize_name(name):
-            return re.sub(r'\s*z-index\s*\d+\s*$', '', name or '').strip().lower()
-        slide_layout_name_norm = normalize_name(slide_layout.name)
-        # Find all slides in sql_input_data matching this slide_layout (by number and normalized name)
-        matching_slides = []
-        for slide in sql_input_data:
-            slide_num = str(slide.get('slide_layout_number'))
-            slide_name_norm = normalize_name(slide.get('slide_layout_name'))
-            logger.debug(f"Comparing input slide_layout_number={slide_num}, name='{slide_name_norm}' to current number={slide_layout.number}, name='{slide_layout_name_norm}'")
-            if slide_num == str(slide_layout.number) and slide_name_norm == slide_layout_name_norm:
-                matching_slides.append(slide)
-        found_any = False
+
+        matching_slides = self._find_matching_slides(slide_layout, sql_input_data)
         color_sql_lines = []
+        found_any = False
         for slide in matching_slides:
-            candidate_config = slide.get('slideConfig', None)
-            logger.debug(f"Found candidate slideConfig for slide_layout_number={slide.get('slide_layout_number')}, name='{slide.get('slide_layout_name')}': {candidate_config}")
+            candidate_config = slide.get("slideConfig", None)
+            logger.debug(
+                f"Found candidate slideConfig for slide_layout_number={slide.get('slide_layout_number')}, name='{slide.get('slide_layout_name')}': {candidate_config}"
+            )
             if candidate_config and len(candidate_config) > 0:
                 found_any = True
-                # --- updated color/font SQL generation logic for new structure ---
-                palette_colors = set()
-                block_config_colors = {}
-                block_config_fonts = {}
-                for block_type, color_dict in candidate_config.items():
-                    for color_hex, obj_list in color_dict.items():
-                        color_hex_lc = normalize_color(color_hex)
-                        # For each object in the list, extract fill and fontFamily
-                        for obj in obj_list:
-                            fill_color = obj.get('fill')
-                            if fill_color:
-                                fill_color = normalize_color(fill_color)
-                            font_raw = obj.get('fontFamily', 'roboto')
-                            font_norm = normalize_font_family(font_raw)
-                            # Insert color into PresentationPalette
-                            if color_hex_lc not in palette_colors:
-                                palette_id = self.id_generator.generate_uuid7()
-                                color_sql_lines.append(f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES ('{palette_id}', '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;")
-                                palette_colors.add(color_hex_lc)
-                            # Insert color into BlockLayoutConfig for this block type
-                            if block_type not in block_config_colors:
-                                block_config_colors[block_type] = set()
-                            if color_hex_lc not in block_config_colors[block_type]:
-                                color_sql_lines.append(f"-- Ensure color {color_hex_lc} is in BlockLayoutConfig.{block_type}")
-                                color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET {block_type} = array_append({block_type}, '{color_hex_lc}'::text) WHERE NOT ('{color_hex_lc}'::text = ANY({block_type}));")
-                                block_config_colors[block_type].add(color_hex_lc)
-                            # Insert font into BlockLayoutConfig.font
-                            if block_type not in block_config_fonts:
-                                block_config_fonts[block_type] = set()
-                            if font_norm not in block_config_fonts[block_type]:
-                                color_sql_lines.append(f"-- Ensure font {font_norm} is in BlockLayoutConfig.font")
-                                color_sql_lines.append(f"UPDATE \"BlockLayoutConfig\" SET font = array_append(font, '{font_norm}'::\"FontFamilyType\") WHERE NOT ('{font_norm}'::\"FontFamilyType\" = ANY(font));")
-                                block_config_fonts[block_type].add(font_norm)
-                            color_sql_lines.append(f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}'::text) - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
-                            color_sql_lines.append(f"-- Get font index: SELECT array_position(font, '{font_norm}'::\"FontFamilyType\") - 1 FROM \"BlockLayoutConfig\" WHERE ...;")
+                color_sql_lines.extend(self._process_slide_color_font_config(candidate_config, slide_layout))
         if not found_any:
-            logger.warning(f"No slideConfig found for slide {slide_layout.number} ('{slide_layout.name}') in sql_generator_input.json")
-            return '', output_dir
-        return '\n'.join(color_sql_lines), output_dir
+            logger.warning(
+                f"No slideConfig found for slide {slide_layout.number} ('{slide_layout.name}') in sql_generator_input.json"
+            )
+            return "", output_dir
+        return "\n".join(color_sql_lines), output_dir
 
-    def _parse_ids_from_sql_files(self, sql_dir):
-        """Parse BlockLayoutId and SlideLayoutId from existing generated SQL files."""
-        blocklayout_id_map = {}  # block_name -> block_layout_id
-        slidelayout_id_map = {}  # slide_name -> slide_layout_id
-        block_pattern = re.compile(r"INSERT INTO \"BlockLayout\" \(id,.*?name.*?\) VALUES \('([\w-]+)'.*?'(.*?)'\)", re.DOTALL)
-        slide_pattern = re.compile(r"INSERT INTO \"SlideLayout\" \(id,.*?name.*?\) VALUES \('([\w-]+)'.*?'(.*?)'\)", re.DOTALL)
-        for fname in os.listdir(sql_dir):
-            if not fname.endswith('.sql'):
-                continue
-            with open(os.path.join(sql_dir, fname), 'r', encoding='utf-8') as f:
-                content = f.read()
-                for m in block_pattern.finditer(content):
-                    blocklayout_id, block_name = m.groups()
-                    blocklayout_id_map[block_name] = blocklayout_id
-                for m in slide_pattern.finditer(content):
-                    slidelayout_id, slide_name = m.groups()
-                    slidelayout_id_map[slide_name] = slidelayout_id
-        return blocklayout_id_map, slidelayout_id_map
-
-    def _generate_color_font_index_sql(self, slide_layout, sql_input_data):
-        """Generate SQL for BlockLayoutConfig, BlockLayoutIndexConfig, and SlideLayoutIndexConfig, using real IDs from generated SQLs."""
-        output_config = self.config_manager.get_output_config()
-        base_output_dir = output_config['output_dir']
-        folder_name = self.config_manager.get_folder_for_slide_number(slide_layout.number)
-        output_dir = os.path.join(base_output_dir, folder_name)
-        slide_name = slide_layout.name
-        sql_dir = output_dir  # Assume block/slide SQLs are in the same folder
-        blocklayout_id_map, slidelayout_id_map = self._parse_ids_from_sql_files(sql_dir)
+    def _find_matching_slides(self, slide_layout, sql_input_data) -> list:
+        """Find all slides in sql_input_data matching this slide_layout (by number and normalized name)."""
         def normalize_name(name):
-            return re.sub(r'\s*z-index\s*\d+\s*$', '', name or '').strip().lower()
+            return re.sub(r"\s*z-index\s*\d+\s*$", "", name or "").strip().lower()
         slide_layout_name_norm = normalize_name(slide_layout.name)
-        # Find all slides in sql_input_data matching this slide_layout (by number and normalized name)
         matching_slides = []
         for slide in sql_input_data:
-            slide_num = str(slide.get('slide_layout_number'))
-            slide_name_norm = normalize_name(slide.get('slide_layout_name'))
-            logger.debug(f"Comparing input slide_layout_number={slide_num}, name='{slide_name_norm}' to current number={slide_layout.number}, name='{slide_layout_name_norm}'")
-            if slide_num == str(slide_layout.number) and slide_name_norm == slide_layout_name_norm:
+            slide_num = str(slide.get("slide_layout_number"))
+            slide_name_norm = normalize_name(slide.get("slide_layout_name"))
+            logger.debug(
+                f"Comparing input slide_layout_number={slide_num}, name='{slide_name_norm}' to current number={slide_layout.number}, name='{slide_layout_name_norm}'"
+            )
+            if (
+                slide_num == str(slide_layout.number)
+                and slide_name_norm == slide_layout_name_norm
+            ):
                 matching_slides.append(slide)
-        found_any = False
-        sql_lines = []
-        for slide in matching_slides:
-            candidate_config = slide.get('slideConfig', None)
-            logger.debug(f"Found candidate slideConfig for slide_layout_number={slide.get('slide_layout_number')}, name='{slide.get('slide_layout_name')}': {candidate_config}")
-            if candidate_config and len(candidate_config) > 0:
-                found_any = True
-                blocklayout_configs = {}  # (block_type, tuple(colors), tuple(fonts)) -> config_id
-                blocklayout_index_configs = set()  # (block_layout_id, config_id, color_index, font_index)
-                slidelay_index_configs = set()  # (slide_layout_id, ...)
-                for block_type, color_dict in candidate_config.items():
-                    color_array = []
-                    font_array = []
-                    color_to_index = {}
-                    font_to_index = {}
-                    # Collect all unique colors and fonts from the list of objects
-                    for color_hex, obj_list in color_dict.items():
-                        color_hex_lc = normalize_color(color_hex)
-                        if color_hex_lc not in color_to_index:
-                            color_to_index[color_hex_lc] = len(color_array)
-                            color_array.append(color_hex_lc)
-                        for obj in obj_list:
-                            font_norm = normalize_font_family(obj.get('fontFamily', 'roboto'))
-                            if font_norm not in font_to_index:
-                                font_to_index[font_norm] = len(font_array)
-                                font_array.append(font_norm)
-                    config_key = (block_type, tuple(color_array), tuple(font_array))
-                    if config_key not in blocklayout_configs:
-                        config_id = str(uuid.uuid4())
-                        blocklayout_configs[config_key] = config_id
-                        sql_lines.append(f"INSERT INTO \"BlockLayoutConfig\" (id, {block_type}, font) VALUES ('{config_id}', ARRAY{color_array}, ARRAY{font_array}) ON CONFLICT DO NOTHING;")
-                    else:
-                        config_id = blocklayout_configs[config_key]
-                    for color_hex, obj_list in color_dict.items():
-                        color_hex_lc = normalize_color(color_hex)
-                        for obj in obj_list:
-                            font_norm = normalize_font_family(obj.get('fontFamily', 'roboto'))
-                            color_index = color_to_index[color_hex_lc]
-                            font_index = font_to_index[font_norm]
-                            block_name = obj.get('blockName') or obj.get('name') or block_type  # Try to get block name
-                            block_layout_id = blocklayout_id_map.get(block_name)
-                            if not block_layout_id:
-                                block_layout_id = str(uuid.uuid4())  # fallback
-                            blocklayout_index_key = (block_layout_id, config_id, color_index, font_index)
-                            if blocklayout_index_key not in blocklayout_index_configs:
-                                blocklayout_index_config_id = str(uuid.uuid4())
-                                blocklayout_index_configs.add(blocklayout_index_key)
-                                sql_lines.append(f"INSERT INTO \"BlockLayoutIndexConfig\" (id, blockLayoutId, indexColorId, indexFontId) VALUES ('{blocklayout_index_config_id}', '{block_layout_id}', {color_index}, {font_index});")
-                                slidelay_index_key = (slide_layout.id, blocklayout_index_config_id, config_id)
-                                if slidelay_index_key not in slidelay_index_configs:
-                                    slidelay_index_config_id = str(uuid.uuid4())
-                                    slidelay_index_configs.add(slidelay_index_key)
-                                    slide_layout_id = slidelayout_id_map.get(slide_name, slide_layout.id)
-                                    presentation_palette_id = str(uuid.uuid4())  # In real use, get or create as above
-                                    sql_lines.append(f"INSERT INTO \"SlideLayoutIndexConfig\" (id, presentationPaletteId, configNumber, slideLayoutId, blockLayoutIndexConfigId, blockLayoutConfigId) VALUES ('{slidelay_index_config_id}', '{presentation_palette_id}', 0, '{slide_layout_id}', '{blocklayout_index_config_id}', '{config_id}');")
-        if not found_any:
-            logger.warning(f"No slideConfig found for slide {slide_layout.number} ('{slide_layout.name}') in sql_generator_input.json")
-            return '', output_dir
-        readable_time = datetime.now().strftime(output_config['timestamp_format'])
-        file_name = f"{slide_name}_color_font_index_{readable_time}.sql"
-        sql_file = os.path.join(output_dir, file_name)
-        with open(sql_file, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(sql_lines))
-        return sql_file, output_dir
+        return matching_slides
+
+    def _process_slide_color_font_config(self, candidate_config, slide_layout) -> list:
+        """Process a single slide's color/font config and generate SQL lines."""
+        color_sql_lines = []
+        palette_colors = set()
+        block_config_colors = {}
+        block_config_fonts = {}
+        for block_type, color_dict in candidate_config.items():
+            for color_hex, obj_list in color_dict.items():
+                color_hex_lc = normalize_color(color_hex)
+                for obj in obj_list:
+                    fill_color = obj.get("fill")
+                    if fill_color:
+                        fill_color = normalize_color(fill_color)
+                    font_raw = obj.get("fontFamily", "roboto")
+                    font_norm = normalize_font_family(font_raw)
+                    # Insert color into PresentationPalette
+                    if color_hex_lc not in palette_colors:
+                        palette_id = self.id_generator.generate_uuid7()
+                        color_sql_lines.append(
+                            f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES ('{palette_id}', '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;"
+                        )
+                        palette_colors.add(color_hex_lc)
+                    # Insert color into BlockLayoutConfig for this block type
+                    if block_type not in block_config_colors:
+                        block_config_colors[block_type] = set()
+                    if color_hex_lc not in block_config_colors[block_type]:
+                        color_sql_lines.append(
+                            f"-- Ensure color {color_hex_lc} is in BlockLayoutConfig.{block_type}"
+                        )
+                        color_sql_lines.append(
+                            f"UPDATE \"BlockLayoutConfig\" SET {block_type} = array_append({block_type}, '{color_hex_lc}'::text) WHERE NOT ('{color_hex_lc}'::text = ANY({block_type}));"
+                        )
+                        block_config_colors[block_type].add(color_hex_lc)
+                    # Insert font into BlockLayoutConfig.font
+                    if block_type not in block_config_fonts:
+                        block_config_fonts[block_type] = set()
+                    if font_norm not in block_config_fonts[block_type]:
+                        color_sql_lines.append(
+                            f"-- Ensure font {font_norm} is in BlockLayoutConfig.font"
+                        )
+                        color_sql_lines.append(
+                            f'UPDATE "BlockLayoutConfig" SET font = array_append(font, \'{font_norm}\'::"FontFamilyType") WHERE NOT (\'{font_norm}\'::"FontFamilyType" = ANY(font));'
+                        )
+                        block_config_fonts[block_type].add(font_norm)
+                    color_sql_lines.append(
+                        f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}'::text) - 1 FROM \"BlockLayoutConfig\" WHERE ...;"
+                    )
+                    color_sql_lines.append(
+                        f'-- Get font index: SELECT array_position(font, \'{font_norm}\'::"FontFamilyType") - 1 FROM "BlockLayoutConfig" WHERE ...;'
+                    )
+        return color_sql_lines
 
     def _collect_slide_information(self) -> SlideLayout:
-        """Collect slide layout information"""
+        """Collect slide layout information interactively from the user (manual mode)."""
         slide_layout_name = self.user_input.get_input(
             "SlideLayout name",
-            self.config_manager.get_default_value('slide_layout_name')
+            self.config_manager.get_default_value("slide_layout_name"),
         )
 
         # Ask if this is the last slide
         is_last_slide_option = self.user_input.get_input(
-            "Is this the last slide?",
-            "no",
-            options=["yes", "no"]
+            "Is this the last slide?", "no", options=["yes", "no"]
         )
-        is_last_slide = (is_last_slide_option == "yes")
+        is_last_slide = is_last_slide_option == "yes"
 
-        slide_layout_number = -1 if is_last_slide else self.user_input.get_input(
-            "SlideLayout number",
-            self.config_manager.get_default_value('slide_layout_number'),
-            is_integer=True
+        slide_layout_number = (
+            -1
+            if is_last_slide
+            else self.user_input.get_input(
+                "SlideLayout number",
+                self.config_manager.get_default_value("slide_layout_number"),
+                is_integer=True,
+            )
         )
 
         presentation_layout_id = self.user_input.get_input(
             "Presentation Layout ID",
-            self.config_manager.get_default_value('presentation_layout_id')
+            self.config_manager.get_default_value("presentation_layout_id"),
         )
 
         # Initialize with a default for_generation value (will be updated by the strategy)
         for_generation = True
 
         # Determine initial slide type based on number
-        type_key, slide_type, for_generation = self.number_strategy.determine_slide_type(
+        (
+            type_key,
+            slide_type,
+            for_generation,
+        ) = self.number_strategy.determine_slide_type(
             SlideLayout(
                 id="",  # Temporary ID until we generate it
                 name=slide_layout_name,
@@ -1231,19 +1311,32 @@ class SQLGenerator:
                 presentation_layout_id=presentation_layout_id,
                 is_last=is_last_slide,
                 type_key="classic",  # Will be set by the strategy
-                type="",      # Will be set by the strategy
+                type="",  # Will be set by the strategy
                 icon_url="",  # Will be set later
-                for_generation=for_generation
+                for_generation=for_generation,
             ),
-            []  # No blocks yet
+            [],  # No blocks yet
         )
 
         # Use SLIDE_NUMBER_TO_NUMBER for icon url, but skip number for certain types
-        skip_number_types = {"infographics", "table", "chart", "last", "title"}
-        if slide_type in skip_number_types:
+        skip_number_types = set(
+            filter(
+                None,
+                [
+                    safe_slide_type(self.config_manager.config, "infographics"),
+                    safe_slide_type(self.config_manager.config, "table"),
+                    safe_slide_type(self.config_manager.config, "chart"),
+                    safe_slide_type(self.config_manager.config, "last"),
+                    safe_slide_type(self.config_manager.config, "title"),
+                ],
+            )
+        )
+        if slide_type in skip_number_types or slide_layout_number == 0:
             icon_url = f"{self.config_manager.get_miniatures_base_path()}/{slide_type}/{slide_layout_name}.svg"
         else:
-            number_for_icon = self.config_manager.config.SLIDE_NUMBER_TO_NUMBER.get(slide_layout_number, slide_layout_number)
+            number_for_icon = self.config_manager.config.SLIDE_NUMBER_TO_NUMBER.get(
+                slide_layout_number, slide_layout_number
+            )
             icon_url = f"{self.config_manager.get_miniatures_base_path()}/{slide_type}/{number_for_icon}_{slide_layout_name}.svg"
 
         # Generate ID for slide layout
@@ -1258,131 +1351,58 @@ class SQLGenerator:
             type_key=type_key,
             type=slide_type,
             icon_url=icon_url,
-            for_generation=for_generation
+            for_generation=for_generation,
         )
 
-    def _collect_blocks(self, slide_layout):
-        """Collect block information"""
+    def _auto_blocks(self, slide_layout) -> list:
+        """Return a list of automatically added blocks (background, watermark, etc) based on config and slide_layout."""
         blocks = []
-        figure_blocks = []
-        precompiled_image_blocks = []
-
-        # For last slides, add watermark info
-        if slide_layout.is_last:
-            logger.info("Last slide will automatically include a watermark block.")
-        # For non-last slides, add watermark based on config
-        elif self.config_manager.should_add_watermark():
-            logger.info("Regular slide will automatically include a watermark block.")
-
-        # Add automatic background if configured
+        # Add background if configured
         if self.config_manager.should_add_background():
             bg_config = self.config_manager.get_auto_block_config("background")
             bg_block = self.block_factory.create_background_block(bg_config)
             blocks.append(bg_block)
             logger.info(f"\nAutomatically added background block with color {bg_config['color']}")
-
-        # Add watermarks based on slide type
+        # Add watermark for last slide
         if slide_layout.is_last:
-            # Add watermark for last slide
+            logger.info("Last slide will automatically include a watermark block.")
             wm_config = self.config_manager.get_auto_block_config("last_slide")["watermark1"]
-            wm_block = self.block_factory.create_watermark_block(wm_config["dimensions"])
-            blocks.append(wm_block)
+            watermark_block = self.block_factory.create_watermark_block(wm_config["dimensions"])
+            blocks.append(watermark_block)
             logger.info("\nAutomatically added watermark block for last slide")
+        # Add watermark for regular slides if configured
         elif self.config_manager.should_add_watermark():
-            # Add regular watermark
+            logger.info("Regular slide will automatically include a watermark block.")
             wm_config = self.config_manager.get_auto_block_config("watermark")
-            wm_block = self.block_factory.create_watermark_block(wm_config["dimensions"])
-            blocks.append(wm_block)
+            watermark_block = self.block_factory.create_watermark_block(wm_config["dimensions"])
+            blocks.append(watermark_block)
             logger.info("\nAutomatically added watermark block")
-
-        # Collect user-defined blocks
-        num_blocks = self.user_input.get_input(
-            "How many additional blocks do you want to create?",
-            self.config_manager.get_default_value('num_blocks'),
-            is_integer=True
-        )
-
-        for i in range(num_blocks):
-            logger.info(f"\nBlock {i + 1} information:")
-
-            is_first_block = (i == 0)
-            default_type = 'slideTitle' if is_first_block else 'text'
-            block_type = self.user_input.get_input(
-                f"Block {i + 1} Layout Type",
-                default_type,
-                options=self.config_manager.get_block_type_options()
-            )
-
-            block = self.block_factory.create_block(
-                block_type,
-                i,
-                self.user_input,
-                num_blocks
-            )
-
-            if block:
-                blocks.append(block)
-                if block.figure_info:
-                    figure_blocks.append(block.figure_info)
-                if block.precompiled_image_info:
-                    # If it's a list (multiple variants), extend; else, append
-                    if isinstance(block.precompiled_image_info, list):
-                        precompiled_image_blocks.extend(block.precompiled_image_info)
-                    else:
-                        precompiled_image_blocks.append(block.precompiled_image_info)
-
-        # Ensure a background block is present
-        has_background = any(b.type == 'background' for b in blocks)
-        if not has_background:
-            bg_config = self.config_manager.config.AUTO_BLOCKS['background']
-            bg_styles = {
-                "textVertical": None,
-                "textHorizontal": None,
-                "fontSize": None,
-                "weight": None,
-                "zIndex": bg_config['z_index'],
-                "textTransform": None,
-                "color": bg_config['color']
-            }
-            bg_block = Block(
-                id=self.id_generator.generate_uuid7(),
-                type='background',
-                dimensions=bg_config['dimensions'],
-                styles=bg_styles,
-                needs_null_styles=True,
-                needs_z_index=True,
-                is_figure=False,
-                is_background=True,
-                is_precompiled_image=False,
-                color=None,
-                figure_info=None,
-                precompiled_image_info=None,
-                border_radius=[0, 0, 0, 0],
-                name="background"
-            )
-            blocks.insert(0, bg_block)
-
-        # Add watermark block if specified in config
+        # Add watermark if specified in config for the slide
         add_watermark = False
-        if hasattr(self.config_manager.config, 'WATERMARK_SLIDES'):
-            add_watermark = slide_layout.number in self.config_manager.config.WATERMARK_SLIDES
+        if hasattr(self.config_manager.config, "WATERMARK_SLIDES"):
+            add_watermark = (
+                slide_layout.number in self.config_manager.config.WATERMARK_SLIDES
+            )
         if add_watermark:
-            if slide_layout.number == -1 and 'last_slide' in self.config_manager.config.AUTO_BLOCKS:
-                wm_dims = self.config_manager.config.AUTO_BLOCKS['last_slide']['watermark1']['dimensions']
+            if (
+                slide_layout.number == -1
+                and "last_slide" in self.config_manager.config.AUTO_BLOCKS
+            ):
+                watermark_dimensions = self.config_manager.config.AUTO_BLOCKS["last_slide"]["watermark1"]["dimensions"]
             else:
-                wm_dims = self.config_manager.config.AUTO_BLOCKS['watermark']['dimensions']
-            wm_block = Block(
+                watermark_dimensions = self.config_manager.config.AUTO_BLOCKS["watermark"]["dimensions"]
+            watermark_block = Block(
                 id=self.id_generator.generate_uuid7(),
-                type='watermark',
-                dimensions=wm_dims,
+                type="watermark",
+                dimensions=watermark_dimensions,
                 styles={
                     "textVertical": None,
                     "textHorizontal": None,
                     "fontSize": None,
                     "weight": None,
-                    "zIndex": self.config_manager.config.Z_INDEX_DEFAULTS['watermark'],
+                    "zIndex": self.config_manager.config.Z_INDEX_DEFAULTS["watermark"],
                     "textTransform": None,
-                    "color": "#ffffff"
+                    "color": "#ffffff",
                 },
                 needs_null_styles=True,
                 needs_z_index=False,
@@ -1393,49 +1413,132 @@ class SQLGenerator:
                 figure_info=None,
                 precompiled_image_info=None,
                 border_radius=[0, 0, 0, 0],
-                name="watermark"
+                name="watermark",
             )
-            blocks.append(wm_block)
+            blocks.append(watermark_block)
+        return blocks
 
+    def _collect_blocks(self, slide_layout) -> tuple:
+        """Collect all blocks for the given slide layout, including auto and user-defined blocks."""
+        blocks = []
+        # Add auto blocks (background, watermark, etc)
+        blocks += self._auto_blocks(slide_layout)
+        # Collect user-defined blocks
+        user_blocks, figure_blocks, precompiled_image_blocks = self._collect_user_defined_blocks()
+        blocks += user_blocks
+        # Ensure a background block is present
+        if not any(b.type == "background" for b in blocks):
+            bg_config = self.config_manager.config.AUTO_BLOCKS["background"]
+            bg_styles = {
+                "textVertical": None,
+                "textHorizontal": None,
+                "fontSize": None,
+                "weight": None,
+                "zIndex": bg_config["z_index"],
+                "textTransform": None,
+                "color": bg_config["color"],
+            }
+            bg_block = Block(
+                id=self.id_generator.generate_uuid7(),
+                type="background",
+                dimensions=bg_config["dimensions"],
+                styles=bg_styles,
+                needs_null_styles=True,
+                needs_z_index=True,
+                is_figure=False,
+                is_background=True,
+                is_precompiled_image=False,
+                color=None,
+                figure_info=None,
+                precompiled_image_info=None,
+                border_radius=[0, 0, 0, 0],
+                name="background",
+            )
+            blocks.insert(0, bg_block)
+        return blocks, figure_blocks, precompiled_image_blocks
+
+    def _collect_user_defined_blocks(self) -> tuple:
+        """Prompt user for blocks and return (blocks, figure_blocks, precompiled_image_blocks)."""
+        blocks = []
+        figure_blocks = []
+        precompiled_image_blocks = []
+        num_blocks = self.user_input.get_input(
+            "How many additional blocks do you want to create?",
+            self.config_manager.get_default_value("num_blocks"),
+            is_integer=True,
+        )
+        for i in range(num_blocks):
+            logger.info(f"\nBlock {i + 1} information:")
+            is_first_block = i == 0
+            default_type = "slideTitle" if is_first_block else "text"
+            block_type = self.user_input.get_input(
+                f"Block {i + 1} Layout Type",
+                default_type,
+                options=self.config_manager.get_block_type_options(),
+            )
+            block = self.block_factory.create_block(
+                block_type, i, self.user_input, num_blocks
+            )
+            if block:
+                blocks.append(block)
+                if block.figure_info:
+                    figure_blocks.append(block.figure_info)
+                if block.precompiled_image_info:
+                    if isinstance(block.precompiled_image_info, list):
+                        precompiled_image_blocks.extend(block.precompiled_image_info)
+                    else:
+                        precompiled_image_blocks.append(block.precompiled_image_info)
         return blocks, figure_blocks, precompiled_image_blocks
 
     def _update_slide_type(self, slide_layout, blocks):
         """Update slide type based on block content"""
-        type_key, slide_type, for_generation = self.content_strategy.determine_slide_type(slide_layout, blocks)
+        (
+            type_key,
+            slide_type,
+            for_generation,
+        ) = self.content_strategy.determine_slide_type(slide_layout, blocks)
 
         # Update slide layout with potentially new type
         slide_layout.type_key = type_key
         slide_layout.type = slide_type
-        skip_number_types = {"infographics", "table", "chart", "last", "hero"}
+        skip_number_types = set(
+            filter(
+                None,
+                [
+                    safe_slide_type(self.config_manager.config, "infographics"),
+                    safe_slide_type(self.config_manager.config, "table"),
+                    safe_slide_type(self.config_manager.config, "chart"),
+                    safe_slide_type(self.config_manager.config, "last"),
+                    safe_slide_type(self.config_manager.config, "title"),
+                ],
+            )
+        )
         if slide_type in skip_number_types or slide_layout.number == 0:
             slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{slide_type}/{slide_layout.name}.svg"
         else:
-            number_for_icon = self.config_manager.config.SLIDE_NUMBER_TO_NUMBER.get(slide_layout.number, slide_layout.number)
+            number_for_icon = self.config_manager.config.SLIDE_NUMBER_TO_NUMBER.get(
+                slide_layout.number, slide_layout.number
+            )
             slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{slide_type}/{number_for_icon}_{slide_layout.name}.svg"
 
-    def _generate_sql_queries(self,
-                            slide_layout,
-                            blocks,
-                            figure_blocks,
-                            precompiled_image_blocks):
+    def _generate_sql_queries(
+        self, slide_layout, blocks, figure_blocks, precompiled_image_blocks
+    ):
         """Generate SQL queries for all entities"""
         sql_queries = []
 
         # Create timestamp for SQL comment header
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         sql_queries.append(f"-- Generated on {current_time}\n")
 
         # Create and execute all SQL commands
         commands = [
             # 1. SlideLayout
             SlideLayoutCommand(self.config_manager, slide_layout, current_time),
-
             # 2. BlockLayout
             BlockLayoutCommand(self.config_manager, blocks, slide_layout.id),
-
             # 3. BlockLayoutStyles
             BlockStylesCommand(self.config_manager, blocks),
-
             # 4. BlockLayoutDimensions
             BlockDimensionsCommand(self.config_manager, blocks),
         ]
@@ -1449,15 +1552,19 @@ class SQLGenerator:
         # 6. PrecompiledImage records (optional)
         if precompiled_image_blocks:
             commands.append(
-                PrecompiledImageCommand(self.config_manager, self.id_generator, precompiled_image_blocks)
+                PrecompiledImageCommand(
+                    self.config_manager, self.id_generator, precompiled_image_blocks
+                )
             )
 
         # 7-9. Additional slide layout info
-        commands.extend([
-            SlideLayoutAdditionalInfoCommand(self.config_manager, slide_layout),
-            SlideLayoutDimensionsCommand(self.config_manager, slide_layout),
-            SlideLayoutStylesCommand(self.config_manager, slide_layout)
-        ])
+        commands.extend(
+            [
+                SlideLayoutAdditionalInfoCommand(self.config_manager, slide_layout),
+                SlideLayoutDimensionsCommand(self.config_manager, slide_layout),
+                SlideLayoutStylesCommand(self.config_manager, slide_layout),
+            ]
+        )
 
         # Execute all commands and collect SQL
         for command in commands:
@@ -1471,35 +1578,48 @@ class SQLGenerator:
     def _write_sql_to_file(self, sql, slide_layout):
         """Write SQL to output file, with folder based on slide number, in slide_insertion subdirectory."""
         output_config = self.config_manager.get_output_config()
-        base_output_dir = output_config['output_dir']
+        base_output_dir = output_config["output_dir"]
         # Get the folder name based on slide number
-        folder_name = self.config_manager.get_folder_for_slide_number(slide_layout.number)
+        folder_name = self.config_manager.get_folder_for_slide_number(
+            slide_layout.number
+        )
         # Create the full output directory path (slide_insertion subdir)
-        output_dir = os.path.join(base_output_dir, 'slide_insertion', folder_name)
+        output_dir = os.path.join(base_output_dir, "slide_insertion", folder_name)
         # Create output directory if it doesn't exist
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
             logger.info(f"Created directory: {output_dir}")
         # Generate filename with timestamp
-        readable_time = datetime.now().strftime(output_config['timestamp_format'])
-        file_name = output_config['filename_template'].format(
-            slide_layout_name=slide_layout.name,
-            timestamp=readable_time
+        readable_time = datetime.now().strftime(output_config["timestamp_format"])
+        file_name = output_config["filename_template"].format(
+            slide_layout_name=slide_layout.name, timestamp=readable_time
         )
         output_file = os.path.join(output_dir, file_name)
         # Write SQL to file
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             f.write(sql)
         logger.info(f"\nSQL has been generated and saved to {output_file}")
         return output_file
 
+
 def normalize_font_family(font_name: str) -> str:
     if not font_name:
-        return 'roboto'
-    return re.sub(r'[^a-z0-9_]', '', font_name.strip().lower().replace(' ', '_').replace('-', '_'))
+        return "roboto"
+    return re.sub(
+        r"[^a-z0-9_]", "", font_name.strip().lower().replace(" ", "_").replace("-", "_")
+    )
+
 
 def normalize_color(color: str) -> str:
     return color.strip().lower()
+
+
+def safe_slide_type(config, name):
+    val = config.SLIDE_LAYOUT_TYPES.get(name)
+    if val is None:
+        logger.warning(f"Slide type '{name}' not found in config.SLIDE_LAYOUT_TYPES")
+    return val
+
 
 def auto_generate_sql_from_figma(json_path, output_dir=None):
     """
@@ -1514,7 +1634,7 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
     import logging
 
     generator = SQLGenerator(config, output_dir=output_dir)
-    output_dir = output_dir or config.OUTPUT_CONFIG['output_dir']
+    output_dir = output_dir or config.OUTPUT_CONFIG["output_dir"]
     # Remove output directory if it exists
     if os.path.exists(output_dir):
         logger.info(f"Preparing to remove existing output directory: {output_dir}")
@@ -1533,187 +1653,243 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
     logger.info(f"Created output directory: {output_dir}")
     setup_slide_insertion_logger(output_dir)
     logger.info(f"Starting auto SQL generation from {json_path} to {output_dir}")
+
     def strip_zindex(name: str) -> str:
         # Remove 'background_N' and ' z-index N' (case-insensitive, with or without leading/trailing spaces)
-        name = re.sub(r'\s*background_\d+\s*', ' ', name, flags=re.IGNORECASE)
-        name = re.sub(r'\s*z-index\s*\d+\s*$', '', name, flags=re.IGNORECASE)
+        name = re.sub(r"\s*background_\d+\s*", " ", name, flags=re.IGNORECASE)
+        name = re.sub(r"\s*z-index\s*\d+\s*$", "", name, flags=re.IGNORECASE)
         # Clean up any extra spaces
         return name.strip()
-    color_pattern = re.compile(r'(#[0-9a-fA-F]{3,6})')
-    precompiled_image_pattern = re.compile(r'^image precompiled ([^\s]+) z-index \d+ (#[0-9a-fA-F]{3,6})$', re.IGNORECASE)
-    with open(json_path, 'r', encoding='utf-8') as f:
+
+    with open(json_path, "r", encoding="utf-8") as f:
         slides = json.load(f)
     for slide in slides:
-        logger.info(f"Processing slide: name={slide['slide_layout_name']}, number={slide['slide_layout_number']}, type={slide['slide_type']}")
-        # Generate a UUID for the SlideLayout
-        slide_layout_id = generator.id_generator.generate_uuid7()
-        # Strip z-index from slide layout name
-        clean_slide_layout_name = strip_zindex(slide['slide_layout_name'])
-        # Build SlideLayout object
-        slide_layout = SlideLayout(
-            id=slide_layout_id,
-            name=clean_slide_layout_name,
-            number=slide['slide_layout_number'],
-            presentation_layout_id=slide['presentation_layout_id'],
-            is_last=slide['is_last'],
-            type_key=slide['slide_type'],
-            type=slide['slide_type'],
-            icon_url="",  # Will be set below
-            for_generation=True  # Will be set by SQLGenerator
-        )
-        logger.info(f"Created SlideLayout: {slide_layout}")
-        # Set icon_url using config and slide info (same as manual mode)
-        miniatures_base_path = config.MINIATURES_BASE_PATH
-        slide_type = slide_layout.type
-        slide_layout_name = slide_layout.name
-        slide_layout_number = slide_layout.number
-        skip_number_types = {"infographics", "table", "chart", "last", "title", "hero"}
-        if slide_type in skip_number_types or slide_layout_number == 0:
-            icon_url = f"{miniatures_base_path}/{slide_type}/{slide_layout_name}.svg"
-        else:
-            number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(slide_layout_number, slide_layout_number)
-            icon_url = f"{miniatures_base_path}/{slide_type}/{number_for_icon}_{slide_layout_name}.svg"
-        slide_layout.icon_url = icon_url
-        # Build Block objects with generated UUIDs
-        blocks = []
-        block_id_map = {}  # Map Figma block id to generated UUID
-        precompiled_images = []
-        figure_blocks = []
-        for block in slide['blocks']:
-            block_uuid = generator.id_generator.generate_uuid7()
-            block_id_map[block['id']] = block_uuid
-            styles = dict(block['styles']) if block.get('styles') else {}
-            color = None
-            if 'color' in styles and styles['color']:
-                color = styles['color']
-            elif 'color' in block and block['color']:
-                color = block['color']
-            elif block.get('styles', {}).get('color'):
-                color = block['styles']['color']
-            if color is not None:
-                styles['color'] = str(color)
-            else:
-                styles['color'] = None
-            # --- Precompiled image extraction logic ---
-            if block['type'] == 'image' and block['name'].startswith('image precompiled'):
-                # Extract base name and color if present
-                match = re.match(r'image precompiled ([^ ]+)(?: z-index \d+)?(?: (#[0-9a-fA-F]{3,6}))?', block['name'])
-                if match:
-                    base_name = match.group(1)
-                    base_url = config.PRECOMPILED_IMAGES["base_url"]
-                    colors = config.PRECOMPILED_IMAGES["default_colors"]
-                    prefixes = config.PRECOMPILED_IMAGES["prefix"]
-                    # If color is present in the block name, use it, else use all default colors
-                    if match.group(2):
-                        color_val = match.group(2)
-                        url = f"{base_url}/{base_name}.png"
-                        precompiled_images.append({
-                            "block_layout_id": block_uuid,
-                            "url": url,
-                            "color": color_val
-                        })
-                    else:
-                        for color_val, prefix in zip(colors, prefixes):
-                            variant_name = f"{base_name}{prefix}"
-                            url = f"{base_url}/{variant_name}.png"
-                            precompiled_images.append({
-                                "block_layout_id": block_uuid,
-                                "url": url,
-                                "color": color_val
-                            })
-            clean_block_name = strip_zindex(block['name'])
-            # --- Figure extraction logic ---
-            if block['type'] == 'figure':
-                match = re.search(r'\(([^)]+)\)', clean_block_name)
-                if match:
-                    figure_name = match.group(1)
-                else:
-                    figure_name = clean_block_name
-                figure_color = color if color is not None else '#ffffff'
-                figure_blocks.append({
-                    "block_id": block_uuid,
-                    "name": figure_name,
-                    "color": figure_color
-                })
-            block_obj = Block(
-                id=block_uuid,
-                type=block['type'],
-                dimensions=block['dimensions'],
-                styles=styles,
-                needs_null_styles=block['needs_null_styles'],
-                needs_z_index=block['needs_z_index'],
-                is_figure=block.get('is_figure', False),
-                is_background=block.get('is_background', False),
-                is_precompiled_image=block.get('is_precompiled_image', False),
-                color=None,
-                figure_info=block.get('figure_info'),
-                precompiled_image_info=block.get('precompiled_image_info'),
-                border_radius=block.get('corner_radius', [0, 0, 0, 0]),
-                name=clean_block_name
-            )
-            blocks.append(block_obj)
-            logger.info(f"Block: type={block_obj.type}, name={block_obj.name}, dimensions={block_obj.dimensions}, styles={block_obj.styles}")
-        # Ensure a background block is present
-        has_background = any(b.type == 'background' for b in blocks)
-        logger.info(f"Background block present from Figma: {has_background}")
-        if has_background:
-            logger.info("Using background block(s) extracted from Figma with original colors")
-        else:
-            logger.info("No background block found in Figma extraction - slide will use default background handling")
-        # Add watermark block if specified in config
-        add_watermark = False
-        if hasattr(config, 'WATERMARK_SLIDES'):
-            add_watermark = slide_layout.number in config.WATERMARK_SLIDES
-        if add_watermark:
-            if slide_layout.number == -1 and 'last_slide' in config.AUTO_BLOCKS:
-                wm_dims = config.AUTO_BLOCKS['last_slide']['watermark1']['dimensions']
-            else:
-                wm_dims = config.AUTO_BLOCKS['watermark']['dimensions']
-            wm_block = Block(
-                id=generator.id_generator.generate_uuid7(),
-                type='watermark',
-                dimensions=wm_dims,
-                styles={
-                    "textVertical": None,
-                    "textHorizontal": None,
-                    "fontSize": None,
-                    "weight": None,
-                    "zIndex": config.Z_INDEX_DEFAULTS['watermark'],
-                    "textTransform": None,
-                    "color": "#ffffff"
-                },
-                needs_null_styles=True,
-                needs_z_index=False,
-                is_figure=False,
-                is_background=False,
-                is_precompiled_image=False,
-                color=None,
-                figure_info=None,
-                precompiled_image_info=None,
-                border_radius=[0, 0, 0, 0],
-                name="watermark"
-            )
-            blocks.append(wm_block)
-            logger.info(f"Automatically added watermark block: {wm_block}")
-        # Use SQLGenerator's internal methods to generate SQL and write to file
-        sql = generator._generate_sql_queries(slide_layout, blocks, figure_blocks, precompiled_images)
-        folder_name = generator.config_manager.get_folder_for_slide_number(slide_layout.number)
-        # Write slide SQL to <output_dir>/<group>/slide_insertion/
-        slide_insertion_dir = os.path.join(output_dir, folder_name, 'slide_insertion')
-        os.makedirs(slide_insertion_dir, exist_ok=True)
-        timestamp = datetime.now().strftime(config.OUTPUT_CONFIG['timestamp_format'])
-        filename = f"{clean_slide_layout_name}_{timestamp}.sql"
-        sql_file_path = os.path.join(slide_insertion_dir, filename)
-        with open(sql_file_path, 'w', encoding='utf-8') as f:
-            f.write(sql)
-        logger.info(f"Generated SQL for slide {clean_slide_layout_name} at {sql_file_path}")
-        # --- Add color/font SQL generation in auto mode ---
-        logger.info(f"Calling color/font SQL generation for slide: name={slide_layout.name}, number={slide_layout.number}")
+        _process_figma_slide(slide, generator, output_dir, strip_zindex)
     logger.info("Auto SQL generation process completed.")
+
+def _process_figma_slide(slide: dict, generator: 'SQLGenerator', output_dir: str, strip_zindex) -> None:
+    """Process a single slide from Figma JSON and generate SQL."""
+    import config
+    from datetime import datetime
+    # Generate a UUID for the SlideLayout
+    slide_layout_id = generator.id_generator.generate_uuid7()
+    # Strip z-index from slide layout name
+    clean_slide_layout_name = strip_zindex(slide["slide_layout_name"])
+    # Build SlideLayout object
+    slide_layout = SlideLayout(
+        id=slide_layout_id,
+        name=clean_slide_layout_name,
+        number=slide["slide_layout_number"],
+        presentation_layout_id=slide["presentation_layout_id"],
+        is_last=slide["is_last"],
+        type_key=slide["slide_type"],
+        type=slide["slide_type"],
+        icon_url="",  # Will be set below
+        for_generation=True,  # Will be set by SQLGenerator
+    )
+    logger.info(f"Created SlideLayout: {slide_layout}")
+    # Set icon_url using config and slide info (same as manual mode)
+    miniatures_base_path = config.MINIATURES_BASE_PATH
+    slide_type = slide_layout.type
+    slide_layout_name = slide_layout.name
+    slide_layout_number = slide_layout.number
+    skip_number_types = set(
+        filter(
+            None,
+            [
+                safe_slide_type(config, "infographics"),
+                safe_slide_type(config, "table"),
+                safe_slide_type(config, "chart"),
+                safe_slide_type(config, "last"),
+                safe_slide_type(config, "title"),
+            ],
+        )
+    )
+    if slide_type in skip_number_types or slide_layout_number == 0:
+        icon_url = f"{miniatures_base_path}/{slide_type}/{slide_layout_name}.svg"
+    else:
+        number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(
+            slide_layout_number, slide_layout_number
+        )
+        icon_url = f"{miniatures_base_path}/{slide_type}/{number_for_icon}_{slide_layout_name}.svg"
+    slide_layout.icon_url = icon_url
+    # Build Block objects with generated UUIDs
+    blocks, precompiled_images, figure_blocks = _process_figma_blocks(slide, generator, strip_zindex)
+    _ensure_background_and_watermark_blocks(slide_layout, blocks, generator)
+    # Use SQLGenerator's internal methods to generate SQL and write to file
+    sql = generator._generate_sql_queries(
+        slide_layout, blocks, figure_blocks, precompiled_images
+    )
+    folder_name = generator.config_manager.get_folder_for_slide_number(
+        slide_layout.number
+    )
+    # Write slide SQL to <output_dir>/<group>/slide_insertion/
+    slide_insertion_dir = os.path.join(output_dir, folder_name, "slide_insertion")
+    os.makedirs(slide_insertion_dir, exist_ok=True)
+    timestamp = datetime.now().strftime(config.OUTPUT_CONFIG["timestamp_format"])
+    filename = f"{clean_slide_layout_name}_{timestamp}.sql"
+    sql_file_path = os.path.join(slide_insertion_dir, filename)
+    with open(sql_file_path, "w", encoding="utf-8") as f:
+        f.write(sql)
+    logger.info(
+        f"Generated SQL for slide {clean_slide_layout_name} at {sql_file_path}"
+    )
+    logger.info(
+        f"Calling color/font SQL generation for slide: name={slide_layout.name}, number={slide_layout.number}"
+    )
+
+def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) -> tuple:
+    """Process blocks from a Figma slide and return blocks, precompiled_images, and figure_blocks lists."""
+    import config
+    blocks = []
+    block_id_map = {}  # Map Figma block id to generated UUID
+    precompiled_images = []
+    figure_blocks = []
+    for block in slide["blocks"]:
+        block_uuid = generator.id_generator.generate_uuid7()
+        block_id_map[block["id"]] = block_uuid
+        styles = dict(block["styles"]) if block.get("styles") else {}
+        color = None
+        if "color" in styles and styles["color"]:
+            color = styles["color"]
+        elif "color" in block and block["color"]:
+            color = block["color"]
+        elif block.get("styles", {}).get("color"):
+            color = block["styles"]["color"]
+        if color is not None:
+            styles["color"] = str(color)
+        else:
+            styles["color"] = None
+        # Precompiled image extraction logic
+        if block["type"] == "image" and block["name"].startswith(
+            "image precompiled"
+        ):
+            _process_precompiled_image_block(block, block_uuid, precompiled_images)
+        clean_block_name = strip_zindex(block["name"])
+        # Figure extraction logic
+        if block["type"] == "figure":
+            _process_figure_block(block, block_uuid, clean_block_name, color, figure_blocks)
+        block_obj = Block(
+            id=block_uuid,
+            type=block["type"],
+            dimensions=block["dimensions"],
+            styles=styles,
+            needs_null_styles=block["needs_null_styles"],
+            needs_z_index=block["needs_z_index"],
+            is_figure=block.get("is_figure", False),
+            is_background=block.get("is_background", False),
+            is_precompiled_image=block.get("is_precompiled_image", False),
+            color=None,
+            figure_info=block.get("figure_info"),
+            precompiled_image_info=block.get("precompiled_image_info"),
+            border_radius=block.get("corner_radius", [0, 0, 0, 0]),
+            name=clean_block_name,
+        )
+        blocks.append(block_obj)
+        logger.info(
+            f"Block: type={block_obj.type}, name={block_obj.name}, dimensions={block_obj.dimensions}, styles={block_obj.styles}"
+        )
+    return blocks, precompiled_images, figure_blocks
+
+def _process_precompiled_image_block(block: dict, block_uuid: str, precompiled_images: list) -> None:
+    """Process a precompiled image block and append variants to precompiled_images."""
+    import config
+    match = re.match(
+        r"image precompiled ([^ ]+)(?: z-index \d+)?(?: (#[0-9a-fA-F]{3,6}))?",
+        block["name"],
+    )
+    if match:
+        base_name = match.group(1)
+        base_url = config.PRECOMPILED_IMAGES["base_url"]
+        colors = config.PRECOMPILED_IMAGES["default_colors"]
+        prefixes = config.PRECOMPILED_IMAGES["prefix"]
+        # If color is present in the block name, use it, else use all default colors
+        if match.group(2):
+            color_val = match.group(2)
+            url = f"{base_url}/{base_name}.png"
+            precompiled_images.append(
+                {
+                    "block_layout_id": block_uuid,
+                    "url": url,
+                    "color": color_val,
+                }
+            )
+        else:
+            for color_val, prefix in zip(colors, prefixes):
+                variant_name = f"{base_name}{prefix}"
+                url = f"{base_url}/{variant_name}.png"
+                precompiled_images.append(
+                    {
+                        "block_layout_id": block_uuid,
+                        "url": url,
+                        "color": color_val,
+                    }
+                )
+
+def _process_figure_block(block: dict, block_uuid: str, clean_block_name: str, color: str, figure_blocks: list) -> None:
+    """Process a figure block and append to figure_blocks."""
+    match = re.search(r"\(([^)]+)\)", clean_block_name)
+    if match:
+        figure_name = match.group(1)
+    else:
+        figure_name = clean_block_name
+    figure_color = color if color is not None else "#ffffff"
+    figure_blocks.append(
+        {"block_id": block_uuid, "name": figure_name, "color": figure_color}
+    )
+
+def _ensure_background_and_watermark_blocks(slide_layout, blocks: list, generator: 'SQLGenerator') -> None:
+    """Ensure a background block and watermark block are present if needed."""
+    import config
+    has_background = any(b.type == "background" for b in blocks)
+    logger.info(f"Background block present from Figma: {has_background}")
+    if has_background:
+        logger.info(
+            "Using background block(s) extracted from Figma with original colors"
+        )
+    else:
+        logger.info(
+            "No background block found in Figma extraction - slide will use default background handling"
+        )
+    # Add watermark block if specified in config
+    add_watermark = False
+    if hasattr(config, "WATERMARK_SLIDES"):
+        add_watermark = slide_layout.number in config.WATERMARK_SLIDES
+    if add_watermark:
+        if slide_layout.number == -1 and "last_slide" in config.AUTO_BLOCKS:
+            watermark_dimensions = config.AUTO_BLOCKS["last_slide"]["watermark1"]["dimensions"]
+        else:
+            watermark_dimensions = config.AUTO_BLOCKS["watermark"]["dimensions"]
+        watermark_block = Block(
+            id=generator.id_generator.generate_uuid7(),
+            type="watermark",
+            dimensions=watermark_dimensions,
+            styles={
+                "textVertical": None,
+                "textHorizontal": None,
+                "fontSize": None,
+                "weight": None,
+                "zIndex": config.Z_INDEX_DEFAULTS["watermark"],
+                "textTransform": None,
+                "color": "#ffffff",
+            },
+            needs_null_styles=True,
+            needs_z_index=False,
+            is_figure=False,
+            is_background=False,
+            is_precompiled_image=False,
+            color=None,
+            figure_info=None,
+            precompiled_image_info=None,
+            border_radius=[0, 0, 0, 0],
+            name="watermark",
+        )
+        blocks.append(watermark_block)
+
 
 def main():
     """Main entry point for interactive mode"""
-    output_dir = config.OUTPUT_CONFIG['output_dir']
+    output_dir = config.OUTPUT_CONFIG["output_dir"]
     # Remove output directory if it exists
     if os.path.exists(output_dir):
         logger.info(f"Preparing to remove existing output directory: {output_dir}")
@@ -1733,11 +1909,23 @@ def main():
     generator = SQLGenerator(config)
     generator.run()
 
+
 # Extend CLI to support --auto-from-figma
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="SQL Generator for Layout and Blocks (interactive or auto mode)")
-    parser.add_argument('--auto-from-figma', type=str, help='Path to sql_generator_input.json from figma.py for non-interactive SQL generation')
-    parser.add_argument('--output-dir', type=str, default=None, help='Output directory for SQL files (optional, overrides config)')
+    parser = argparse.ArgumentParser(
+        description="SQL Generator for Layout and Blocks (interactive or auto mode)"
+    )
+    parser.add_argument(
+        "--auto-from-figma",
+        type=str,
+        help="Path to sql_generator_input.json from figma.py for non-interactive SQL generation",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Output directory for SQL files (optional, overrides config)",
+    )
     args, unknown = parser.parse_known_args()
 
     if args.auto_from_figma:
@@ -1745,5 +1933,6 @@ if __name__ == "__main__":
     else:
         main_output_dir = args.output_dir if args.output_dir else None
         import config
+
         generator = SQLGenerator(config, output_dir=main_output_dir)
         generator.run()
