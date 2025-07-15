@@ -158,6 +158,12 @@ def confirm_db_execution(db_config):
             print("\n\nExecution cancelled by user.")
             return False
 
+def _as_pg_array(val):
+    """Convert a list or string to a Postgres array literal with curly braces."""
+    if isinstance(val, list):
+        return '{' + ','.join(str(x) for x in val) + '}'
+    return '{' + str(val) + '}'
+
 def insert_block_layout_config_auto(json_path, db_config, csv_path):
     if not psycopg2:
         print('psycopg2 is required for auto mode. Please install it.')
@@ -179,9 +185,14 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
             # Check if a similar config already exists
             cur.execute("""
                 SELECT id FROM "BlockLayoutConfig" 
-                WHERE text = %s AND slideTitle = %s AND blockTitle = %s AND font = %s
+                WHERE "text" = %s AND "slideTitle" = %s AND "blockTitle" = %s AND "font" = %s::"FontFamilyType"[]
                 LIMIT 1
-            """, (config['text'], config['slideTitle'], config['blockTitle'], config['font']))
+            """, (
+                _as_pg_array(config['text']),
+                _as_pg_array(config['slideTitle']),
+                _as_pg_array(config['blockTitle']),
+                _as_pg_array(config['font'])
+            ))
             existing = cur.fetchone()
             if existing:
                 config_id = existing[0]
@@ -191,44 +202,44 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
                 # Insert new config
                 cur.execute("""
                     INSERT INTO "BlockLayoutConfig" (
-                        id, text, slideTitle, blockTitle, email, date, name, percentage,
-                        figure, icon, background, subTitle, number, logo, font
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        "id", "text", "slideTitle", "blockTitle", "email", "date", "name", "percentage",
+                        "figure", "icon", "background", "subTitle", "number", "logo", "font"
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::"FontFamilyType"[])
                 """, (
                     config_id,
-                    config['text'],
-                    config['slideTitle'],
-                    config['blockTitle'],
-                    config['email'],
-                    config['date'],
-                    config['name'],
-                    config['percentage'],
-                    config['figure'],
-                    config['icon'],
-                    config['background'],
-                    config['subTitle'],
-                    config['number'],
-                    config['logo'],
-                    config['font']
+                    _as_pg_array(config['text']),
+                    _as_pg_array(config['slideTitle']),
+                    _as_pg_array(config['blockTitle']),
+                    _as_pg_array(config['email']),
+                    _as_pg_array(config['date']),
+                    _as_pg_array(config['name']),
+                    _as_pg_array(config['percentage']),
+                    _as_pg_array(config['figure']),
+                    _as_pg_array(config['icon']),
+                    _as_pg_array(config['background']),
+                    _as_pg_array(config['subTitle']),
+                    _as_pg_array(config['number']),
+                    _as_pg_array(config['logo']),
+                    _as_pg_array(config['font'])
                 ))
                 print(f"[AUTO] Inserted new config: {config_id}")
             # Add to mapping, including all *_font columns
             mapping.append({
                 'id': config_id,
-                'text': str(config['text']),
-                'slideTitle': str(config['slideTitle']),
-                'blockTitle': str(config['blockTitle']),
-                'email': str(config['email']),
-                'date': str(config['date']),
-                'name': str(config['name']),
-                'percentage': str(config['percentage']),
-                'figure': str(config['figure']),
-                'icon': str(config['icon']),
-                'background': str(config['background']),
-                'subTitle': str(config['subTitle']),
-                'number': str(config['number']),
-                'logo': str(config['logo']),
-                'font': str(config['font']),
+                'text': _as_pg_array(config['text']),
+                'slideTitle': _as_pg_array(config['slideTitle']),
+                'blockTitle': _as_pg_array(config['blockTitle']),
+                'email': _as_pg_array(config['email']),
+                'date': _as_pg_array(config['date']),
+                'name': _as_pg_array(config['name']),
+                'percentage': _as_pg_array(config['percentage']),
+                'figure': _as_pg_array(config['figure']),
+                'icon': _as_pg_array(config['icon']),
+                'background': _as_pg_array(config['background']),
+                'subTitle': _as_pg_array(config['subTitle']),
+                'number': _as_pg_array(config['number']),
+                'logo': _as_pg_array(config['logo']),
+                'font': _as_pg_array(config['font']),
                 **{col: str(config.get(col, [])) for col in font_columns}
             })
         conn.commit()
@@ -255,9 +266,7 @@ def insert_block_layout_config_manual(json_path, csv_path):
     mapping = []
     for config in configs:
         def format_array(arr):
-            if isinstance(arr, list):
-                return "ARRAY[" + ",".join(f"'{item}'" for item in arr) + "]"
-            return f"ARRAY['{arr}']"
+            return _as_pg_array(arr)
         sql = f'''INSERT INTO "BlockLayoutConfig" (
     id, text, slideTitle, blockTitle, email, date, name, percentage,
     figure, icon, background, subTitle, number, logo, font
@@ -282,20 +291,20 @@ def insert_block_layout_config_manual(json_path, csv_path):
         print(f"[MANUAL] {sql}")
         mapping.append({
             'id': config['id'],
-            'text': str(config['text']),
-            'slideTitle': str(config['slideTitle']),
-            'blockTitle': str(config['blockTitle']),
-            'email': str(config['email']),
-            'date': str(config['date']),
-            'name': str(config['name']),
-            'percentage': str(config['percentage']),
-            'figure': str(config['figure']),
-            'icon': str(config['icon']),
-            'background': str(config['background']),
-            'subTitle': str(config['subTitle']),
-            'number': str(config['number']),
-            'logo': str(config['logo']),
-            'font': str(config['font'])
+            'text': _as_pg_array(config['text']),
+            'slideTitle': _as_pg_array(config['slideTitle']),
+            'blockTitle': _as_pg_array(config['blockTitle']),
+            'email': _as_pg_array(config['email']),
+            'date': _as_pg_array(config['date']),
+            'name': _as_pg_array(config['name']),
+            'percentage': _as_pg_array(config['percentage']),
+            'figure': _as_pg_array(config['figure']),
+            'icon': _as_pg_array(config['icon']),
+            'background': _as_pg_array(config['background']),
+            'subTitle': _as_pg_array(config['subTitle']),
+            'number': _as_pg_array(config['number']),
+            'logo': _as_pg_array(config['logo']),
+            'font': _as_pg_array(config['font'])
         })
     fieldnames = ['id', 'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name', 'percentage', 'figure', 'icon', 'background', 'subTitle', 'number', 'logo', 'font']
     with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:

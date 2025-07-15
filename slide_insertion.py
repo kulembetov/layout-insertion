@@ -5,7 +5,7 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict, List, Tuple, TypedDict, Literal
+from typing import Dict, List, Tuple, TypedDict
 from dataclasses import dataclass, field
 import json
 import shutil

@@ -6,7 +6,6 @@ import ast
 from typing import Dict, List, Tuple, Optional
 import glob
 import shutil
-# --- UUIDv7 generator from slide_insertion.py ---
 import time
 import uuid
 
