@@ -12,6 +12,7 @@ import json
 import shutil
 import argparse
 import config
+from config import camel_to_snake
 
 @dataclass
 class SlideLayoutIndexConfig:
@@ -883,13 +884,14 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
     def execute(self) -> str:
         """Generate SlideLayoutAdditionalInfo SQL"""
         additional_info = self.config.get_slide_layout_additional_info()
-
+        # Always use camelCase for type
+        slide_type_camel = config.SLIDE_NUMBER_TO_TYPE.get(self.slide_layout.number, self.slide_layout.type)
         return self.config.get_sql_template("slide_layout_additional_info").format(
             slide_layout_id=self.slide_layout.id,
             percentesCount=additional_info["percentesCount"],
             maxSymbolsInBlock=additional_info["maxSymbolsInBlock"],
             hasHeaders=str(additional_info["hasHeaders"]).lower(),
-            type=self.slide_layout.type,
+            type=slide_type_camel,  # always camelCase
             icon_url=self.slide_layout.icon_url,
         )
 
@@ -1479,46 +1481,22 @@ class SQLGenerator:
         # Initialize with a default for_generation value (will be updated by the strategy)
         for_generation = True
 
-        # Determine initial slide type based on number
-        (
-            type_key,
-            slide_type,
-            for_generation,
-        ) = self.number_strategy.determine_slide_type(
-            SlideLayout(
-                id="",  # Temporary ID until we generate it
-                name=slide_layout_name,
-                number=slide_layout_number,
-                presentation_layout_id=presentation_layout_id,
-                is_last=is_last_slide,
-                type_key="classic",  # Will be set by the strategy
-                type="",  # Will be set by the strategy
-                icon_url="",  # Will be set later
-                for_generation=for_generation,
-            ),
-            [],  # No blocks yet
-        )
+        # Determine initial slide type based on number (camelCase)
+        slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide_layout_number, "other")
+        type_key = slide_type  # For now, type_key is the same as slide_type
 
         # Use SLIDE_NUMBER_TO_NUMBER for icon url, but skip number for certain types
-        skip_number_types = set(
-            filter(
-                None,
-                [
-                    safe_slide_type(self.config_manager.config, "infographics"),
-                    safe_slide_type(self.config_manager.config, "table"),
-                    safe_slide_type(self.config_manager.config, "chart"),
-                    safe_slide_type(self.config_manager.config, "last"),
-                    safe_slide_type(self.config_manager.config, "title"),
-                ],
-            )
-        )
+        skip_number_types = set([
+            config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [5, 9, 13, -1, 1]
+        ])
+        miniature_folder = camel_to_snake(slide_type)
         if slide_type in skip_number_types or slide_layout_number == 0:
-            icon_url = f"{self.config_manager.get_miniatures_base_path()}/{slide_type}/{slide_layout_name}.svg"
+            icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout_name}.svg"
         else:
-            number_for_icon = self.config_manager.config.SLIDE_NUMBER_TO_NUMBER.get(
+            number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(
                 slide_layout_number, slide_layout_number
             )
-            icon_url = f"{self.config_manager.get_miniatures_base_path()}/{slide_type}/{number_for_icon}_{slide_layout_name}.svg"
+            icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout_name}.svg"
 
         # Generate ID for slide layout
         slide_layout_id = self.id_generator.generate_uuid7()
@@ -1529,8 +1507,8 @@ class SQLGenerator:
             number=slide_layout_number,
             presentation_layout_id=presentation_layout_id,
             is_last=is_last_slide,
-            type_key=type_key,
-            type=slide_type,
+            type_key=type_key,  # camelCase
+            type=slide_type,    # camelCase
             icon_url=icon_url,
             for_generation=for_generation,
         )
@@ -1669,35 +1647,23 @@ class SQLGenerator:
         return blocks, figure_blocks, precompiled_image_blocks
 
     def _update_slide_type(self, slide_layout, blocks):
-        """Update slide type based on block content"""
-        (
-            type_key,
-            slide_type,
-            for_generation,
-        ) = self.content_strategy.determine_slide_type(slide_layout, blocks)
-
-        # Update slide layout with potentially new type
-        slide_layout.type_key = type_key
-        slide_layout.type = slide_type
-        skip_number_types = set(
-            filter(
-                None,
-                [
-                    safe_slide_type(self.config_manager.config, "infographics"),
-                    safe_slide_type(self.config_manager.config, "table"),
-                    safe_slide_type(self.config_manager.config, "chart"),
-                    safe_slide_type(self.config_manager.config, "last"),
-                    safe_slide_type(self.config_manager.config, "title"),
-                ],
-            )
-        )
+        """Update slide layout type and icon_url based on content analysis."""
+        # Use content-based strategy to determine type (camelCase)
+        slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide_layout.number, "other")
+        type_key = slide_type
+        slide_layout.type_key = type_key  # camelCase
+        slide_layout.type = slide_type    # camelCase
+        skip_number_types = set([
+            config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [5, 9, 13, -1, 1]
+        ])
+        miniature_folder = camel_to_snake(slide_type)
         if slide_type in skip_number_types or slide_layout.number == 0:
-            slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{slide_type}/{slide_layout.name}.svg"
+            slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout.name}.svg"
         else:
-            number_for_icon = self.config_manager.config.SLIDE_NUMBER_TO_NUMBER.get(
+            number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(
                 slide_layout.number, slide_layout.number
             )
-            slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{slide_type}/{number_for_icon}_{slide_layout.name}.svg"
+            slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout.name}.svg"
 
     def _generate_sql_queries(
         self, slide_layout, blocks, figure_blocks, precompiled_image_blocks
@@ -1861,43 +1827,35 @@ def _process_figma_slide(slide: dict, generator: 'SQLGenerator', output_dir: str
     slide_layout_id = generator.id_generator.generate_uuid7()
     # Strip z-index from slide layout name
     clean_slide_layout_name = strip_zindex(slide["slide_layout_name"])
-    # Build SlideLayout object
+    # Always use camelCase for type
+    slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide["slide_layout_number"], "other")
     slide_layout = SlideLayout(
         id=slide_layout_id,
         name=clean_slide_layout_name,
         number=slide["slide_layout_number"],
         presentation_layout_id=slide["presentation_layout_id"],
         is_last=slide["is_last"],
-        type_key=slide["slide_type"],
-        type=slide["slide_type"],
+        type_key=slide_type,  # camelCase
+        type=slide_type,      # camelCase
         icon_url="",  # Will be set below
         for_generation=True,  # Will be set by SQLGenerator
     )
     logger.info(f"Created SlideLayout: {slide_layout}")
     # Set icon_url using config and slide info (same as manual mode)
     miniatures_base_path = config.MINIATURES_BASE_PATH
-    slide_type = slide_layout.type
     slide_layout_name = slide_layout.name
     slide_layout_number = slide_layout.number
-    skip_number_types = set(
-        filter(
-            None,
-            [
-                safe_slide_type(config, "infographics"),
-                safe_slide_type(config, "table"),
-                safe_slide_type(config, "chart"),
-                safe_slide_type(config, "last"),
-                safe_slide_type(config, "title"),
-            ],
-        )
-    )
+    skip_number_types = set([
+        config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [5, 9, 13, -1, 1]
+    ])
+    miniature_folder = camel_to_snake(slide_type)
     if slide_type in skip_number_types or slide_layout_number == 0:
-        icon_url = f"{miniatures_base_path}/{slide_type}/{slide_layout_name}.svg"
+        icon_url = f"{miniatures_base_path}/{miniature_folder}/{slide_layout_name}.svg"
     else:
         number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(
             slide_layout_number, slide_layout_number
         )
-        icon_url = f"{miniatures_base_path}/{slide_type}/{number_for_icon}_{slide_layout_name}.svg"
+        icon_url = f"{miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_layout_name}.svg"
     slide_layout.icon_url = icon_url
     # Build Block objects with generated UUIDs
     blocks, precompiled_images, figure_blocks = _process_figma_blocks(slide, generator, strip_zindex)
