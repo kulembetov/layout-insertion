@@ -117,6 +117,7 @@ class Block:
     border_radius: list = field(default_factory=lambda: [0, 0, 0, 0])
     name: str = ""
     index: int = None  # Store the index extracted from the block name (e.g., "text_1" -> index=1)
+    opacity: float = 1.0  # Always default to 1.0 if not provided
 
 
 @dataclass
@@ -494,6 +495,9 @@ class BlockFactory:
         # Get dimensions
         dimensions = self._get_dimensions(block_type, index, user_input, is_first_block)
 
+        # Opacity: always set to 1 if not provided
+        opacity = 1.0
+
         return Block(
             id=block_id,
             type=block_type,
@@ -508,6 +512,7 @@ class BlockFactory:
             figure_info=figure_info,
             precompiled_image_info=precompiled_image_info,
             border_radius=border_radius,
+            opacity=opacity,
         )
 
     def create_watermark_block(self, dimension_config):
@@ -1902,6 +1907,10 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
             styles["color"] = str(color)
         else:
             styles["color"] = None
+        # Opacity: always set to 1 if not provided
+        opacity = block.get("opacity", 1.0)
+        if opacity is None:
+            opacity = 1.0
         # Precompiled image extraction logic
         if block["type"] == "image" and block["name"].startswith(
             "image precompiled"
@@ -1969,6 +1978,7 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
             name=clean_block_name,
             # Add the extracted index to the Block object
             index=block_index,
+            opacity=opacity,
         )
         blocks.append(block_obj)
         logger.info(
