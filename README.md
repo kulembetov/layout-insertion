@@ -61,23 +61,24 @@ All these tables are created and maintained in your company's presentation datab
 ## Example Workflow
 
 ```bash
-# 1. Insert into PresentationPalette
+
+# 1. Extract from Figma
+py figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+
+# 2. Insert into PresentationPalette
 # manual mode
 python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # auto mode
 python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
-# 2. Insert into BlockLayoutConfig
+# 3. Insert into BlockLayoutConfig
 # manual mode
 python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
 # auto mode
 python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
 
-# 3. Match BlockLayoutConfig with PresentationPalette
+# 4. Match BlockLayoutConfig with PresentationPalette
 python match_block_layout_presentation_palette.py
-
-# 4. Extract from Figma
-py figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
 
 # 5. Generate SQL
 py slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output

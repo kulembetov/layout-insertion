@@ -342,6 +342,22 @@ INSERT INTO "SlideLayoutStyles" (
 ) VALUES (
     '{slide_layout_id}'
 )
+RETURNING *;""",
+
+    "block_layout_index_config": """-- Create BlockLayoutIndexConfig
+INSERT INTO "BlockLayoutIndexConfig" (
+    "id", "blockLayoutId", "indexColorId", "indexFontId"
+)
+VALUES
+{block_layout_index_config_values}
+RETURNING *;""",
+
+    "slide_layout_index_config": """-- Create SlideLayoutIndexConfig
+INSERT INTO "SlideLayoutIndexConfig" (
+    "id", "presentationPaletteId", "configNumber", "slideLayoutId", "blockLayoutIndexConfigId", "blockLayoutConfigId"
+)
+VALUES
+{slide_layout_index_config_values}
 RETURNING *;"""
 }
 
@@ -388,10 +404,10 @@ SLIDE_NUMBER_TO_NUMBER = {
 
 SLIDE_NUMBER_TO_TYPE = {
     1: 'title',         # title
-    2: 'few_text',      # 1cols
-    3: 'optimal_text',  # 2cols
-    4: 'many_text',     # 3cols
-    5: 'extra_text',    # 4cols
+    2: 'fewText',      # 1cols
+    3: 'optimalText',  # 2cols
+    4: 'manyText',     # 3cols
+    5: 'extraText',    # 4cols
     6: 'other',         # 5cols
     7: 'other',         # 6cols
     8: 'other',         # 7cols

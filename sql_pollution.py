@@ -140,7 +140,7 @@ class SQLExecutor:
         """Ask user for confirmation before executing SQL files."""
         if not sql_files:
             return False
-            
+
         print("\n" + "=" * 60)
         print("CONFIRMATION REQUIRED")
         print("=" * 60)
@@ -149,15 +149,15 @@ class SQLExecutor:
         print(f"User: {self.db_manager.params.get('user', 'Unknown')}")
         print(f"SQL Directory: {self.sql_dir}")
         print(f"Files to execute ({len(sql_files)}):")
-        
+
         for i, file_path in enumerate(sql_files, 1):
             filename = os.path.basename(file_path)
             print(f"  {i:2}. {filename}")
-        
+
         print("\nWARNING: This will execute SQL commands against your database!")
         print("   Make sure you have backups and understand what these scripts do.")
         print("=" * 60)
-        
+
         while True:
             try:
                 response = input("\nDo you want to proceed? (yes/no): ").strip().lower()
@@ -233,8 +233,8 @@ def main():
     print(f"Current working directory: {os.getcwd()}")
 
     # Process command line arguments
-    config_file = '../database.ini'
-    sql_dir = '../sql'
+    config_file = 'database.ini'
+    sql_dir = 'my_sql_output'
 
     if len(sys.argv) > 1:
         config_file = sys.argv[1]

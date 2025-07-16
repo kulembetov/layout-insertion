@@ -3,6 +3,7 @@ import time
 import uuid
 import logging
 import re
+import csv
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, List, Tuple, TypedDict
@@ -11,6 +12,32 @@ import json
 import shutil
 import argparse
 import config
+
+@dataclass
+class SlideLayoutIndexConfig:
+    id: str
+    presentation_palette_id: str
+    block_layout_config_id: str
+    matched_background_color: str
+    config_background_colors: List[str]
+
+# Load slide layout index config mapping data
+slide_layout_index_config_mapping = []
+with open('slide_layout_index_config_mapping.csv', 'r') as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        # Convert the string representation of list to an actual list
+        config_bg_colors = eval(row['config_background_colors']) if row['config_background_colors'] else []
+
+        # Create an instance of SlideLayoutIndexConfig
+        config_obj = SlideLayoutIndexConfig(
+            id=row['id'],
+            presentation_palette_id=row['presentationPaletteId'],
+            block_layout_config_id=row['blockLayoutConfigId'],
+            matched_background_color=row['matched_background_color'],
+            config_background_colors=config_bg_colors
+        )
+        slide_layout_index_config_mapping.append(config_obj)
 
 # Helper to set up the logger file handler in any mode
 def setup_slide_insertion_logger(output_dir):
@@ -88,6 +115,7 @@ class Block:
     precompiled_image_info: list = None
     border_radius: list = field(default_factory=lambda: [0, 0, 0, 0])
     name: str = ""
+    index: int = None  # Store the index extracted from the block name (e.g., "text_1" -> index=1)
 
 
 @dataclass
@@ -785,14 +813,24 @@ class FigureCommand(SQLCommand):
         return self.config.get_sql_template("figure").format(figure_values=values)
 
     def _format_figure_values(self) -> str:
-        """Format the values for Figure SQL, omitting trailing _<digits> from the name"""
+        """Format the values for Figure SQL, extracting and storing the index from names like 'text_1'"""
         values = []
         for figure in self.figure_blocks:
             figure_id = self.id_generator.generate_uuid7()
-            # Remove trailing _<digits> from the name
+            # Extract index from name if it exists (e.g., "text_1" -> index=1)
             name = figure["name"]
+            index = None
+            match = re.search(r"_(\d+)$", name)
+            if match:
+                index = int(match.group(1))
+                logger.info(f"Extracted index {index} from figure name {name}")
+
+            # Remove trailing _<digits> from the name
             name = re.sub(r"_\d+$", "", name)
-            values.append(f"    ('{figure_id}', '{figure['block_id']}', '{name}')")
+
+            # Include the index in the SQL comment for reference
+            index_comment = f" -- index: {index}" if index is not None else ""
+            values.append(f"    ('{figure_id}', '{figure['block_id']}', '{name}'){index_comment}")
         return ",\n".join(values)
 
 
@@ -888,6 +926,106 @@ class SlideLayoutStylesCommand(SQLCommand):
         return self.config.get_sql_template("slide_layout_styles").format(
             slide_layout_id=self.slide_layout.id
         )
+
+
+class BlockLayoutIndexConfigCommand(SQLCommand):
+    """Generates BlockLayoutIndexConfig SQL"""
+
+    def __init__(self, config: ConfigManager, id_generator: IdGenerator, blocks: List[Block]):
+        self.config = config
+        self.id_generator = id_generator
+        self.blocks = blocks
+        self.block_id_to_index_config_id = {}  # mapping block.id -> block_layout_index_config_id
+
+    def execute(self) -> str:
+        """Generate BlockLayoutIndexConfig SQL"""
+        values = self._format_block_layout_index_config_values()
+        if not values:  # If no blocks have indices, return empty string
+            return ""
+        return self.config.get_sql_template("block_layout_index_config").format(
+            block_layout_index_config_values=values
+        )
+
+    def _format_block_layout_index_config_values(self) -> str:
+        """Format the values for BlockLayoutIndexConfig SQL"""
+        values = []
+        for block in self.blocks:
+            # Only process blocks that have an index
+            if block.index is not None:
+                # Generate a UUID for the record
+                block_layout_index_config_id = self.id_generator.generate_uuid7()
+                # Calculate indexColorId and indexFontId as block_index - 1
+                index_color_id = block.index - 1
+                index_font_id = block.index - 1
+                # Save mapping for use in SlideLayoutIndexConfigCommand
+                self.block_id_to_index_config_id[block.id] = block_layout_index_config_id
+                # Add the values to the list
+                values.append(
+                    f"    ('{block_layout_index_config_id}', '{block.id}', {index_color_id}, {index_font_id})"
+                )
+        return ",\n".join(values)
+
+
+class SlideLayoutIndexConfigCommand(SQLCommand):
+    """Generates SlideLayoutIndexConfig SQL"""
+
+    def __init__(self, config: ConfigManager, id_generator: IdGenerator, slide_layout: SlideLayout, blocks: List[Block], block_id_to_index_config_id: dict = None):
+        self.config = config
+        self.id_generator = id_generator
+        self.slide_layout = slide_layout
+        self.blocks = blocks
+        self.block_id_to_index_config_id = block_id_to_index_config_id or {}
+
+    def execute(self) -> str:
+        """Generate SlideLayoutIndexConfig SQL"""
+        values = self._format_slide_layout_index_config_values()
+        if not values:  # If no blocks have indices, return empty string
+            return ""
+        return self.config.get_sql_template("slide_layout_index_config").format(
+            slide_layout_index_config_values=values
+        )
+
+    def _format_slide_layout_index_config_values(self) -> str:
+        """Format the values for SlideLayoutIndexConfig SQL"""
+        values = []
+        # Get the background colors from the config
+        background_colors = self.config.get_precompiled_images_default_colors()
+
+        for block in self.blocks:
+            # Only process blocks that have an index
+            if block.index is not None:
+                # Get the slide layout ID
+                slide_layout_id = self.slide_layout.id
+
+                # For each background color, create a SlideLayoutIndexConfig record
+                for background_color in background_colors:
+                    # Find the matching presentation palette ID from slide_layout_index_config_mapping
+                    presentation_palette_id = None
+                    block_layout_config_id = None
+
+                    for config in slide_layout_index_config_mapping:
+                        if config.matched_background_color == background_color:
+                            presentation_palette_id = config.presentation_palette_id
+                            block_layout_config_id = config.block_layout_config_id
+                            break
+
+                    # If no matching presentation palette ID is found, log a warning and skip this record
+                    if not presentation_palette_id:
+                        logger.warning(f"No matching presentation palette ID found for background color {background_color}")
+                        continue
+
+                    # Generate a UUID for the record
+                    slide_layout_index_config_id = self.id_generator.generate_uuid7()
+                    # Use the block index as the config number
+                    config_number = 0
+                    # Use the block_id_to_index_config_id mapping if available
+                    block_layout_index_config_id = self.block_id_to_index_config_id.get(block.id, block.id)
+
+                    # Add the values to the list
+                    values.append(
+                        f"    ('{slide_layout_index_config_id}', '{presentation_palette_id}', {config_number}, '{slide_layout_id}', '{block_layout_index_config_id}', '{block_layout_config_id}')"
+                    )
+        return ",\n".join(values)
 
 
 # ================ Strategy Pattern for Slide Type Determination ================
@@ -1234,23 +1372,52 @@ class SQLGenerator:
         for block_type, color_dict in candidate_config.items():
             for color_hex, obj_list in color_dict.items():
                 color_hex_lc = normalize_color(color_hex)
+
+                # Find matching config in slide_layout_index_config_mapping
+                matching_config = None
+                for config in slide_layout_index_config_mapping:
+                    if config.matched_background_color == color_hex_lc:
+                        matching_config = config
+                        break
+
                 for obj in obj_list:
                     fill_color = obj.get("fill")
                     if fill_color:
                         fill_color = normalize_color(fill_color)
                     font_raw = obj.get("fontFamily", "roboto")
                     font_norm = normalize_font_family(font_raw)
+
                     # Insert color into PresentationPalette
                     if color_hex_lc not in palette_colors:
-                        palette_id = self.id_generator.generate_uuid7()
+                        if matching_config:
+                            # Use the presentation_palette_id from the matching config
+                            palette_id = matching_config.presentation_palette_id
+                            logger.info(f"Using existing presentation_palette_id {palette_id} for color {color_hex_lc}")
+                        else:
+                            # Generate a new UUID if no matching config is found
+                            palette_id = self.id_generator.generate_uuid7()
+                            logger.warning(f"No matching config found for color {color_hex_lc}, generating new palette_id {palette_id}")
+
                         color_sql_lines.append(
                             f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES ('{palette_id}', '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;"
                         )
                         palette_colors.add(color_hex_lc)
+
                     # Insert color into BlockLayoutConfig for this block type
                     if block_type not in block_config_colors:
                         block_config_colors[block_type] = set()
+
                     if color_hex_lc not in block_config_colors[block_type]:
+                        if matching_config:
+                            # Use the block_layout_config_id from the matching config
+                            block_layout_config_id = matching_config.block_layout_config_id
+                            logger.info(f"Using existing block_layout_config_id {block_layout_config_id} for color {color_hex_lc}")
+
+                            # Add a comment to indicate the relationship
+                            color_sql_lines.append(
+                                f"-- Using block_layout_config_id {block_layout_config_id} for color {color_hex_lc} in {block_type}"
+                            )
+
                         color_sql_lines.append(
                             f"-- Ensure color {color_hex_lc} is in BlockLayoutConfig.{block_type}"
                         )
@@ -1258,9 +1425,11 @@ class SQLGenerator:
                             f"UPDATE \"BlockLayoutConfig\" SET {block_type} = array_append({block_type}, '{color_hex_lc}'::text) WHERE NOT ('{color_hex_lc}'::text = ANY({block_type}));"
                         )
                         block_config_colors[block_type].add(color_hex_lc)
+
                     # Insert font into BlockLayoutConfig.font
                     if block_type not in block_config_fonts:
                         block_config_fonts[block_type] = set()
+
                     if font_norm not in block_config_fonts[block_type]:
                         color_sql_lines.append(
                             f"-- Ensure font {font_norm} is in BlockLayoutConfig.font"
@@ -1269,12 +1438,14 @@ class SQLGenerator:
                             f'UPDATE "BlockLayoutConfig" SET font = array_append(font, \'{font_norm}\'::"FontFamilyType") WHERE NOT (\'{font_norm}\'::"FontFamilyType" = ANY(font));'
                         )
                         block_config_fonts[block_type].add(font_norm)
+
                     color_sql_lines.append(
                         f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}'::text) - 1 FROM \"BlockLayoutConfig\" WHERE ...;"
                     )
                     color_sql_lines.append(
                         f'-- Get font index: SELECT array_position(font, \'{font_norm}\'::"FontFamilyType") - 1 FROM "BlockLayoutConfig" WHERE ...;'
                     )
+
         return color_sql_lines
 
     def _collect_slide_information(self) -> SlideLayout:
@@ -1539,6 +1710,11 @@ class SQLGenerator:
         sql_queries.append(f"-- Generated on {current_time}\n")
 
         # Create and execute all SQL commands
+        # 1. BlockLayoutIndexConfigCommand first, to get mapping
+        block_layout_index_config_cmd = BlockLayoutIndexConfigCommand(self.config_manager, self.id_generator, blocks)
+        block_layout_index_config_sql = block_layout_index_config_cmd.execute()
+        block_id_to_index_config_id = block_layout_index_config_cmd.block_id_to_index_config_id
+
         commands = [
             # 1. SlideLayout
             SlideLayoutCommand(self.config_manager, slide_layout, current_time),
@@ -1550,21 +1726,19 @@ class SQLGenerator:
             BlockDimensionsCommand(self.config_manager, blocks),
         ]
 
-        # 5. Figure records (optional)
+        # 6. Figure records (optional)
         if figure_blocks:
             commands.append(
                 FigureCommand(self.config_manager, self.id_generator, figure_blocks)
             )
-
-        # 6. PrecompiledImage records (optional)
+        # 7. PrecompiledImage records (optional)
         if precompiled_image_blocks:
             commands.append(
                 PrecompiledImageCommand(
                     self.config_manager, self.id_generator, precompiled_image_blocks
                 )
             )
-
-        # 7-9. Additional slide layout info
+        # 8-10. Additional slide layout info
         commands.extend(
             [
                 SlideLayoutAdditionalInfoCommand(self.config_manager, slide_layout),
@@ -1572,14 +1746,22 @@ class SQLGenerator:
                 SlideLayoutStylesCommand(self.config_manager, slide_layout),
             ]
         )
-
-        # Execute all commands and collect SQL
+        # Execute all remaining commands and collect SQL
         for command in commands:
             sql = command.execute()
             if sql:  # Only add non-empty SQL
                 sql_queries.append(sql)
-
         # Join all SQL queries
+
+
+        if block_layout_index_config_sql:
+            sql_queries.append(block_layout_index_config_sql)
+        # 5. SlideLayoutIndexConfig (pass mapping)
+        slide_layout_index_config_cmd = SlideLayoutIndexConfigCommand(self.config_manager, self.id_generator, slide_layout, blocks, block_id_to_index_config_id)
+        slide_layout_index_config_sql = slide_layout_index_config_cmd.execute()
+        if slide_layout_index_config_sql:
+            sql_queries.append(slide_layout_index_config_sql)
+
         return "\n\n".join(sql_queries)
 
     def _write_sql_to_file(self, sql, slide_layout):
@@ -1655,9 +1837,10 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
     setup_slide_insertion_logger(output_dir)
     logger.info(f"Starting auto SQL generation from {json_path} to {output_dir}")
 
+
     def strip_zindex(name: str) -> str:
-        # Remove 'background_N' and ' z-index N' (case-insensitive, with or without leading/trailing spaces)
-        name = re.sub(r"\s*background_\d+\s*", " ", name, flags=re.IGNORECASE)
+        # Remove ' z-index N' (case-insensitive, with or without leading/trailing spaces)
+        # Note: We no longer remove 'background_N' to preserve the index for extraction
         name = re.sub(r"\s*z-index\s*\d+\s*$", "", name, flags=re.IGNORECASE)
         # Clean up any extra spaces
         return name.strip()
@@ -1767,9 +1950,50 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
         ):
             _process_precompiled_image_block(block, block_uuid, precompiled_images)
         clean_block_name = strip_zindex(block["name"])
-        # Figure extraction logic
+
+        # Extract block index from name if it exists (e.g., "text_1" -> index=1)
+        block_index = block.get("index", None)  # Get index from precompiled image block if it exists
+
+        # Special handling for figure blocks with format "figure (iconOvalOutlineRfs_4)"
         if block["type"] == "figure":
+            # Extract the content inside parentheses if present
+            paren_match = re.search(r"\(([^)]+)\)", clean_block_name)
+            if paren_match:
+                figure_content = paren_match.group(1)
+                # Extract index from the content inside parentheses
+                # Use a more flexible regex pattern to match digits after underscore anywhere in the string
+                index_match = re.search(r"_(\d+)", figure_content)
+                if index_match:
+                    block_index = int(index_match.group(1))
+                    logger.info(f"Extracted index {block_index} from figure name {figure_content} inside parentheses")
+            # Process the figure block
             _process_figure_block(block, block_uuid, clean_block_name, color, figure_blocks)
+        # Special handling for background blocks with format "None four_outlines background_1 z-index"
+        elif "background" in clean_block_name:
+            # Extract index from background_N
+            bg_match = re.search(r"background_(\d+)", clean_block_name)
+            if bg_match:
+                block_index = int(bg_match.group(1))
+                logger.info(f"Extracted index {block_index} from background block name {clean_block_name}")
+                # Set is_background flag
+                block["is_background"] = True
+        # For other non-figure blocks, use the standard pattern
+        else:
+            match = re.search(r"_(\d+)", clean_block_name)
+            if match:
+                block_index = int(match.group(1))
+                logger.info(f"Extracted index {block_index} from block name {clean_block_name} of type {block['type']}")
+
+
+        # Look up configuration in slideConfig based on block type and block_index
+        slide_config_info = None
+
+        blockTypeColorsAndFontFamily = slide.get('slideConfig', {}).get(block["type"], {})
+# на будущее, когдп fontFamily будет как то по другому
+#         for btcaff in blockTypeColorsAndFontFamily:
+#             colorsAndFontFamily = blockTypeColorsAndFontFamily.get(btcaff, {}).get(block_index, 0)
+
+
         block_obj = Block(
             id=block_uuid,
             type=block["type"],
@@ -1785,6 +2009,8 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
             precompiled_image_info=block.get("precompiled_image_info"),
             border_radius=block.get("corner_radius", [0, 0, 0, 0]),
             name=clean_block_name,
+            # Add the extracted index to the Block object
+            index=block_index,
         )
         blocks.append(block_obj)
         logger.info(
@@ -1800,6 +2026,16 @@ def _process_precompiled_image_block(block: dict, block_uuid: str, precompiled_i
     )
     if match:
         base_name = match.group(1)
+        # Extract index from base_name if it exists (e.g., "qrRightRfs_1" -> index=1)
+        index_match = re.search(r"_(\d+)$", base_name)
+        if index_match:
+            block_index = int(index_match.group(1))
+            logger.info(f"Extracted index {block_index} from precompiled image name {base_name}")
+            # Store the index in the block for later use
+            block["index"] = block_index
+            # Remove the index from the base_name for URL construction
+            base_name = re.sub(r"_\d+$", "", base_name)
+
         base_url = config.PRECOMPILED_IMAGES["base_url"]
         colors = config.PRECOMPILED_IMAGES["default_colors"]
         prefixes = config.PRECOMPILED_IMAGES["prefix"]
@@ -1831,6 +2067,8 @@ def _process_figure_block(block: dict, block_uuid: str, clean_block_name: str, c
     match = re.search(r"\(([^)]+)\)", clean_block_name)
     if match:
         figure_name = match.group(1)
+        # Remove any _<digits> from the figure name (not just at the end)
+        figure_name = re.sub(r"_\d+", "", figure_name)
     else:
         figure_name = clean_block_name
     figure_color = color if color is not None else "#ffffff"
