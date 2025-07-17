@@ -446,7 +446,8 @@ class EnhancedFigmaExtractor:
                 styles['zIndex'] = z_index
                 has_corner_radius, corner_radius = self.extract_corner_radius(node)
                 text_content = None
-                if sql_type == 'text' and node.get('type') == 'TEXT':
+                text_like_types = ['text', 'blockTitle', 'slideTitle', 'subTitle', 'number', 'email', 'date', 'name', 'percentage']
+                if sql_type in text_like_types and node.get('type') == 'TEXT':
                     text_content = node.get('characters', None)
                 
                 # Extract color information for background and other relevant blocks
