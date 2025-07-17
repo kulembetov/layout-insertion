@@ -964,16 +964,17 @@ class FigmaToSQLIntegrator:
             for block in slide['blocks']:
                 styles = dict(block['styles']) if block.get('styles') else {}
                 block_input = {
-                    'id': block['id'],
-                    'type': block['sql_type'],
-                    'name': block['name'],
-                    'dimensions': block['dimensions'],
+                    'id': block.get('id', ''),
+                    'type': block.get('sql_type', ''),
+                    'name': block.get('name', ''),
+                    'dimensions': block.get('dimensions', {}),
                     'styles': styles,
                     'z_index': styles.get('z_index'),
-                    'needs_null_styles': block['needs_null_styles'],
-                    'needs_z_index': block['needs_z_index'],
+                    'needs_null_styles': block.get('needs_null_styles', False),
+                    'needs_z_index': block.get('needs_z_index', False),
                     'corner_radius': block.get('corner_radius'),
-                    'sql_ready': True
+                    'sql_ready': True,
+                    'words': block.get('words', 0)
                 }
                 slide_input['blocks'].append(block_input)
             sql_input.append(slide_input)
