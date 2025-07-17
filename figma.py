@@ -444,8 +444,7 @@ class EnhancedFigmaExtractor:
                 if z_index == 0:
                     z_index = config.Z_INDEX_DEFAULTS.get(sql_type, config.Z_INDEX_DEFAULTS['default'])
                 styles['zIndex'] = z_index
-                has_corner_radius = False
-                corner_radius = [0, 0, 0, 0]
+                has_corner_radius, corner_radius = self.extract_corner_radius(node)
                 text_content = None
                 if sql_type == 'text' and node.get('type') == 'TEXT':
                     text_content = node.get('characters', None)
@@ -535,7 +534,6 @@ class EnhancedFigmaExtractor:
         return config_dict, sorted(palette_colors)
 
     def _update_figure_config_with_names(self, slide_config, blocks):
-        import re
         # Collect all figure blocks with their info
         figure_blocks_info = []
         for block in blocks:
@@ -791,6 +789,13 @@ class EnhancedFigmaExtractor:
             'needs_z_index': block.sql_type in config.BLOCK_TYPES['z_index_types'],
             'corner_radius': block.corner_radius if block.corner_radius is not None else None,
         }
+        # Add word count for all blocks
+        text_content = getattr(block, 'text_content', None)
+        if text_content:
+            words = [w for w in re.split(r'\s+', text_content) if w.strip()]
+            block_dict['words'] = len(words)
+        else:
+            block_dict['words'] = 0
         
         # Handle background blocks with color extraction
         if block.sql_type == 'background':
@@ -811,7 +816,6 @@ class EnhancedFigmaExtractor:
         
         # Handle figure blocks with color extraction - prioritize direct node color
         elif block.sql_type == 'figure':
-            import re
             clean_name = block.name  # Default to full block name
             name_match = re.search(r'\(([^)]+)\)', block.name)
             if name_match:
