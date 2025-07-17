@@ -12,7 +12,6 @@ import json
 import shutil
 import argparse
 import config
-from config import camel_to_snake
 
 @dataclass
 class SlideLayoutIndexConfig:
@@ -56,7 +55,6 @@ def setup_slide_insertion_logger(output_dir):
     logger.addHandler(file_handler)
     logger.propagate = False
     logger.info("Logger initialized and writing to %s", log_path)
-
 
 # Configure logging
 logging.basicConfig(
@@ -118,6 +116,7 @@ class Block:
     name: str = ""
     index: int = None  # Store the index extracted from the block name (e.g., "text_1" -> index=1)
     opacity: float = 1.0  # Always default to 1.0 if not provided
+    words: int = 1  # Add words field, default 1
 
 
 @dataclass
@@ -774,20 +773,17 @@ class BlockStylesCommand(SQLCommand):
 
 class BlockDimensionsCommand(SQLCommand):
     """Generates BlockLayoutDimensions SQL"""
-
     def __init__(self, config: ConfigManager, blocks: List[Block]):
         self.config = config
         self.blocks = blocks
 
     def execute(self) -> str:
-        """Generate BlockLayoutDimensions SQL"""
         values = self._format_dimension_values()
         return self.config.get_sql_template("block_dimensions").format(
             dimension_values=values
         )
 
     def _format_dimension_values(self) -> str:
-        """Format the values for BlockLayoutDimensions SQL"""
         values = []
         for block in self.blocks:
             dim = block.dimensions
@@ -971,6 +967,35 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
                     f"    ('{block_layout_index_config_id}', '{block.id}', {index_color_id}, {index_font_id})"
                 )
         return ",\n".join(values)
+    
+class BlockLayoutLimitCommand(SQLCommand):
+    """Generates BlockLayoutLimit SQL"""
+
+    def __init__(self, config: ConfigManager, blocks: List[Block]):
+        self.config = config
+        self.blocks = blocks
+
+    def execute(self) -> str:
+        """Generate BlockLayoutLimit SQL"""
+        values = self._format_block_layout_limit_values()
+        if not values:  # If no blocks have indices, return ""
+            return ""
+        # Use the SQL template for BlockLayoutLimit
+        sql_template = self.config.config.SQL_TEMPLATES.get("block_layout_limit")
+        if not sql_template:
+            raise KeyError("block_layout_limit SQL template not found in config.SQL_TEMPLATES")
+        return sql_template.format(
+            block_layout_limit_values=",\n".join(values)
+        )
+
+    def _format_block_layout_limit_values(self) -> list:
+        values = []
+        min_words_config = getattr(self.config.config, "BLOCK_TYPE_MIN_WORDS", {})
+        for block in self.blocks:
+            min_words = min_words_config.get(block.type, 1)
+            max_words = getattr(block, "words", 1)
+            values.append(f"    ({min_words}, {max_words}, '{block.id}')")
+        return values
 
 
 class SlideLayoutIndexConfigCommand(SQLCommand):
@@ -1454,7 +1479,7 @@ class SQLGenerator:
                     )
 
         return color_sql_lines
-
+    
     def _collect_slide_information(self) -> SlideLayout:
         """Collect slide layout information interactively from the user (manual mode)."""
         slide_layout_name = self.user_input.get_input(
@@ -1695,6 +1720,8 @@ class SQLGenerator:
             BlockStylesCommand(self.config_manager, blocks, self.BLOCK_TYPE_IMAGE),
             # 4. BlockLayoutDimensions
             BlockDimensionsCommand(self.config_manager, blocks),
+            # 5. BlockLayoutLimit
+            BlockLayoutLimitCommand(self.config_manager, blocks),
         ]
 
         # 6. Figure records (optional)
@@ -1951,15 +1978,16 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
                 block_index = int(match.group(1))
                 logger.info(f"Extracted index {block_index} from block name {clean_block_name} of type {block['type']}")
 
-
         # Look up configuration in slideConfig based on block type and block_index
         slide_config_info = None
 
         blockTypeColorsAndFontFamily = slide.get('slideConfig', {}).get(block["type"], {})
-# на будущее, когдп fontFamily будет как то по другому
-#         for btcaff in blockTypeColorsAndFontFamily:
-#             colorsAndFontFamily = blockTypeColorsAndFontFamily.get(btcaff, {}).get(block_index, 0)
+        # на будущее, когдп fontFamily будет как то по другому
+        #         for btcaff in blockTypeColorsAndFontFamily:
+        #             colorsAndFontFamily = blockTypeColorsAndFontFamily.get(btcaff, {}).get(block_index, 0)
 
+        # Get words from the block JSON
+        words = block.get("words", 1)
 
         block_obj = Block(
             id=block_uuid,
@@ -1979,6 +2007,7 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
             # Add the extracted index to the Block object
             index=block_index,
             opacity=opacity,
+            words=words,
         )
         blocks.append(block_obj)
         logger.info(
@@ -2091,6 +2120,10 @@ def _ensure_background_and_watermark_blocks(slide_layout, blocks: list, generato
         )
         blocks.append(watermark_block)
 
+def camel_to_snake(name):
+    """Convert camelCase or PascalCase to snake_case."""
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 def main():
     """Main entry point for interactive mode"""

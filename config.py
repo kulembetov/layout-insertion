@@ -130,6 +130,18 @@ BLOCK_TYPES = {
     ],
 }
 
+BLOCK_TYPE_MIN_WORDS = {
+    "slideTitle": 3,
+    "subTitle": 5,
+    "blockTitle": 1,
+    "text": 8,
+    "percentage": 1,
+    "number": 1,
+    "date": 1,
+    "name": 1,
+    "email": 1,
+}
+
 # Default Z-index mappings
 Z_INDEX_DEFAULTS = {
     'background': 0,
@@ -358,7 +370,8 @@ INSERT INTO "SlideLayoutIndexConfig" (
 )
 VALUES
 {slide_layout_index_config_values}
-RETURNING *;"""
+RETURNING *;""",
+    "block_layout_limit": """-- Create BlockLayoutLimit\nINSERT INTO "BlockLayoutLimit" ("minWords", "maxWords", "blockLayoutId")\nVALUES\n{block_layout_limit_values}\nRETURNING *;"""
 }
 
 # Output configuration
@@ -479,11 +492,3 @@ FIGMA_TO_SQL_BLOCK_MAPPING = {
     'caption': 'text',
     'label': 'text',
 }
-
-# Helper to convert camelCase or PascalCase to snake_case
-import re
-
-def camel_to_snake(name):
-    """Convert camelCase or PascalCase to snake_case."""
-    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
