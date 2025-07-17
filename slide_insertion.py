@@ -878,20 +878,28 @@ class PrecompiledImageCommand(SQLCommand):
 class SlideLayoutAdditionalInfoCommand(SQLCommand):
     """Generates SlideLayoutAdditionalInfo SQL"""
 
-    def __init__(self, config: ConfigManager, slide_layout: SlideLayout):
+    def __init__(self, config: ConfigManager, slide_layout: SlideLayout, blocks: list = None):
         self.config = config
         self.slide_layout = slide_layout
+        self.blocks = blocks or []
 
     def execute(self) -> str:
         """Generate SlideLayoutAdditionalInfo SQL"""
         additional_info = self.config.get_slide_layout_additional_info()
         # Always use camelCase for type
         slide_type_camel = config.SLIDE_NUMBER_TO_TYPE.get(self.slide_layout.number, self.slide_layout.type)
+        # Set hasHeaders True if any block is of type 'blockTitle' or 'percentage'
+        has_headers = additional_info["hasHeaders"]
+        if self.blocks:
+            for block in self.blocks:
+                if block.type in ("blockTitle", "percentage"):
+                    has_headers = True
+                    break
         return self.config.get_sql_template("slide_layout_additional_info").format(
             slide_layout_id=self.slide_layout.id,
             percentesCount=additional_info["percentesCount"],
             maxSymbolsInBlock=additional_info["maxSymbolsInBlock"],
-            hasHeaders=str(additional_info["hasHeaders"]).lower(),
+            hasHeaders=str(has_headers).lower(),
             type=slide_type_camel,  # always camelCase
             icon_url=self.slide_layout.icon_url,
         )
@@ -1739,7 +1747,7 @@ class SQLGenerator:
         # 8-10. Additional slide layout info
         commands.extend(
             [
-                SlideLayoutAdditionalInfoCommand(self.config_manager, slide_layout),
+                SlideLayoutAdditionalInfoCommand(self.config_manager, slide_layout, blocks),
                 SlideLayoutDimensionsCommand(self.config_manager, slide_layout),
                 SlideLayoutStylesCommand(self.config_manager, slide_layout),
             ]
@@ -1978,14 +1986,6 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
                 block_index = int(match.group(1))
                 logger.info(f"Extracted index {block_index} from block name {clean_block_name} of type {block['type']}")
 
-        # Look up configuration in slideConfig based on block type and block_index
-        slide_config_info = None
-
-        blockTypeColorsAndFontFamily = slide.get('slideConfig', {}).get(block["type"], {})
-        # на будущее, когдп fontFamily будет как то по другому
-        #         for btcaff in blockTypeColorsAndFontFamily:
-        #             colorsAndFontFamily = blockTypeColorsAndFontFamily.get(btcaff, {}).get(block_index, 0)
-
         # Get words from the block JSON
         words = block.get("words", 1)
 
@@ -2124,7 +2124,6 @@ def camel_to_snake(name):
     """Convert camelCase or PascalCase to snake_case."""
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-
 def main():
     """Main entry point for interactive mode"""
     output_dir = config.OUTPUT_CONFIG["output_dir"]
