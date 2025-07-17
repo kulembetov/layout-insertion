@@ -427,7 +427,7 @@ class BlockFactory:
                     )
                     # Handle color selection
                     if isinstance(selected_color, str) and selected_color.isdigit():
-                        color_index = int(selected_color) - 1
+                        color_index = int(selected_color)
                         if 0 <= color_index < len(default_colors):
                             color_val = default_colors[color_index]
                         else:
@@ -965,9 +965,9 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
             if block.index is not None:
                 # Generate a UUID for the record
                 block_layout_index_config_id = self.id_generator.generate_uuid7()
-                # Calculate indexColorId and indexFontId as block_index - 1
-                index_color_id = block.index - 1
-                index_font_id = block.index - 1
+                # Calculate indexColorId and indexFontId as block_index
+                index_color_id = block.index
+                index_font_id = block.index
                 # Save mapping for use in SlideLayoutIndexConfigCommand
                 self.block_id_to_index_config_id[block.id] = block_layout_index_config_id
                 # Add the values to the list
@@ -1480,10 +1480,10 @@ class SQLGenerator:
                         block_config_fonts[block_type].add(font_norm)
 
                     color_sql_lines.append(
-                        f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}'::text) - 1 FROM \"BlockLayoutConfig\" WHERE ...;"
+                        f"-- Get color index: SELECT array_position({block_type}, '{color_hex_lc}'::text) FROM \"BlockLayoutConfig\" WHERE ...;"
                     )
                     color_sql_lines.append(
-                        f'-- Get font index: SELECT array_position(font, \'{font_norm}\'::"FontFamilyType") - 1 FROM "BlockLayoutConfig" WHERE ...;'
+                        f'-- Get font index: SELECT array_position(font, \'{font_norm}\'::"FontFamilyType") FROM "BlockLayoutConfig" WHERE ...;'
                     )
 
         return color_sql_lines
