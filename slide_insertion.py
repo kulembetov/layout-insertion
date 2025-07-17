@@ -1837,8 +1837,8 @@ def auto_generate_sql_from_figma(json_path, output_dir=None):
 
 
     def strip_zindex(name: str) -> str:
-        # Remove ' z-index N' (case-insensitive, with or without leading/trailing spaces)
-        # Note: We no longer remove 'background_N' to preserve the index for extraction
+        # Remove 'background_N' and ' z-index N' (case-insensitive, with or without leading/trailing spaces)
+        name = re.sub(r"\s*background_\d+", "", name, flags=re.IGNORECASE)
         name = re.sub(r"\s*z-index\s*\d+\s*$", "", name, flags=re.IGNORECASE)
         # Clean up any extra spaces
         return name.strip()
