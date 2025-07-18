@@ -532,6 +532,10 @@ class EnhancedFigmaExtractor:
                                 block_objs.append(obj)
                         block_colors[color_hex] = block_objs
                     config_dict[block_type] = block_colors
+                    if block_logger:
+                        block_logger.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
+                        for color_hex, obj_list in block_colors.items():
+                            block_logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
         return config_dict, sorted(palette_colors)
 
     def _update_figure_config_with_names(self, slide_config, blocks):
@@ -551,48 +555,77 @@ class EnhancedFigmaExtractor:
         new_figure_config = {}
         for color_hex, obj_list in slide_config['figure'].items():
             figure_objects = []
-            for fig in figure_blocks_info:
-                # Extract index from figure name (e.g., "iconOvalOutlineRfs_2" -> "2")
-                base_name = fig['base_name']
-                clean_figure_name = re.sub(r'_(\d+)$', '', base_name)  # Remove suffix for storage
-                index_match = re.search(r'_(\d+)$', base_name)
-                
-                # Find the matching object by index in slideColors
-                match_obj = None
-                if index_match:
-                    figure_index = index_match.group(1)  # Extract "2" from "iconOvalOutlineRfs_2"
-                    for obj in obj_list:
-                        if obj.get('figureName') == figure_index:  # Look for "2" in slideColors
-                            match_obj = obj
+            
+            # Process ALL figure entries from slideColors, not just the ones that have corresponding blocks
+            for obj in obj_list:
+                figure_name = obj.get('figureName', '')
+                if figure_name:
+                    # Try to find a matching block in the main structure
+                    matching_block = None
+                    for fig in figure_blocks_info:
+                        base_name = fig['base_name']
+                        index_match = re.search(r'_(\d+)$', base_name)
+                        if index_match and index_match.group(1) == figure_name:
+                            matching_block = fig['block']
                             break
                     
-                    if match_obj:
-                        font_family = match_obj.get('fontFamily')
-                        if font_family:
-                            # Normalize to snake_case
-                            font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
-                        fill = match_obj.get('color')
+                    # Create figure object for this entry
+                    font_family = obj.get('fontFamily')
+                    if font_family:
+                        # Normalize to snake_case
+                        font_family = re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
+                    fill = obj.get('color')
+                    
+                    # Always try to extract the proper figure name from the figure blocks
+                    clean_figure_name = figure_name  # Default to slideColors name
+                    
+                    # Try to find a matching block to get the proper name
+                    found_match = False
+                    for fig in figure_blocks_info:
+                        base_name = fig['base_name']
+                        index_match = re.search(r'_(\d+)$', base_name)
+                        if index_match and index_match.group(1) == figure_name:
+                            # Found matching block, extract proper name
+                            clean_figure_name = re.sub(r'_(\d+)$', '', base_name)
+                            if block_logger:
+                                block_logger.info(f"[figureConfig] Found exact index match for '{figure_name}', using name: '{clean_figure_name}'")
+                            found_match = True
+                            break
+                    
+                    # If no exact match, try to find by z-index or other patterns
+                    if not found_match:
+                        for fig in figure_blocks_info:
+                            base_name = fig['base_name']
+                            # Try to match by z-index if available
+                            z_index_match = re.search(r'z-index\s*(\d+)', fig['block'].name)
+                            if z_index_match and z_index_match.group(1) == figure_name:
+                                clean_figure_name = re.sub(r'_(\d+)$', '', base_name)
+                                if block_logger:
+                                    block_logger.info(f"[figureConfig] Found z-index match for '{figure_name}', using name: '{clean_figure_name}'")
+                                found_match = True
+                                break
+                    
+                    # If still no match, try to find by position in the list (assuming order matters)
+                    if not found_match and len(figure_blocks_info) > 0:
+                        # Use the first available block name as fallback
+                        first_block = figure_blocks_info[0]
+                        clean_figure_name = re.sub(r'_(\d+)$', '', first_block['base_name'])
                         if block_logger:
-                            block_logger.info(f"[figureConfig] MATCHED: color {color_hex}, figure '{base_name}' using index '{figure_index}' -> color: {fill}, font: {font_family}")
-                    else:
-                        font_family = None
-                        fill = None
-                        if block_logger:
-                            available_indices = [obj.get('figureName', 'UNNAMED') for obj in obj_list]
-                            block_logger.info(f"[figureConfig] NOT FOUND: color {color_hex}, figure '{base_name}' looking for index '{figure_index}' in slideColors, available: {available_indices}")
-                else:
-                    # No index found in figure name
-                    font_family = None
-                    fill = None
+                            block_logger.info(f"[figureConfig] No match found for '{figure_name}', using fallback name: '{clean_figure_name}'")
+                    
                     if block_logger:
-                        block_logger.info(f"[figureConfig] NO INDEX: figure '{base_name}' has no index suffix")
-                
-                figure_obj = {
-                    "color": fill,
-                    "fontFamily": font_family,
-                    "figureName": clean_figure_name  # Store base name without suffix
-                }
-                figure_objects.append(figure_obj)
+                        if matching_block:
+                            block_logger.info(f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill}, font: {font_family}")
+                        else:
+                            block_logger.info(f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill}, font: {font_family}")
+                    
+                    figure_obj = {
+                        "color": fill,
+                        "fontFamily": font_family,
+                        "figureName": clean_figure_name
+                    }
+                    figure_objects.append(figure_obj)
+            
             new_figure_config[color_hex] = figure_objects
         slide_config['figure'] = new_figure_config
         
@@ -815,7 +848,7 @@ class EnhancedFigmaExtractor:
             if not color_found and hasattr(block, 'node_color') and block.node_color:
                 block_dict['color'] = block.node_color
         
-        # Handle figure blocks with color extraction - prioritize direct node color
+        # Handle figure blocks with color extraction - collect all colors from slideConfig
         elif block.sql_type == 'figure':
             clean_name = block.name  # Default to full block name
             name_match = re.search(r'\(([^)]+)\)', block.name)
@@ -829,28 +862,91 @@ class EnhancedFigmaExtractor:
                 if block_logger:
                     block_logger.info(f"[figureColor] Using direct node color for '{clean_name}': {block.node_color}")
             
-            # Secondary: Try slideConfig (though it seems to only contain indices)
-            elif slide_config and 'figure' in slide_config and name_match:
-                # Extract figure index from name (e.g., "iconOvalOutlineRfs_2" -> "2")
-                index_match = re.search(r'_(\d+)$', clean_name)
-                if index_match:
-                    figure_index = index_match.group(1)
-                    
-                    # Look for this index in slideColors
-                    for color_hex, figure_objects in slide_config['figure'].items():
-                        for figure_obj in figure_objects:
-                            if figure_obj.get('figureName') == figure_index:
-                                block_dict['color'] = figure_obj.get('color')
-                                block_dict['fontFamily'] = figure_obj.get('fontFamily')
-                                if block_logger:
-                                    block_logger.info(f"[figureColor] Using slideConfig index match for '{clean_name}' index '{figure_index}': color={figure_obj.get('color')}")
+            # Secondary: Collect all colors from slideConfig for figures
+            elif slide_config and 'figure' in slide_config:
+                # Store all available colors for figures
+                all_colors = []
+                all_fonts = []
+                
+                for color_hex, figure_objects in slide_config['figure'].items():
+                    for figure_obj in figure_objects:
+                        color_val = figure_obj.get('color')
+                        font_family = figure_obj.get('fontFamily')
+                        if color_val:
+                            all_colors.append(color_val)
+                        if font_family:
+                            all_fonts.append(font_family)
+                
+                # Store all colors and fonts found for figures
+                if all_colors:
+                    block_dict['all_colors'] = list(set(all_colors))  # Remove duplicates
+                    if block_logger:
+                        block_logger.info(f"[figureColor] Block '{block.name}' (figure): Found {len(block_dict['all_colors'])} unique colors: {block_dict['all_colors']}")
+                if all_fonts:
+                    block_dict['all_fonts'] = list(set(all_fonts))  # Remove duplicates
+                    if block_logger:
+                        block_logger.info(f"[figureColor] Block '{block.name}' (figure): Found {len(block_dict['all_fonts'])} unique fonts: {block_dict['all_fonts']}")
+                
+                # Also try to match specific index if available
+                if name_match:
+                    index_match = re.search(r'_(\d+)$', clean_name)
+                    if index_match:
+                        figure_index = index_match.group(1)
+                        
+                        # Look for this index in slideColors
+                        for color_hex, figure_objects in slide_config['figure'].items():
+                            for figure_obj in figure_objects:
+                                if figure_obj.get('figureName') == figure_index:
+                                    block_dict['color'] = figure_obj.get('color')
+                                    block_dict['fontFamily'] = figure_obj.get('fontFamily')
+                                    if block_logger:
+                                        block_logger.info(f"[figureColor] Using slideConfig index match for '{clean_name}' index '{figure_index}': color={figure_obj.get('color')}")
+                                    break
+                            if 'color' in block_dict:
                                 break
-                        if 'color' in block_dict:
-                            break
+                
+                # Also keep the first color for backward compatibility if no specific match
+                if all_colors and 'color' not in block_dict:
+                    block_dict['color'] = all_colors[0]
+                if all_fonts and 'fontFamily' not in block_dict:
+                    block_dict['fontFamily'] = all_fonts[0]
         
         # Handle image blocks with color extraction
         elif block.sql_type == 'image' and hasattr(block, 'node_color') and block.node_color:
             block_dict['color'] = block.node_color
+        
+        # NEW: Add all available colors for text-based block types from slideConfig
+        # This allows extracting all colors (like 5 for slideTitle, 3 for blockTitle) instead of just the first one
+        text_block_types = ['slideTitle', 'blockTitle', 'text', 'subTitle', 'number', 'email', 'date', 'name', 'percentage']
+        if block.sql_type in text_block_types and slide_config and block.sql_type in slide_config:
+            # Store all available colors for this block type
+            all_colors = []
+            all_fonts = []
+            
+            for color_hex, color_objects in slide_config[block.sql_type].items():
+                for obj in color_objects:
+                    color_val = obj.get('color')
+                    font_family = obj.get('fontFamily')
+                    if color_val:
+                        all_colors.append(color_val)
+                    if font_family:
+                        all_fonts.append(font_family)
+            
+            # Store all colors and fonts found for this block type
+            if all_colors:
+                block_dict['all_colors'] = list(set(all_colors))  # Remove duplicates
+                if block_logger:
+                    block_logger.info(f"[colorExtraction] Block '{block.name}' ({block.sql_type}): Found {len(block_dict['all_colors'])} unique colors: {block_dict['all_colors']}")
+            if all_fonts:
+                block_dict['all_fonts'] = list(set(all_fonts))  # Remove duplicates
+                if block_logger:
+                    block_logger.info(f"[colorExtraction] Block '{block.name}' ({block.sql_type}): Found {len(block_dict['all_fonts'])} unique fonts: {block_dict['all_fonts']}")
+            
+            # Also keep the first color for backward compatibility
+            if all_colors and 'color' not in block_dict:
+                block_dict['color'] = all_colors[0]
+            if all_fonts and 'fontFamily' not in block_dict:
+                block_dict['fontFamily'] = all_fonts[0]
         
         return block_dict
 
