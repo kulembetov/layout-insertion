@@ -23,23 +23,22 @@ DEFAULT_COLOR = "#ffffff"
 PRECOMPILED_IMAGES = {
     "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen",
     "default_colors": [
-        "#e9eaea",
-        "#d7cdf5",
-        "#f1dddd",
-        "#fad2be",
-        "#d2def0",
-        "#adc5ed",
-        "#9cd8d8"
-
+        "#bae4e4",  # мятно-бирюзовый
+        "#c6d6f2",  # холодно-синий
+        "#dfe8f5",  # небесно-голубой
+        "#e3dcf8",  # сиреневый
+        "#f0f0f0",  # светло-серый
+        "#f5e7e7",  # розово-бежевый
+        "#fad2be"   # персиково-оранжевый
     ],
     "prefix": [
-        "Gray",
-        "Purple",
-        "Pink",
-        "Orange",
+        "Green",
+        "Blue", 
         "Sky",
-        "Blue"
-        "Green"
+        "Purple",
+        "Gray",
+        "Pink",
+        "Orange"
     ]
 }
 

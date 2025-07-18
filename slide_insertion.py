@@ -1950,6 +1950,21 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
                 # Set is_background flag
                 block["is_background"] = True
         
+        # Special handling for percentage blocks - extract index BEFORE stripping
+        if block["type"] == "percentage" or "percentage" in original_block_name.lower():
+            # Extract index from percentage_N pattern in original name
+            pct_match = re.search(r"percentage_(\d+)", original_block_name, re.IGNORECASE)
+            if pct_match:
+                block_index = int(pct_match.group(1))
+                logger.info(f"Extracted index {block_index} from percentage block name {original_block_name}")
+            else:
+                # Also try to find percentage blocks with different naming patterns
+                # Look for patterns like "percentage 1", "percentage1", etc.
+                pct_alt_match = re.search(r"percentage\s*(\d+)", original_block_name, re.IGNORECASE)
+                if pct_alt_match:
+                    block_index = int(pct_alt_match.group(1))
+                    logger.info(f"Extracted index {block_index} from percentage block name {original_block_name} (alternative pattern)")
+        
         # Now strip z-index for clean name
         clean_block_name = strip_zindex(original_block_name)
 
