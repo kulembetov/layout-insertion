@@ -324,14 +324,15 @@ RETURNING *;""",
 
     "slide_layout_additional_info": """-- Create SlideLayoutAdditionalInfo
 INSERT INTO "SlideLayoutAdditionalInfo" (
-    "slideLayoutId", "percentesCount", "maxSymbolsInBlock", "hasHeaders", "type", "iconUrl"
+    "slideLayoutId", "percentesCount", "maxSymbolsInBlock", "hasHeaders", "type", "iconUrl", "infographicsType"
 ) VALUES (
     '{slide_layout_id}',
     {percentesCount},
     {maxSymbolsInBlock},
     {hasHeaders},
     '{type}'::"SlideLayoutType",
-    '{icon_url}'
+    '{icon_url}',
+    '{infographics_type}'
 )
 RETURNING *;""",
 
@@ -490,4 +491,38 @@ FIGMA_TO_SQL_BLOCK_MAPPING = {
     'content': 'text',
     'caption': 'text',
     'label': 'text',
+}
+
+# Infographics type mapping based on slide layout name patterns
+SLIDE_LAYOUT_TO_INFOCRAPHICS_TYPE = {
+    'step_by_step': {
+        'infographicsType': 'grid_timeline'
+    },
+    'grid_cards_horizontal': {
+        'infographicsType': 'grid'
+    },
+    'grid_cards_vertical': {
+        'infographicsType': 'grid'
+    },
+    'timeline': {
+        'infographicsType': 'timeline'
+    },
+    'table_bottom': {
+        'infographicsType': 'table'
+    },
+    'center_horizontal_chart': {
+        'infographicsType': 'bar_horizontal'
+    },
+    'center_linear_chart': {
+        'infographicsType': 'line'
+    },
+    'center_circle_chart': {
+        'infographicsType': 'pie'
+    },
+    'center_ring_chart': {
+        'infographicsType': 'pie'
+    },
+    'center_bar_chart': {
+        'infographicsType': 'bar'
+    }
 }
