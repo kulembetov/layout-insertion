@@ -95,14 +95,34 @@ python slide_deletion.py
 
 **macOS:**
 ```bash
-# Use python3 instead of python on Mac
-python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+# 1. Extract from Figma
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+
+# 2. Insert into PresentationPalette
+# manual mode
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+# auto mode
 python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+
+# 3. Insert into BlockLayoutConfig
+# manual mode
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# auto mode
 python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
+# 4. Match BlockLayoutConfig with PresentationPalette
 python3 match_block_layout_presentation_palette.py
+
+# 5. Generate SQL
 python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+
+# 6. Validate SQL
 python3 sql_validator.py --input-dir my_sql_output
+
+# 7. Apply SQL to DB
 python3 sql_pollution.py
+
+# 8. Delete from the DB (blocks, slides, images)
 python3 slide_deletion.py
 ```
 
@@ -135,6 +155,11 @@ python3 slide_deletion.py
 
 ### `database.ini`
 - Stores database connection settings in INI format.
+
+### `slide_deletion.py`
+- Deletes slides, blocks, and images from the database.
+- Supports selective deletion based on slide numbers or block types.
+- Useful for cleaning up test data or removing outdated content.
 
 ---
 
@@ -235,15 +260,37 @@ python slide_deletion.py
 
 **macOS:**
 ```bash
-# Используйте python3 вместо python на Mac
-python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+# 1. Вставка в PresentationPalette
+# ручной режим
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+# авто режим
 python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+
+# 2. Вставка в BlockLayoutConfig
+# ручной режим
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# авто режим
 python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
+# 3. Сопоставление BlockLayoutConfig с PresentationPalette
 python3 match_block_layout_presentation_palette.py
+
+# 4. Извлечение из Figma
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+
+# 5. Генерация SQL
 python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+
+# 6. Валидация SQL
 python3 sql_validator.py --input-dir my_sql_output
+
+# 7. Загрузка SQL в БД
 python3 sql_pollution.py
+
+# 8. Удаление из БД (блоков, слайдов, изображений)
 python3 slide_deletion.py
+```
+
 
 ---
 
@@ -273,4 +320,9 @@ python3 slide_deletion.py
 - Применяет SQL к базе данных, учитывая все зависимости и порядок
 
 ### `database.ini`
-- Хранит параметры подключения к базе данных в формате INI 
+- Хранит параметры подключения к базе данных в формате INI
+
+### `slide_deletion.py`
+- Удаляет слайды, блоки и изображения из базы данных.
+- Поддерживает выборочное удаление по номерам слайдов или типам блоков.
+- Полезен для очистки тестовых данных или удаления устаревшего контента. 
