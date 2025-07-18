@@ -1948,10 +1948,23 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
             "image precompiled"
         ):
             _process_precompiled_image_block(block, block_uuid, precompiled_images)
-        clean_block_name = strip_zindex(block["name"])
-
-        # Extract block index from name if it exists (e.g., "text_1" -> index=1)
+        
+        # Extract block index BEFORE calling strip_zindex
         block_index = block.get("index", None)  # Get index from precompiled image block if it exists
+        original_block_name = block["name"]
+        
+        # Special handling for background blocks - extract index BEFORE stripping
+        if block["type"] == "background" or "background" in original_block_name.lower():
+            # Extract index from background_N pattern in original name
+            bg_match = re.search(r"background_(\d+)", original_block_name, re.IGNORECASE)
+            if bg_match:
+                block_index = int(bg_match.group(1))
+                logger.info(f"Extracted index {block_index} from background block name {original_block_name}")
+                # Set is_background flag
+                block["is_background"] = True
+        
+        # Now strip z-index for clean name
+        clean_block_name = strip_zindex(original_block_name)
 
         # Special handling for figure blocks with format "figure (iconOvalOutlineRfs_4)"
         if block["type"] == "figure":
@@ -1967,17 +1980,8 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
                     logger.info(f"Extracted index {block_index} from figure name {figure_content} inside parentheses")
             # Process the figure block
             _process_figure_block(block, block_uuid, clean_block_name, color, figure_blocks)
-        # Special handling for background blocks with format "None four_outlines background_1 z-index"
-        elif "background" in clean_block_name:
-            # Extract index from background_N
-            bg_match = re.search(r"background_(\d+)", clean_block_name)
-            if bg_match:
-                block_index = int(bg_match.group(1))
-                logger.info(f"Extracted index {block_index} from background block name {clean_block_name}")
-                # Set is_background flag
-                block["is_background"] = True
         # For other non-figure blocks, use the standard pattern
-        else:
+        elif block_index is None:
             match = re.search(r"_(\d+)", clean_block_name)
             if match:
                 block_index = int(match.group(1))
@@ -2001,14 +2005,13 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
             precompiled_image_info=block.get("precompiled_image_info"),
             border_radius=block.get("corner_radius", [0, 0, 0, 0]),
             name=clean_block_name,
-            # Add the extracted index to the Block object
             index=block_index,
             opacity=opacity,
             words=words,
         )
         blocks.append(block_obj)
         logger.info(
-            f"Block: type={block_obj.type}, name={block_obj.name}, dimensions={block_obj.dimensions}, styles={block_obj.styles}"
+            f"Block: type={block_obj.type}, name={block_obj.name}, index={block_obj.index}, dimensions={block_obj.dimensions}, styles={block_obj.styles}"
         )
     return blocks, precompiled_images, figure_blocks
 
