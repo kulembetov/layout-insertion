@@ -131,27 +131,45 @@ EXTRACTORS = {
 def main():
     parser = argparse.ArgumentParser(
         description="Generate SQL delete scripts for all slide groups in my_sql_output/. Traverses all subfolders and processes each slide_insertion folder.")
-    parser.add_argument('--root-dir', type=str, default='my_sql_output',
-                        help='Root directory containing slide groups (default: my_sql_output)')
+    parser.add_argument('--root-dir', type=str, default='.',
+                        help='Root directory to write deletion scripts (default: .)')
+    parser.add_argument('--input-dir', type=str, default='my_sql_output',
+                        help='Input directory containing slide groups (default: my_sql_output)')
     args = parser.parse_args()
 
+    input_dir = args.input_dir
     root_dir = args.root_dir
-    if not os.path.isdir(root_dir):
-        print(f"Root directory '{root_dir}' does not exist.")
+    
+    if not os.path.isdir(input_dir):
+        print(f"Input directory '{input_dir}' does not exist.")
         return
 
-    for group in os.listdir(root_dir):
-        group_path = os.path.join(root_dir, group)
+    if not os.path.isdir(root_dir):
+        print(f"Creating output directory '{root_dir}'...")
+        os.makedirs(root_dir, exist_ok=True)
+
+    print(f"Reading from: {input_dir}")
+    print(f"Writing to: {root_dir}")
+
+    for group in os.listdir(input_dir):
+        group_path = os.path.join(input_dir, group)
         if not os.path.isdir(group_path):
             continue
         slide_insertion_dir = os.path.join(group_path, 'slide_insertion')
         if not os.path.isdir(slide_insertion_dir):
             continue
-        slide_deletion_dir = os.path.join(group_path, 'slide_deletion')
+        
+        # Create corresponding output directory structure
+        output_group_path = os.path.join(root_dir, group)
+        os.makedirs(output_group_path, exist_ok=True)
+        slide_deletion_dir = os.path.join(output_group_path, 'slide_deletion')
         os.makedirs(slide_deletion_dir, exist_ok=True)
+        
+        print(f"Processing group: {group}")
         for fname in os.listdir(slide_insertion_dir):
             if not fname.endswith('.sql'):
                 continue
+            print(f"  Processing: {fname}")
             with open(os.path.join(slide_insertion_dir, fname), encoding='utf-8') as f:
                 sql = f.read()
             ids = {table: EXTRACTORS[table](sql) for table in DELETE_ORDER}
@@ -164,6 +182,9 @@ def main():
                         out.write(f"-- Delete from {table}\n")
                         out.write(f"DELETE FROM \"{table}\" WHERE \"{key_col}\" = '{id_}';\n")
                 out.write('\n')
+        print(f"  Completed group: {group}")
+
+    print(f"\nDeletion scripts generated in: {root_dir}")
 
 if __name__ == '__main__':
     main() 
