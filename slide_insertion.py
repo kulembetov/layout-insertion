@@ -1038,8 +1038,8 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
                 # For each presentation palette in the mapping, create a SlideLayoutIndexConfig record
                 for config in slide_layout_index_config_mapping:
                     presentation_palette_id = config.presentation_palette_id
-                    # Use the actual block layout ID (block.id) instead of the CSV mapping
-                    block_layout_config_id = block.id
+                    # Use the block_layout_config_id from the CSV mapping
+                    block_layout_config_id = config.block_layout_config_id
 
                     # Generate a UUID for the record
                     slide_layout_index_config_id = self.id_generator.generate_uuid7()
