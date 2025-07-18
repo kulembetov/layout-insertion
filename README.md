@@ -90,7 +90,7 @@ py sql_validator.py --input-dir my_sql_output
 py sql_pollution.py --input-dir my_sql_output --db-config database.ini
 
 # 8. Delete from the DB (blocks, slides, images)
-python generate_slide_deletion.py
+python slide_deletion.py
 ```
 ```
 
@@ -217,7 +217,7 @@ py sql_validator.py --input-dir my_sql_output
 py sql_pollution.py --input-dir my_sql_output --db-config database.ini
 
 # 8. Удаление из БД (блоков, слайдов, изображений)
-python generate_slide_deletion.py
+python slide_deletion.py
 ```
 
 ---
