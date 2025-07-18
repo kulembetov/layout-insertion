@@ -60,10 +60,10 @@ All these tables are created and maintained in your company's presentation datab
 
 ## Example Workflow
 
+**Windows:**
 ```bash
-
 # 1. Extract from Figma
-py figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
 
 # 2. Insert into PresentationPalette
 # manual mode
@@ -81,17 +81,29 @@ python insert_block_layout_config.py --json my_output/sql_generator_input.json -
 python match_block_layout_presentation_palette.py
 
 # 5. Generate SQL
-py slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Validate SQL
-py sql_validator.py --input-dir my_sql_output
+python sql_validator.py --input-dir my_sql_output
 
 # 7. Apply SQL to DB
-py sql_pollution.py
+python sql_pollution.py
 
 # 8. Delete from the DB (blocks, slides, images)
 python slide_deletion.py
 ```
+
+**macOS:**
+```bash
+# Use python3 instead of python on Mac
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+python3 match_block_layout_presentation_palette.py
+python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python3 sql_validator.py --input-dir my_sql_output
+python3 sql_pollution.py
+python3 slide_deletion.py
 ```
 
 ---
@@ -188,6 +200,7 @@ python slide_deletion.py
 
 ## Пример рабочего процесса
 
+**Windows:**
 ```bash
 # 1. Вставка в PresentationPalette
 # ручной режим
@@ -205,20 +218,32 @@ python insert_block_layout_config.py --json my_output/sql_generator_input.json -
 python match_block_layout_presentation_palette.py
 
 # 4. Извлечение из Figma
-py figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
 
 # 5. Генерация SQL
-py slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Валидация SQL
-py sql_validator.py --input-dir my_sql_output
+python sql_validator.py --input-dir my_sql_output
 
 # 7. Загрузка SQL в БД
-py sql_pollution.py
+python sql_pollution.py
 
 # 8. Удаление из БД (блоков, слайдов, изображений)
 python slide_deletion.py
 ```
+
+**macOS:**
+```bash
+# Используйте python3 вместо python на Mac
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+python3 match_block_layout_presentation_palette.py
+python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python3 sql_validator.py --input-dir my_sql_output
+python3 sql_pollution.py
+python3 slide_deletion.py
 
 ---
 
