@@ -755,18 +755,18 @@ class BlockStylesCommand(SQLCommand):
                 if block.is_background or block.is_figure:
                     # For background and figure blocks, use the block's color or default white
                     values.append(
-                        f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', null, {border_radius_str}, '{color_settings_id}')"
+                        f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, null, {border_radius_str}, '{color_settings_id}')"
                     )
                 else:
                     # For other null style blocks, set color from styles or default
                     values.append(
-                        f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', null, {border_radius_str}, '{color_settings_id}')"
+                        f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, null, {border_radius_str}, '{color_settings_id}')"
                     )
             else:
                 # For text-based blocks, set color from styles or default
                 styles = block.styles
                 values.append(
-                    f"    ('{block.id}', '{styles.get('textVertical')}', '{styles.get('textHorizontal')}', {styles.get('fontSize')}, {styles.get('weight')}, {styles.get('zIndex', 1)}, '{color_value}', '{styles.get('textTransform')}', {border_radius_str}, '{color_settings_id}')"
+                    f"    ('{block.id}', '{styles.get('textVertical')}', '{styles.get('textHorizontal')}', {styles.get('fontSize')}, {styles.get('weight')}, {styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, '{styles.get('textTransform')}', {border_radius_str}, '{color_settings_id}')"
                 )
         return ",\n".join(values)
 
@@ -1942,10 +1942,7 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
             styles["color"] = str(color)
         else:
             styles["color"] = None
-        # Opacity: always set to 1 if not provided
-        opacity = block.get("opacity", 1.0)
-        if opacity is None:
-            opacity = 1.0
+        opacity = block.get("opacity", 1)
         # Precompiled image extraction logic
         if block["type"] == "image" and block["name"].startswith(
             "image precompiled"
