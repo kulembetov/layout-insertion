@@ -300,7 +300,7 @@ VALUES
 RETURNING *;""",
 
     "block_styles": """-- Create BlockLayoutStyles
-INSERT INTO "BlockLayoutStyles" ("blockLayoutId", "textVertical", "textHorizontal", "fontSize", "weight", "zIndex", "color", "textTransform", "borderRadius", "colorSettingsId")
+INSERT INTO "BlockLayoutStyles" ("blockLayoutId", "textVertical", "textHorizontal", "fontSize", "weight", "zIndex", "color", "opacity", "textTransform", "borderRadius", "colorSettingsId")
 VALUES
 {styles_values}
 RETURNING *;""",
