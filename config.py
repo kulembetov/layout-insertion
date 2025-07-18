@@ -420,10 +420,10 @@ SLIDE_NUMBER_TO_TYPE = {
     2: 'fewText',      # 1cols
     3: 'optimalText',  # 2cols
     4: 'manyText',     # 3cols
-    5: 'extraText',    # 4cols
-    6: 'other',         # 5cols
-    7: 'other',         # 6cols
-    8: 'other',         # 7cols
+    5: 'infographics', # infographics
+    6: 'extraText',    # 4cols
+    7: 'other',         # 5cols
+    8: 'other',         # 6cols
     9: 'table',         # table
     10: 'other',        # 6cols
     11: 'other',        # 7cols

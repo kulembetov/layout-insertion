@@ -1886,7 +1886,7 @@ def _process_figma_slide(slide: dict, generator: 'SQLGenerator', output_dir: str
     slide_layout_name = slide_layout.name
     slide_layout_number = slide_layout.number
     skip_number_types = set([
-        config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [5, 9, 13, -1, 1]
+        config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [5, 9, 13, -1, 1, 8]
     ])
     miniature_folder = camel_to_snake(slide_type)
     if slide_type in skip_number_types or slide_layout_number == 0:
