@@ -2,6 +2,7 @@ import os
 import sys
 import glob
 import psycopg2
+import argparse
 from configparser import ConfigParser
 
 
@@ -228,27 +229,28 @@ class SQLExecutor:
 
 def main():
     """Main function to run the script."""
+    parser = argparse.ArgumentParser(
+        description="Execute SQL files from a directory against a PostgreSQL database."
+    )
+    parser.add_argument('--input-dir', type=str, default='my_sql_output',
+                        help='Directory containing SQL files to execute (default: my_sql_output)')
+    parser.add_argument('--db-config', type=str, default='database.ini',
+                        help='Database configuration file (default: database.ini)')
+    
+    args = parser.parse_args()
+    
     print("SQL Files Execution Script")
     print("=" * 30)
     print(f"Current working directory: {os.getcwd()}")
 
-    # Process command line arguments
-    config_file = 'database.ini'
-    sql_dir = 'my_sql_output'
-
-    if len(sys.argv) > 1:
-        config_file = sys.argv[1]
-    if len(sys.argv) > 2:
-        sql_dir = sys.argv[2]
-
     # Initialize and use the classes
-    config_manager = ConfigManager(config_file)
+    config_manager = ConfigManager(args.db_config)
     db_params = config_manager.load_config()
 
     db_manager = DatabaseManager(db_params)
     db_manager.connect()
 
-    sql_executor = SQLExecutor(db_manager, sql_dir)
+    sql_executor = SQLExecutor(db_manager, args.input_dir)
     sql_executor.execute_files()
 
     db_manager.close()
