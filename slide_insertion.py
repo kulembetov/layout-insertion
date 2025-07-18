@@ -1028,8 +1028,6 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
     def _format_slide_layout_index_config_values(self) -> str:
         """Format the values for SlideLayoutIndexConfig SQL"""
         values = []
-        # Get the background colors from the config
-        background_colors = self.config.get_precompiled_images_default_colors()
 
         for block in self.blocks:
             # Only process blocks that have an index
@@ -1037,28 +1035,17 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
                 # Get the slide layout ID
                 slide_layout_id = self.slide_layout.id
 
-                # For each background color, create a SlideLayoutIndexConfig record
-                for background_color in background_colors:
-                    # Find the matching presentation palette ID from slide_layout_index_config_mapping
-                    presentation_palette_id = None
-                    block_layout_config_id = None
-
-                    for config in slide_layout_index_config_mapping:
-                        if config.matched_background_color == background_color:
-                            presentation_palette_id = config.presentation_palette_id
-                            block_layout_config_id = config.block_layout_config_id
-                            break
-
-                    # If no matching presentation palette ID is found, log a warning and skip this record
-                    if not presentation_palette_id:
-                        logger.warning(f"No matching presentation palette ID found for background color {background_color}")
-                        continue
+                # For each presentation palette in the mapping, create a SlideLayoutIndexConfig record
+                for config in slide_layout_index_config_mapping:
+                    presentation_palette_id = config.presentation_palette_id
+                    # Use the actual block layout ID (block.id) instead of the CSV mapping
+                    block_layout_config_id = block.id
 
                     # Generate a UUID for the record
                     slide_layout_index_config_id = self.id_generator.generate_uuid7()
                     # Use the block index as the config number
                     config_number = 0
-                    # Use the block_id_to_index_config_id mapping if available
+                    # Use the actual BlockLayoutIndexConfig ID from the current generation
                     block_layout_index_config_id = self.block_id_to_index_config_id.get(block.id, block.id)
 
                     # Add the values to the list
