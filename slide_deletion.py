@@ -1,6 +1,7 @@
 import os
 import re
 import argparse
+import shutil
 
 # Table deletion order: child to parent
 DELETE_ORDER = [
@@ -156,8 +157,11 @@ def main():
         if not os.path.isdir(group_path):
             continue
         slide_insertion_dir = os.path.join(group_path, 'slide_insertion')
-        if not os.path.isdir(slide_insertion_dir):
-            continue
+        # Remove the slide_insertion directory before processing if it exists
+        if os.path.isdir(slide_insertion_dir):
+            shutil.rmtree(slide_insertion_dir)
+        # After removal, skip processing this group since there are no .sql files to process
+        # continue
         
         # Create corresponding output directory structure
         output_group_path = os.path.join(root_dir, group)
