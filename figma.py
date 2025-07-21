@@ -1059,12 +1059,16 @@ class FigmaToSQLIntegrator:
             }
             for block in slide['blocks']:
                 styles = dict(block['styles']) if block.get('styles') else {}
+                # Ensure color from block['color'] is included in styles if present
+                color = block.get('color')
+                if color:
+                    styles['color'] = color
                 block_input = {
                     'id': block.get('id', ''),
                     'type': block.get('sql_type', ''),
                     'name': block.get('name', ''),
                     'dimensions': block.get('dimensions', {}),
-                    'styles': styles,
+                    'styles': styles,  # styles now always includes color if available
                     'z_index': styles.get('z_index'),
                     'needs_null_styles': block.get('needs_null_styles', False),
                     'needs_z_index': block.get('needs_z_index', False),
