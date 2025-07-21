@@ -1097,12 +1097,16 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
                     has_headers = True
                     break
 
-        infographics_type = "classic"  # default
+        infographics_type = None
         slide_name = self.slide_layout.name.lower()
         for pattern, config_data in config.SLIDE_LAYOUT_TO_INFOCRAPHICS_TYPE.items():
             if pattern in slide_name:
                 infographics_type = config_data["infographicsType"]
                 break
+
+        infographics_type_sql = (
+            f"'{infographics_type}'" if infographics_type is not None else "null"
+        )
 
         return self.config.get_sql_template("slide_layout_additional_info").format(
             slide_layout_id=self.slide_layout.id,
@@ -1111,7 +1115,7 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
             hasHeaders=str(has_headers).lower(),
             type=slide_type_camel,  # always camelCase
             icon_url=self.slide_layout.icon_url,
-            infographics_type=infographics_type,
+            infographics_type=infographics_type_sql,
         )
 
 

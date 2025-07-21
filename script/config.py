@@ -33,7 +33,7 @@ PRECOMPILED_IMAGES = {
     ],
     "prefix": [
         "Green",
-        "Blue", 
+        "Blue",
         "Sky",
         "Purple",
         "Gray",
@@ -259,7 +259,8 @@ SLIDE_LAYOUT_ADDITIONAL_INFO = {
     "percentesCount": 0,
     "maxSymbolsInBlock": 0,
     "hasHeaders": False,
-    "type": "classic"
+    "type": "classic",
+    "infographicsType": None
 }
 
 SLIDE_LAYOUT_DIMENSIONS = {
@@ -332,7 +333,7 @@ INSERT INTO "SlideLayoutAdditionalInfo" (
     {hasHeaders},
     '{type}'::"SlideLayoutType",
     '{icon_url}',
-    '{infographics_type}'
+    {infographics_type}
 )
 RETURNING *;""",
 

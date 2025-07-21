@@ -131,11 +131,11 @@ EXTRACTORS = {
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate SQL delete scripts for all slide groups in my_sql_output/. Traverses all subfolders and processes each slide_insertion folder.")
+        description="Generate SQL delete scripts for all slide groups in script/my_sql_output/. Traverses all subfolders and processes each slide_insertion folder.")
     parser.add_argument('--root-dir', type=str, default='./slide_deletion',
                         help='Root directory to write deletion scripts (default: .)')
-    parser.add_argument('--input-dir', type=str, default='my_sql_output',
-                        help='Input directory containing slide groups (default: my_sql_output)')
+    parser.add_argument('--input-dir', type=str, default='script/my_sql_output',
+                        help='Input directory containing slide groups (default: script/my_sql_output)')
     args = parser.parse_args()
 
     input_dir = args.input_dir

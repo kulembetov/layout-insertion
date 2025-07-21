@@ -1284,6 +1284,8 @@ class FigmaToSQLIntegrator:
         if not figma_data:
             LogUtils.log_block_event("Failed to extract data from Figma")
             return
+        # Print how many slides were extracted
+        print(f"Extracted {len(figma_data.get('slides', []))} slides from Figma.")
         # Save extracted data
         with open(f"{output_dir}/figma_extract.json", 'w') as f:
             json.dump(figma_data, f, indent=2)

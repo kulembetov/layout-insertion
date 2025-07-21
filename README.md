@@ -1,3 +1,24 @@
+# Project Structure
+
+This repository is organized to support a full workflow from Figma design extraction to SQL generation and database population. Below is an overview of the main files and folders:
+
+- `figma.py`: Extracts and normalizes data from Figma, outputs JSON files for further processing.
+- `slide_insertion.py`: Reads normalized JSON and generates SQL files for each slide, handling all necessary tables.
+- `sql_validator.py`: Validates generated SQL files for syntax and referential integrity before database insertion.
+- `sql_pollution.py`: Executes validated SQL files against the target PostgreSQL database.
+- `slide_deletion.py`: Handles deletion of slides, blocks, and images from the database, supporting selective and batch operations.
+- `insert_palette.py`, `insert_block_layout_config.py`, `match_block_layout_presentation_palette.py`: Scripts for managing palette and block layout configuration, including mapping and matching between Figma and database structures.
+- `color_config.py`, `color_pipeline.py`: Utilities for color extraction, normalization, and pipeline processing.
+- `duo_color_insertion.py`, `duo_figure_insertion.py`, `monochrome_color_insertion.py`, `monochrome_figure_insertion.py`: Scripts for handling color and figure insertions for different presentation styles.
+- `clean.py`, `clean_sql_timestamp.py`: Utility scripts for cleaning up data or timestamps.
+- `config.py`: Central configuration file for all scripts, storing Figma API credentials, mappings, and default values.
+- `database.ini`: Stores database connection parameters for PostgreSQL.
+- `schema.prisma`: Prisma schema file for Node.js backend integration.
+- `my_output/`, `my_sql_output/`: Output directories for extracted JSON and generated SQL files, respectively.
+- `slide_deletion/`: Contains SQL files and scripts for deleting slides/blocks, organized by layout type (e.g., 1cols, 2cols, etc.).
+
+---
+
 # Figma to SQL Generator Workflow (Internal Tool)
 
 ## Overview
@@ -63,19 +84,19 @@ All these tables are created and maintained in your company's presentation datab
 **Windows:**
 ```bash
 # 1. Extract from Figma
-python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir script/my_output 
 
 # 2. Insert into PresentationPalette
 # manual mode
-python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+python insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # auto mode
-python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
 # 3. Insert into BlockLayoutConfig
 # manual mode
-python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
 # auto mode
-python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
 
 # 4. Match BlockLayoutConfig with PresentationPalette
 python match_block_layout_presentation_palette.py
@@ -84,7 +105,7 @@ python match_block_layout_presentation_palette.py
 python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Validate SQL
-python sql_validator.py --input-dir my_sql_output
+python sql_validator.py --input-dir script/my_sql_output
 
 # 7. Apply SQL to DB
 python sql_pollution.py
@@ -96,28 +117,28 @@ python slide_deletion.py
 **macOS:**
 ```bash
 # 1. Extract from Figma
-python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir script/my_output 
 
 # 2. Insert into PresentationPalette
 # manual mode
-python3 insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # auto mode
-python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
 # 3. Insert into BlockLayoutConfig
 # manual mode
-python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
 # auto mode
-python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
 
 # 4. Match BlockLayoutConfig with PresentationPalette
 python3 match_block_layout_presentation_palette.py
 
 # 5. Generate SQL
-python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python3 slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
 
 # 6. Validate SQL
-python3 sql_validator.py --input-dir my_sql_output
+python3 sql_validator.py --input-dir script/my_sql_output
 
 # 7. Apply SQL to DB
 python3 sql_pollution.py
@@ -163,7 +184,26 @@ python3 slide_deletion.py
 
 ---
 
-# Русская версия
+# Структура проекта
+
+Репозиторий организован для поддержки полного цикла: от извлечения данных из Figma до генерации SQL и наполнения базы данных. Вот краткое описание основных файлов и папок:
+
+- `figma.py`: Извлекает и нормализует данные из Figma, формирует JSON для дальнейшей обработки.
+- `slide_insertion.py`: Читает нормализованный JSON и генерирует SQL-файлы для каждого слайда, формируя все необходимые таблицы.
+- `sql_validator.py`: Валидирует сгенерированные SQL-файлы на синтаксис и целостность связей перед загрузкой в базу.
+- `sql_pollution.py`: Выполняет валидированные SQL-файлы в целевой базе PostgreSQL.
+- `slide_deletion.py`: Удаляет слайды, блоки и изображения из базы, поддерживает выборочное и пакетное удаление.
+- `insert_palette.py`, `insert_block_layout_config.py`, `match_block_layout_presentation_palette.py`: Скрипты для управления палитрами и конфигурацией блоков, включая сопоставление между Figma и структурой базы.
+- `color_config.py`, `color_pipeline.py`: Утилиты для извлечения, нормализации и обработки цветов.
+- `duo_color_insertion.py`, `duo_figure_insertion.py`, `monochrome_color_insertion.py`, `monochrome_figure_insertion.py`: Скрипты для работы с цветами и фигурами для разных стилей презентаций.
+- `clean.py`, `clean_sql_timestamp.py`: Вспомогательные скрипты для очистки данных или временных меток.
+- `config.py`: Центральный конфиг для всех скриптов, хранит параметры Figma API, маппинги и значения по умолчанию.
+- `database.ini`: Параметры подключения к PostgreSQL.
+- `schema.prisma`: Файл схемы Prisma для интеграции с Node.js backend.
+- `my_output/`, `my_sql_output/`: Папки для вывода извлечённых JSON и сгенерированных SQL-файлов соответственно.
+- `slide_deletion/`: Содержит SQL-файлы и скрипты для удаления слайдов/блоков, организованные по типу макета (например, 1cols, 2cols и т.д.).
+
+---
 
 ## Обзор
 Этот внутренний инструмент автоматизирует процесс извлечения данных из Figma и генерации SQL-файлов для заполнения корпоративной базы презентаций.
@@ -229,27 +269,27 @@ python3 slide_deletion.py
 ```bash
 # 1. Вставка в PresentationPalette
 # ручной режим
-python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+python insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # авто режим
-python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
 # 2. Вставка в BlockLayoutConfig
 # ручной режим
-python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
 # авто режим
-python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
 
 # 3. Сопоставление BlockLayoutConfig с PresentationPalette
 python match_block_layout_presentation_palette.py
 
 # 4. Извлечение из Figma
-python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir script/my_output
 
 # 5. Генерация SQL
-python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
 
 # 6. Валидация SQL
-python sql_validator.py --input-dir my_sql_output
+python sql_validator.py --input-dir script/my_sql_output
 
 # 7. Загрузка SQL в БД
 python sql_pollution.py
@@ -262,27 +302,27 @@ python slide_deletion.py
 ```bash
 # 1. Вставка в PresentationPalette
 # ручной режим
-python3 insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # авто режим
-python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
 # 2. Вставка в BlockLayoutConfig
 # ручной режим
-python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
 # авто режим
-python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
 
 # 3. Сопоставление BlockLayoutConfig с PresentationPalette
 python3 match_block_layout_presentation_palette.py
 
 # 4. Извлечение из Figma
-python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir script/my_output
 
 # 5. Генерация SQL
-python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python3 slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
 
 # 6. Валидация SQL
-python3 sql_validator.py --input-dir my_sql_output
+python3 sql_validator.py --input-dir script/my_sql_output
 
 # 7. Загрузка SQL в БД
 python3 sql_pollution.py

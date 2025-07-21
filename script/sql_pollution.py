@@ -232,8 +232,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Execute SQL files from a directory against a PostgreSQL database."
     )
-    parser.add_argument('--input-dir', type=str, default='my_sql_output',
-                        help='Directory containing SQL files to execute (default: my_sql_output)')
+    parser.add_argument('--input-dir', type=str, default='script/my_sql_output',
+                        help='Directory containing SQL files to execute (default: script/my_sql_output)')
     parser.add_argument('--db-config', type=str, default='database.ini',
                         help='Database configuration file (default: database.ini)')
     

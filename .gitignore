@@ -2,3 +2,4 @@
 /my_output/
 /my_sql_output/
 *.csv
+__pycache__/
