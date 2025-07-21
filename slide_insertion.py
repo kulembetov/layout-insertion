@@ -6,7 +6,7 @@ import re
 import csv
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict, List, Tuple, TypedDict
+from typing import Dict, List, Tuple, TypedDict, Optional
 from dataclasses import dataclass, field
 import json
 import shutil
@@ -41,6 +41,7 @@ with open('slide_layout_index_config_mapping.csv', 'r') as csvfile:
 
 # Helper to set up the logger file handler in any mode
 def setup_slide_insertion_logger(output_dir):
+    """Set up a file logger for slide insertion operations in the specified output directory."""
     logger = logging.getLogger(__name__)
     os.makedirs(output_dir, exist_ok=True)
     log_path = os.path.join(output_dir, "slide_insertion.log")
@@ -136,81 +137,78 @@ class SlideLayout:
 
 
 class ConfigManager:
-    """Manages configuration for the SQL generator"""
-
+    """Manages configuration for the SQL generator."""
     def __init__(self, config_module):
+        """Initialize ConfigManager with a config module."""
         self.config = config_module
-
     def get_default_value(self, key):
+        """Get the default value for a given key from config."""
         return self.config.DEFAULT_VALUES.get(key)
-
     def get_slide_layout_type(self, key):
+        """Get the slide layout type for a given key from config."""
         return self.config.SLIDE_LAYOUT_TYPES.get(key)
-
     def get_block_type_options(self):
+        """Get available block type options from config."""
         return self.config.BLOCK_TYPES["block_layout_type_options"]
-
     def is_null_style_type(self, block_type):
+        """Check if the block type should use null styles."""
         return block_type in self.config.BLOCK_TYPES["null_style_types"]
-
     def is_z_index_type(self, block_type):
+        """Check if the block type should use z-index."""
         return block_type in self.config.BLOCK_TYPES["z_index_types"]
-
     def get_default_z_index(self, block_type):
+        """Get the default z-index for a block type."""
         return self.config.Z_INDEX_DEFAULTS.get(
             block_type, self.config.Z_INDEX_DEFAULTS["default"]
         )
-
     def get_default_dimensions(self, block_type, is_first_block=False):
+        """Get the default dimensions for a block type."""
         if block_type in self.config.DEFAULT_DIMENSIONS:
             return self.config.DEFAULT_DIMENSIONS[block_type]
         return self.config.DEFAULT_DIMENSIONS["default"]
-
     def get_default_styles(self, block_type):
+        """Get the default styles for a block type."""
         if block_type in self.config.DEFAULT_STYLES:
             return self.config.DEFAULT_STYLES[block_type]
         return self.config.DEFAULT_STYLES["default"]
-
     def get_auto_block_config(self, key):
+        """Get the auto block configuration for a given key."""
         return self.config.AUTO_BLOCKS.get(key, {})
-
     def should_add_background(self):
+        """Return True if a background block should be added."""
         return self.config.AUTO_BLOCKS.get("add_background", False)
-
     def should_add_watermark(self):
+        """Return True if a watermark block should be added."""
         return self.config.AUTO_BLOCKS.get("add_watermark", False)
-
     def get_sql_template(self, key):
+        """Get the SQL template for a given key."""
         return self.config.SQL_TEMPLATES.get(key, "")
-
     def get_slide_layout_additional_info(self):
+        """Get additional info for the slide layout."""
         return self.config.SLIDE_LAYOUT_ADDITIONAL_INFO
-
     def get_slide_layout_dimensions(self):
+        """Get the dimensions for the slide layout."""
         return self.config.SLIDE_LAYOUT_DIMENSIONS
-
     def get_output_config(self):
+        """Get the output configuration dictionary."""
         return self.config.OUTPUT_CONFIG
-
     def get_default_color(self):
+        """Get the default color from config."""
         return self.config.DEFAULT_COLOR
-
     def get_default_color_settings_id(self):
+        """Get the default color settings ID from config."""
         return self.config.DEFAULT_COLOR_SETTINGS_ID
-
     def get_miniatures_base_path(self):
+        """Get the base path for slide layout miniatures."""
         return self.config.MINIATURES_BASE_PATH
-
     def get_folder_for_slide_number(self, slide_number):
-        # Get the output folder name based on slide number
+        """Get the output folder name based on slide number."""
         return self.config.SLIDE_NUMBER_TO_FOLDER.get(slide_number, "other")
-
     def get_precompiled_images_base_url(self):
-        # Get the base URL for precompiled images
+        """Get the base URL for precompiled images."""
         return self.config.PRECOMPILED_IMAGES.get("base_url", "")
-
     def get_precompiled_images_default_colors(self):
-        # Get the list of default colors for precompiled images
+        """Get the list of default colors for precompiled images."""
         return self.config.PRECOMPILED_IMAGES.get("default_colors", ["#ffffff"])
 
 
@@ -218,14 +216,10 @@ class ConfigManager:
 
 
 class IdGenerator:
-    """Generates unique IDs for entities"""
-
+    """Generates unique IDs for entities."""
     @staticmethod
     def generate_uuid7() -> str:
-        """
-        Generate a UUID version 7 (time-ordered UUID)
-        Implementation based on the draft RFC for UUID v7 - time-ordered
-        """
+        """Generate a UUID version 7 (time-ordered UUID)."""
         # Get current UNIX timestamp (milliseconds)
         unix_ts_ms = int(time.time() * 1000)
 
@@ -253,31 +247,31 @@ class IdGenerator:
 
 
 class InputValidator:
-    """Validates user input"""
-
+    """Validates user input."""
     @staticmethod
     def validate_options(value: str, options: List[str]) -> bool:
+        """Return True if value is in options."""
         return value in options
-
     @staticmethod
     def validate_integer(value: str) -> bool:
+        """Return True if value is an integer."""
         try:
             int(value)
             return True
         except ValueError:
             return False
-
     @staticmethod
     def validate_color(value: str) -> bool:
+        """Return True if value is a valid hex color string."""
         # Add hash if not provided
         if not value.startswith("#"):
             value = f"#{value}"
 
         # Check if valid hex color after potentially adding the hash
         return len(value) in [4, 7]
-
     @staticmethod
     def prepare_color(value: str) -> str:
+        """Prepare and normalize a color string to hex format."""
         # Add hash if not provided
         if not value.startswith("#"):
             value = f"#{value}"
@@ -285,14 +279,12 @@ class InputValidator:
 
 
 class UserInputService:
-    """Handles user interaction"""
-
+    """Handles user interaction."""
     def __init__(self, validator: InputValidator):
+        """Initialize UserInputService with an InputValidator."""
         self.validator = validator
-
-    def get_input(
-        self, prompt, default=None, options=None, is_integer=False, is_color=False
-    ):
+    def get_input(self, prompt, default=None, options=None, is_integer=False, is_color=False):
+        """Prompt the user for input, with optional validation for options, integer, or color."""
         """Get validated input from user"""
         while True:
             if default is not None:
@@ -324,8 +316,8 @@ class UserInputService:
                 return self.validator.prepare_color(value)
 
             return value
-
     def show_color_options(self, colors: List[str]) -> None:
+        """Display available color options to the user."""
         """Display available color options"""
         logger.info("Available default colors:")
         for i, color in enumerate(colors, 1):
@@ -653,6 +645,162 @@ class BlockFactory:
 
         return {"x": x, "y": y, "w": w, "h": h}
 
+    @staticmethod
+    def create_block_from_dict(block_dict: dict, extra: dict = None) -> Block:
+        """
+        Create a Block from a dict (Figma JSON or user input), handling all defaults and normalization.
+        extra: optional dict for overrides (e.g., id, name, index, etc.)
+        """
+        data = dict(block_dict)  # shallow copy
+        extra = extra or {}
+        # Use provided or generate id
+        block_id = extra.get('id') or data.get('id') or str(uuid.uuid4())
+        # Normalize/clean name
+        name = extra.get('name') or data.get('name') or ""
+        name = BlockNameUtils.normalize_name(name)
+        # Index
+        index = extra.get('index') if 'index' in extra else data.get('index')
+        # Styles
+        styles = dict(data.get('styles', {}))
+        # Dimensions
+        dimensions = dict(data.get('dimensions', {}))
+        # Border radius
+        border_radius = data.get('border_radius') or data.get('corner_radius') or [0, 0, 0, 0]
+        # Opacity
+        opacity = data.get('opacity', 1)
+        # Words
+        words = data.get('words', 1)
+        # Flags
+        needs_null_styles = data.get('needs_null_styles', False)
+        needs_z_index = data.get('needs_z_index', False)
+        is_figure = data.get('is_figure', False)
+        is_background = data.get('is_background', False)
+        is_precompiled_image = data.get('is_precompiled_image', False)
+        # Info
+        color = data.get('color')
+        figure_info = data.get('figure_info')
+        precompiled_image_info = data.get('precompiled_image_info')
+        # Compose
+        return Block(
+            id=block_id,
+            type=data.get('type', ''),
+            dimensions=dimensions,
+            styles=styles,
+            needs_null_styles=needs_null_styles,
+            needs_z_index=needs_z_index,
+            is_figure=is_figure,
+            is_background=is_background,
+            is_precompiled_image=is_precompiled_image,
+            color=color,
+            figure_info=figure_info,
+            precompiled_image_info=precompiled_image_info,
+            border_radius=border_radius,
+            name=name,
+            index=index,
+            opacity=opacity,
+            words=words,
+        )
+
+    @staticmethod
+    def extract_figure_info(block_dict, block_uuid, clean_block_name, color):
+        if block_dict.get('type') != BlockTypes.FIGURE:
+            return None
+        # Extract figure name from clean_block_name (handle (name_N) or just name)
+        match = re.search(r"\(([^)]+)\)", clean_block_name)
+        if match:
+            figure_name = match.group(1)
+            figure_name = re.sub(r"_\d+", "", figure_name)
+        else:
+            figure_name = clean_block_name
+        normalized_color = ColorUtils.normalize_color(color) if color else None
+        figure_color = normalized_color if normalized_color is not None else "#ffffff"
+        return {
+            "block_id": block_uuid,
+            "name": figure_name,
+            "color": figure_color,
+        }
+
+    @staticmethod
+    def extract_precompiled_image_info(block_dict, block_uuid):
+        if block_dict.get('type') != BlockTypes.IMAGE or not block_dict.get('name', '').startswith('image precompiled'):
+            return None
+        match = re.match(
+            r"image precompiled ([^ ]+)(?: z-index \d+)?(?: (#[0-9a-fA-F]{3,6}))?",
+            block_dict["name"],
+        )
+        if not match:
+            return None
+        base_name = match.group(1)
+        block_index = BlockNameUtils.extract_index(base_name, BlockTypes.IMAGE)
+        if block_index is not None:
+            base_name = re.sub(r"_\d+$", "", base_name)
+        base_url = config.PRECOMPILED_IMAGES["base_url"]
+        colors = config.PRECOMPILED_IMAGES["default_colors"]
+        prefixes = config.PRECOMPILED_IMAGES["prefix"]
+        precompiled_images = []
+        if match.group(2):
+            color_val = ColorUtils.normalize_color(match.group(2))
+            url = f"{base_url}/{base_name}.png"
+            precompiled_images.append(
+                {
+                    "block_layout_id": block_uuid,
+                    "url": url,
+                    "color": color_val,
+                }
+            )
+        else:
+            for color_val, prefix in zip(colors, prefixes):
+                norm_color = ColorUtils.normalize_color(color_val)
+                variant_name = f"{base_name}{prefix}"
+                url = f"{base_url}/{variant_name}.png"
+                precompiled_images.append(
+                    {
+                        "block_layout_id": block_uuid,
+                        "url": url,
+                        "color": norm_color,
+                    }
+                )
+        return precompiled_images
+
+# ================ Color Utils ================
+
+class ColorUtils:
+    @staticmethod
+    def normalize_color(color: str) -> str | None:
+        """
+        Normalize a color string to a standard hex format (#aabbcc, lowercase).
+        Returns None if the color is invalid or empty.
+        """
+        if not color or not isinstance(color, str):
+            return None
+        color = color.strip().lower()
+        # Handle hex colors
+        if color.startswith('#'):
+            color = color.lstrip('#')
+        if re.fullmatch(r'[0-9a-f]{6}', color):
+            return f'#{color}'
+        if re.fullmatch(r'[0-9a-f]{3}', color):
+            # Expand short hex to full
+            color = ''.join([c*2 for c in color])
+            return f'#{color}'
+        return None
+
+class BlockTypes:
+    FIGURE = "figure"
+    IMAGE = "image"
+    BACKGROUND = "background"
+    TEXT = "text"
+    SLIDE_TITLE = "slideTitle"
+    BLOCK_TITLE = "blockTitle"
+    EMAIL = "email"
+    DATE = "date"
+    NAME = "name"
+    PERCENTAGE = "percentage"
+    ICON = "icon"
+    SUBTITLE = "subTitle"
+    NUMBER = "number"
+    LOGO = "logo"
+    # Add more as needed
 
 # ================ SQL Command Pattern ================
 
@@ -743,8 +891,7 @@ class BlockStylesCommand(SQLCommand):
 
             # Format the SQL based on block type
             color_value = block.styles.get("color")
-            if color_value:
-                color_value = str(color_value).strip().lower()
+            color_value = ColorUtils.normalize_color(color_value) if color_value else None
             if (
                 not color_value
                 or not color_value.startswith("#")
@@ -819,18 +966,11 @@ class FigureCommand(SQLCommand):
         values = []
         for figure in self.figure_blocks:
             figure_id = self.id_generator.generate_uuid7()
-            # Extract index from name if it exists (e.g., "text_1" -> index=1)
             name = figure["name"]
-            index = None
-            match = re.search(r"_(\d+)$", name)
-            if match:
-                index = int(match.group(1))
+            index = BlockNameUtils.extract_index(name, "figure")
+            if index is not None:
                 logger.info(f"Extracted index {index} from figure name {name}")
-
-            # Remove trailing _<digits> from the name
             name = re.sub(r"_\d+$", "", name)
-
-            # Include the index in the SQL comment for reference
             index_comment = f" -- index: {index}" if index is not None else ""
             values.append(f"    ('{figure_id}', '{figure['block_id']}', '{name}'){index_comment}")
         return ",\n".join(values)
@@ -1348,7 +1488,6 @@ class SQLGenerator:
             logger.info(f"Color SQL written to {color_sql_file}")
         logger.info(f"SQL written to {output_file}")
         logger.info(f"SQL file generated: {os.path.basename(output_file)} (saved at: {os.path.abspath(output_file)})")
-        print(f"\nSQL file generated: {os.path.basename(output_file)}\nSaved at: {os.path.abspath(output_file)}\n")
         logger.info("SQL generation process completed.")
         return output_file
 
@@ -1383,7 +1522,7 @@ class SQLGenerator:
     def _find_matching_slides(self, slide_layout, sql_input_data) -> list:
         """Find all slides in sql_input_data matching this slide_layout (by number and normalized name)."""
         def normalize_name(name):
-            return re.sub(r"\s*z-index\s*\d+\s*$", "", name or "").strip().lower()
+            return BlockNameUtils.normalize_name(name)
         slide_layout_name_norm = normalize_name(slide_layout.name)
         matching_slides = []
         for slide in sql_input_data:
@@ -1626,7 +1765,7 @@ class SQLGenerator:
                 "weight": None,
                 "zIndex": bg_config["z_index"],
                 "textTransform": None,
-                "color": bg_config["color"],
+                "color": "#ffffff",
             }
             bg_block = Block(
                 id=self.id_generator.generate_uuid7(),
@@ -1812,49 +1951,62 @@ def safe_slide_type(config, name):
     return val
 
 
-def auto_generate_sql_from_figma(json_path, output_dir=None):
+def auto_generate_sql_from_figma(json_path: str, output_dir: Optional[str] = None) -> None:
     """
     Automatically generate SQL files from a Figma JSON export (as produced by figma.py's sql_generator_input.json),
     without any user interaction. Each slide in the JSON will be processed and SQL files will be written to the appropriate output directory.
+    Args:
+        json_path: Path to the Figma JSON export file
+        output_dir: Output directory for generated SQL files (optional)
+    Returns:
+        None
     """
+    try:
+        generator = SQLGenerator(config, output_dir=output_dir)
+        output_dir = output_dir or config.OUTPUT_CONFIG["output_dir"]
+        # Remove output directory if it exists
+        if os.path.exists(output_dir):
+            logger.info(f"Preparing to remove existing output directory: {output_dir}")
+            # Close all file handlers for loggers to avoid PermissionError
+            loggers = [logging.getLogger(), logger]
+            for log in loggers:
+                handlers = log.handlers[:]
+                for handler in handlers:
+                    logger.info(f"Closing logger handler: {handler}")
+                    handler.close()
+                    log.removeHandler(handler)
+            logger.info(f"All logger handlers closed. Removing directory: {output_dir}")
+            shutil.rmtree(output_dir)
+            logger.info(f"Removed output directory: {output_dir}")
+        os.makedirs(output_dir, exist_ok=True)
+        logger.info(f"Created output directory: {output_dir}")
+        setup_slide_insertion_logger(output_dir)
+        logger.info(f"Starting auto SQL generation from {json_path} to {output_dir}")
 
-    generator = SQLGenerator(config, output_dir=output_dir)
-    output_dir = output_dir or config.OUTPUT_CONFIG["output_dir"]
-    # Remove output directory if it exists
-    if os.path.exists(output_dir):
-        logger.info(f"Preparing to remove existing output directory: {output_dir}")
-        # Close all file handlers for loggers to avoid PermissionError
-        loggers = [logging.getLogger(), logger]
-        for log in loggers:
-            handlers = log.handlers[:]
-            for handler in handlers:
-                logger.info(f"Closing logger handler: {handler}")
-                handler.close()
-                log.removeHandler(handler)
-        logger.info(f"All logger handlers closed. Removing directory: {output_dir}")
-        shutil.rmtree(output_dir)
-        logger.info(f"Removed output directory: {output_dir}")
-    os.makedirs(output_dir, exist_ok=True)
-    logger.info(f"Created output directory: {output_dir}")
-    setup_slide_insertion_logger(output_dir)
-    logger.info(f"Starting auto SQL generation from {json_path} to {output_dir}")
+        def strip_zindex(name: str) -> str:
+            # Remove 'background_N' and ' z-index N' (case-insensitive, with or without leading/trailing spaces)
+            name = re.sub(r"\s*background_\d+", "", name, flags=re.IGNORECASE)
+            name = re.sub(r"\s*z-index\s*\d+\s*$", "", name, flags=re.IGNORECASE)
+            # Clean up any extra spaces
+            return name.strip()
 
-
-    def strip_zindex(name: str) -> str:
-        # Remove 'background_N' and ' z-index N' (case-insensitive, with or without leading/trailing spaces)
-        name = re.sub(r"\s*background_\d+", "", name, flags=re.IGNORECASE)
-        name = re.sub(r"\s*z-index\s*\d+\s*$", "", name, flags=re.IGNORECASE)
-        # Clean up any extra spaces
-        return name.strip()
-
-    with open(json_path, "r", encoding="utf-8") as f:
-        slides = json.load(f)
-    slide_count = 0
-    for slide in slides:
-        _process_figma_slide(slide, generator, output_dir, strip_zindex)
-        slide_count += 1
-    logger.info(f"Auto SQL generation process completed. Total slides processed: {slide_count}")
-    print(f"Auto SQL generation process completed. Total slides processed: {slide_count}")
+        with open(json_path, "r", encoding="utf-8") as f:
+            slides = json.load(f)
+        slide_count = 0
+        error_count = 0
+        for slide in slides:
+            try:
+                _process_figma_slide(slide, generator, output_dir, strip_zindex)
+                slide_count += 1
+            except Exception as e:
+                logger.error(f"Failed to process slide: {e}")
+                print(f"Failed to process slide: {e}")
+                error_count += 1
+        logger.info(f"Auto SQL generation process completed. {slide_count} slides processed successfully, {error_count} failed. Output directory: {output_dir}")
+        print(f"Auto SQL generation process completed. {slide_count} slides processed successfully, {error_count} failed. Output directory: {output_dir}")
+    except Exception as e:
+        logger.error(f"Auto SQL generation failed: {e}")
+        print(f"Auto SQL generation failed: {e}")
 
 def _process_figma_slide(slide: dict, generator: 'SQLGenerator', output_dir: str, strip_zindex) -> None:
     """Process a single slide from Figma JSON and generate SQL."""
@@ -1918,9 +2070,8 @@ def _process_figma_slide(slide: dict, generator: 'SQLGenerator', output_dir: str
     )
 
 def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) -> tuple:
-    """Process blocks from a Figma slide and return blocks, precompiled_images, and figure_blocks lists."""
     blocks = []
-    block_id_map = {}  # Map Figma block id to generated UUID
+    block_id_map = {}
     precompiled_images = []
     figure_blocks = []
     for block in slide["blocks"]:
@@ -1934,155 +2085,34 @@ def _process_figma_blocks(slide: dict, generator: 'SQLGenerator', strip_zindex) 
             color = block["color"]
         elif block.get("styles", {}).get("color"):
             color = block["styles"]["color"]
-        if color is not None:
-            styles["color"] = str(color)
+        normalized_color = ColorUtils.normalize_color(color) if color else None
+        if normalized_color is not None:
+            styles["color"] = normalized_color
         else:
             styles["color"] = None
         opacity = block.get("opacity", 1)
-        # Precompiled image extraction logic
-        if block["type"] == "image" and block["name"].startswith(
-            "image precompiled"
-        ):
-            _process_precompiled_image_block(block, block_uuid, precompiled_images)
-        
-        # Extract block index BEFORE calling strip_zindex
-        block_index = block.get("index", None)  # Get index from precompiled image block if it exists
         original_block_name = block["name"]
-        
-        # Special handling for background blocks - extract index BEFORE stripping
-        if block["type"] == "background" or "background" in original_block_name.lower():
-            # Extract index from background_N pattern in original name
-            bg_match = re.search(r"background_(\d+)", original_block_name, re.IGNORECASE)
-            if bg_match:
-                block_index = int(bg_match.group(1))
-                logger.info(f"Extracted index {block_index} from background block name {original_block_name}")
-                # Set is_background flag
-                block["is_background"] = True
-        
-        # Special handling for percentage blocks - extract index BEFORE stripping
-        if block["type"] == "percentage" or "percentage" in original_block_name.lower():
-            # Extract index from percentage_N pattern in original name
-            pct_match = re.search(r"percentage_(\d+)", original_block_name, re.IGNORECASE)
-            if pct_match:
-                block_index = int(pct_match.group(1))
-                logger.info(f"Extracted index {block_index} from percentage block name {original_block_name}")
-            else:
-                # Also try to find percentage blocks with different naming patterns
-                # Look for patterns like "percentage 1", "percentage1", etc.
-                pct_alt_match = re.search(r"percentage\s*(\d+)", original_block_name, re.IGNORECASE)
-                if pct_alt_match:
-                    block_index = int(pct_alt_match.group(1))
-                    logger.info(f"Extracted index {block_index} from percentage block name {original_block_name} (alternative pattern)")
-        
-        # Now strip z-index for clean name
-        clean_block_name = strip_zindex(original_block_name)
-
-        # Special handling for figure blocks with format "figure (iconOvalOutlineRfs_4)"
-        if block["type"] == "figure":
-            # Extract the content inside parentheses if present
-            paren_match = re.search(r"\(([^)]+)\)", clean_block_name)
-            if paren_match:
-                figure_content = paren_match.group(1)
-                # Extract index from the content inside parentheses
-                # Use a more flexible regex pattern to match digits after underscore anywhere in the string
-                index_match = re.search(r"_(\d+)", figure_content)
-                if index_match:
-                    block_index = int(index_match.group(1))
-                    logger.info(f"Extracted index {block_index} from figure name {figure_content} inside parentheses")
-            # Process the figure block
-            _process_figure_block(block, block_uuid, clean_block_name, color, figure_blocks)
-        # For other non-figure blocks, use the standard pattern
-        elif block_index is None:
-            match = re.search(r"_(\d+)", clean_block_name)
-            if match:
-                block_index = int(match.group(1))
-                logger.info(f"Extracted index {block_index} from block name {clean_block_name} of type {block['type']}")
-
-        # Get words from the block JSON
+        block_index = BlockNameUtils.extract_index(original_block_name, block["type"])
+        clean_block_name = BlockNameUtils.normalize_name(original_block_name)
         words = block.get("words", 1)
-
-        block_obj = Block(
-            id=block_uuid,
-            type=block["type"],
-            dimensions=block["dimensions"],
-            styles=styles,
-            needs_null_styles=block["needs_null_styles"],
-            needs_z_index=block["needs_z_index"],
-            is_figure=block.get("is_figure", False),
-            is_background=block.get("is_background", False),
-            is_precompiled_image=block.get("is_precompiled_image", False),
-            color=None,
-            figure_info=block.get("figure_info"),
-            precompiled_image_info=block.get("precompiled_image_info"),
-            border_radius=block.get("corner_radius", [0, 0, 0, 0]),
-            name=clean_block_name,
-            index=block_index,
-            opacity=opacity,
-            words=words,
-        )
+        block_dict = dict(block)
+        block_dict.update({
+            'id': block_uuid,
+            'name': clean_block_name,
+            'index': block_index,
+            'styles': styles,
+            'opacity': opacity,
+            'words': words,
+        })
+        block_dict['figure_info'] = BlockFactory.extract_figure_info(block_dict, block_uuid, clean_block_name, normalized_color)
+        block_dict['precompiled_image_info'] = BlockFactory.extract_precompiled_image_info(block_dict, block_uuid)
+        block_obj = BlockFactory.create_block_from_dict(block_dict)
         blocks.append(block_obj)
-        logger.info(
-            f"Block: type={block_obj.type}, name={block_obj.name}, index={block_obj.index}, dimensions={block_obj.dimensions}, styles={block_obj.styles}"
-        )
+        if block_obj.figure_info:
+            figure_blocks.append(block_obj.figure_info)
+        if block_obj.precompiled_image_info:
+            precompiled_images.extend(block_obj.precompiled_image_info)
     return blocks, precompiled_images, figure_blocks
-
-def _process_precompiled_image_block(block: dict, block_uuid: str, precompiled_images: list) -> None:
-    """Process a precompiled image block and append variants to precompiled_images."""
-    match = re.match(
-        r"image precompiled ([^ ]+)(?: z-index \d+)?(?: (#[0-9a-fA-F]{3,6}))?",
-        block["name"],
-    )
-    if match:
-        base_name = match.group(1)
-        # Extract index from base_name if it exists (e.g., "qrRightRfs_1" -> index=1)
-        index_match = re.search(r"_(\d+)$", base_name)
-        if index_match:
-            block_index = int(index_match.group(1))
-            logger.info(f"Extracted index {block_index} from precompiled image name {base_name}")
-            # Store the index in the block for later use
-            block["index"] = block_index
-            # Remove the index from the base_name for URL construction
-            base_name = re.sub(r"_\d+$", "", base_name)
-
-        base_url = config.PRECOMPILED_IMAGES["base_url"]
-        colors = config.PRECOMPILED_IMAGES["default_colors"]
-        prefixes = config.PRECOMPILED_IMAGES["prefix"]
-        # If color is present in the block name, use it, else use all default colors
-        if match.group(2):
-            color_val = match.group(2)
-            url = f"{base_url}/{base_name}.png"
-            precompiled_images.append(
-                {
-                    "block_layout_id": block_uuid,
-                    "url": url,
-                    "color": color_val,
-                }
-            )
-        else:
-            for color_val, prefix in zip(colors, prefixes):
-                variant_name = f"{base_name}{prefix}"
-                url = f"{base_url}/{variant_name}.png"
-                precompiled_images.append(
-                    {
-                        "block_layout_id": block_uuid,
-                        "url": url,
-                        "color": color_val,
-                    }
-                )
-
-def _process_figure_block(block: dict, block_uuid: str, clean_block_name: str, color: str, figure_blocks: list) -> None:
-    """Process a figure block and append to figure_blocks."""
-    match = re.search(r"\(([^)]+)\)", clean_block_name)
-    if match:
-        figure_name = match.group(1)
-        # Remove any _<digits> from the figure name (not just at the end)
-        figure_name = re.sub(r"_\d+", "", figure_name)
-    else:
-        figure_name = clean_block_name
-    figure_color = color if color is not None else "#ffffff"
-    figure_blocks.append(
-        {"block_id": block_uuid, "name": figure_name, "color": figure_color}
-    )
 
 def _ensure_background_and_watermark_blocks(slide_layout, blocks: list, generator: 'SQLGenerator') -> None:
     """Ensure a background block and watermark block are present if needed."""
@@ -2135,6 +2165,64 @@ def camel_to_snake(name):
     """Convert camelCase or PascalCase to snake_case."""
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+class BlockNameUtils:
+    @staticmethod
+    def extract_index(name: str, block_type: str = None) -> int | None:
+        """
+        Extracts an index from a block name using all known patterns.
+        Handles:
+        - 'background_N', 'percentage_N', 'text_N', etc.
+        - 'figure (name_N)' or 'figure (something_N)'
+        - 'image precompiled name_N'
+        - General '_N' at the end
+        Returns the index as int if found, else None.
+        """
+        if not name:
+            return None
+        # Figure with parentheses: figure (name_N)
+        paren_match = re.search(r'\(([^)]+)\)', name)
+        if paren_match:
+            inner = paren_match.group(1)
+            idx_match = re.search(r'_(\d+)', inner)
+            if idx_match:
+                return int(idx_match.group(1))
+        # background_N, percentage_N, etc.
+        if block_type:
+            pattern = rf'{block_type}[_\s-]*(\d+)'  # e.g., background_2 or background 2
+            match = re.search(pattern, name, re.IGNORECASE)
+            if match:
+                return int(match.group(1))
+        # General _N at the end
+        match = re.search(r'_(\d+)$', name)
+        if match:
+            return int(match.group(1))
+        # percentage N (with space)
+        match = re.search(r'percentage\s*(\d+)', name, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+        return None
+
+    @staticmethod
+    def normalize_name(name: str) -> str:
+        """
+        Normalize a block or slide name by:
+        - Removing 'background_N', 'z-index N', and similar suffixes
+        - Stripping leading/trailing whitespace
+        - Removing extra spaces
+        - (NO lowercasing)
+        """
+        if not name:
+            return ""
+        # Remove 'background_N' (case-insensitive)
+        name = re.sub(r"\s*background_\d+", "", name, flags=re.IGNORECASE)
+        # Remove 'z-index N' (case-insensitive)
+        name = re.sub(r"\s*z-index\s*\d+\s*$", "", name, flags=re.IGNORECASE)
+        # Remove trailing underscores and digits (e.g., _1, _2)
+        name = re.sub(r"_\d+$", "", name)
+        # Remove extra spaces
+        return name.strip()
+
 def main():
     """Main entry point for interactive mode"""
     output_dir = config.OUTPUT_CONFIG["output_dir"]
@@ -2180,6 +2268,5 @@ if __name__ == "__main__":
         auto_generate_sql_from_figma(args.auto_from_figma, args.output_dir)
     else:
         main_output_dir = args.output_dir if args.output_dir else None
-
         generator = SQLGenerator(config, output_dir=main_output_dir)
         generator.run()
