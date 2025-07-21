@@ -131,11 +131,11 @@ EXTRACTORS = {
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate SQL delete scripts for all slide groups in script/my_sql_output/. Traverses all subfolders and processes each slide_insertion folder.")
-    parser.add_argument('--root-dir', type=str, default='./slide_deletion',
+        description="Generate SQL delete scripts for all slide groups in my_sql_output/. Traverses all subfolders and processes each slide_insertion folder.")
+    parser.add_argument('--root-dir', type=str, default='slide_deletion',
                         help='Root directory to write deletion scripts (default: .)')
-    parser.add_argument('--input-dir', type=str, default='script/my_sql_output',
-                        help='Input directory containing slide groups (default: script/my_sql_output)')
+    parser.add_argument('--input-dir', type=str, default='my_sql_output',
+                        help='Input directory containing slide groups (default: my_sql_output)')
     args = parser.parse_args()
 
     input_dir = args.input_dir
@@ -157,17 +157,18 @@ def main():
         if not os.path.isdir(group_path):
             continue
         slide_insertion_dir = os.path.join(group_path, 'slide_insertion')
-        # Remove the slide_insertion directory before processing if it exists
-        if os.path.isdir(slide_insertion_dir):
-            shutil.rmtree(slide_insertion_dir)
-        # After removal, skip processing this group since there are no .sql files to process
-        # continue
-        
-        # Create corresponding output directory structure
+        # Do NOT remove or modify the input slide_insertion_dir
+        # Only remove the output slide_deletion directory if it exists
         output_group_path = os.path.join(root_dir, group)
         os.makedirs(output_group_path, exist_ok=True)
         slide_deletion_dir = os.path.join(output_group_path, 'slide_deletion')
+        if os.path.isdir(slide_deletion_dir):
+            shutil.rmtree(slide_deletion_dir)
         os.makedirs(slide_deletion_dir, exist_ok=True)
+        # If slide_insertion_dir does not exist, skip this group
+        if not os.path.isdir(slide_insertion_dir):
+            print(f"  Warning: {slide_insertion_dir} does not exist, skipping group {group}.")
+            continue
         
         print(f"Processing group: {group}")
         for fname in os.listdir(slide_insertion_dir):
