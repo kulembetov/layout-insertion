@@ -88,15 +88,9 @@ python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --out
 
 # 2. Insert into PresentationPalette
 # manual mode
-python insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # auto mode
-python insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
-
-# 3. Insert into BlockLayoutConfig
-# manual mode
-python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
-# auto mode
-python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
+python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
 # 4. Match BlockLayoutConfig with PresentationPalette
 python match_block_layout_presentation_palette.py
@@ -121,15 +115,15 @@ python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --ou
 
 # 2. Insert into PresentationPalette
 # manual mode
-python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # auto mode
-python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
 # 3. Insert into BlockLayoutConfig
 # manual mode
-python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
 # auto mode
-python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
 
 # 4. Match BlockLayoutConfig with PresentationPalette
 python3 match_block_layout_presentation_palette.py

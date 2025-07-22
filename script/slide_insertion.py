@@ -1780,12 +1780,12 @@ class SQLGenerator:
         )
         miniature_folder = camel_to_snake(slide_type)
         if slide_type in skip_number_types or slide_layout_number == 0:
-            icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout_name}.svg"
+            icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout_name}{config.MINIATURE_EXTENSION}"
         else:
             number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(
                 slide_layout_number, slide_layout_number
             )
-            icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout_name}.svg"
+            icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout_name}{config.MINIATURE_EXTENSION}"
 
         # Generate ID for slide layout
         slide_layout_id = self.id_generator.generate_uuid7()
@@ -1961,12 +1961,12 @@ class SQLGenerator:
         )
         miniature_folder = camel_to_snake(slide_type)
         if slide_type in skip_number_types or slide_layout.number == 0:
-            slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout.name}.svg"
+            slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout.name}{config.MINIATURE_EXTENSION}"
         else:
             number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(
                 slide_layout.number, slide_layout.number
             )
-            slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout.name}.svg"
+            slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout.name}{config.MINIATURE_EXTENSION}"
 
     def _generate_sql_queries(
         self, slide_layout, blocks, figure_blocks, precompiled_image_blocks
@@ -2188,12 +2188,12 @@ def _process_figma_slide(
     )
     miniature_folder = camel_to_snake(slide_type)
     if slide_type in skip_number_types or slide_layout_number == 0:
-        icon_url = f"{miniatures_base_path}/{miniature_folder}/{slide_layout_name}.svg"
+        icon_url = f"{miniatures_base_path}/{miniature_folder}/{slide_layout_name}{config.MINIATURE_EXTENSION}"
     else:
         number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(
             slide_layout_number, slide_layout_number
         )
-        icon_url = f"{miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_layout_name}.svg"
+        icon_url = f"{miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_layout_name}{config.MINIATURE_EXTENSION}"
     slide_layout.icon_url = icon_url
     # Build Block objects with generated UUIDs
     blocks, precompiled_images, figure_blocks = _process_figma_blocks(

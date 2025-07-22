@@ -375,6 +375,8 @@ RETURNING *;""",
     "block_layout_limit": """-- Create BlockLayoutLimit\nINSERT INTO "BlockLayoutLimit" ("minWords", "maxWords", "blockLayoutId")\nVALUES\n{block_layout_limit_values}\nRETURNING *;"""
 }
 
+MINIATURE_EXTENSION = ".png"
+
 # Output configuration
 OUTPUT_CONFIG = {
     "output_dir": "my_sql_output",
