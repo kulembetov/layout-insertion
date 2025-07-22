@@ -391,13 +391,12 @@ SLIDE_NUMBER_TO_FOLDER = {
     4: "3cols",
     5: "infographics",
     6: "4cols",
-    7: "5cols",
-    8: "divider",
-    9: "table",
-    10: "6cols",
-    11: "7cols",
-    12: "8cols",
-    13: "chart",
+    7: "divider",
+    8: "table",
+    9: "6cols",
+    10: "7cols",
+    11: "8cols",
+    12: "chart",
     -1: "last"
 }
 
@@ -408,13 +407,12 @@ SLIDE_NUMBER_TO_NUMBER = {
     4: 3,           # 3cols
     5: None,        # infographics
     6: 4,           # 4cols
-    7: 5,           # 5cols
-    8: None,        # divider
-    9: None,        # table
-    10: 6,          # 6cols
-    11: 7,          # 7cols
-    12: 8,          # 8cols
-    13: None,       # chart
+    7: None,        # divider
+    8: None,        # table
+    9: 6,           # 6cols
+    10: 7,          # 7cols
+    11: 8,          # 8cols
+    12: None,       # chart
     -1: None        # last
 }
 
@@ -425,14 +423,13 @@ SLIDE_NUMBER_TO_TYPE = {
     4: 'manyText',     # 3cols
     5: 'infographics', # infographics
     6: 'extraText',    # 4cols
-    7: 'other',         # 5cols
-    8: 'other',         # 6cols
-    9: 'table',         # table
-    10: 'other',        # 6cols
-    11: 'other',        # 7cols
-    12: 'other',        # 8cols
-    13: 'chart',        # chart
-    -1: 'last'          # last
+    7: 'other',        # divider
+    8: 'table',        # table
+    9: 'other',        # 6cols
+    10: 'other',       # 7cols
+    11: 'other',       # 8cols
+    12: 'chart',       # chart
+    -1: 'last'         # last
 }
 
 WATERMARK_SLIDES = []
@@ -444,13 +441,12 @@ CONTAINER_NAME_TO_SLIDE_NUMBER = {
     "3cols": 4,
     "infographics": 5,
     "4cols": 6,
-    "5cols": 7,
-    "divider": 8,
-    "table": 9,
-    "6cols": 10,
-    "7cols": 11,
-    "8cols": 12,
-    "chart": 13,
+    "divider": 7,
+    "table": 8,
+    "6cols": 9,
+    "7cols": 10,
+    "8cols": 11,
+    "chart": 12,
     "last": -1
 }
 
@@ -528,4 +524,12 @@ SLIDE_LAYOUT_TO_INFOCRAPHICS_TYPE = {
     'center_bar_chart': {
         'infographicsType': 'bar'
     }
+}
+
+SLIDE_FOLDER_TO_MINIATURE_NUMBER = {
+    "5cols": 5,
+    "6cols": 6,
+    "7cols": 7,
+    "8cols": 8,
+    "9cols": 9,
 }
