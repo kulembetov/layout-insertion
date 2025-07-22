@@ -1,5 +1,5 @@
 from django.urls import path
-from api_v1.views_ver_2 import APIReceiveJsonFromFigma
+from figma_api.api_v1.views_ver_2 import APIReceiveJsonFromFigma
 
 
 urlpatterns = [
