@@ -4,9 +4,9 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+load_dotenv()
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "")
+SECRET_KEY = os.getenv("SECRET_KEY", "")
 DEBUG = True
 ALLOWED_HOSTS = []
 
@@ -22,7 +22,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
-    'api_v1',
+    'django_filters',
+    'drf_yasg',
+
+    'figma_api.api_v1',
 ]
 
 MIDDLEWARE = [
@@ -35,7 +38,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'backend.urls'
+ROOT_URLCONF = 'figma_api.backend.urls'
 
 TEMPLATES = [
     {
@@ -53,7 +56,15 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'backend.wsgi.application'
+WSGI_APPLICATION = 'figma_api.backend.wsgi.application'
+ASGI_APPLICATION = 'figma_api.backend.asgi.application'
+
+REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ]
+}
 
 DATABASES = {
     'default': {
@@ -95,8 +106,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Figma
-FIGMA_TOKEN = os.environ.get("FIGMA_TOKEN", "")
-FIGMA_FILE_ID = os.environ.get("FIGMA_FILE_ID", "")
+FIGMA_TOKEN = os.getenv("FIGMA_TOKEN", "")
+FIGMA_FILE_ID = os.getenv("FIGMA_FILE_ID", "")
 
 CACHE_ENABLED = True
 
