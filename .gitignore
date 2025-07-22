@@ -53,6 +53,7 @@ venv.bak/
 .DS_Store
 Thumbs.db
 .venv
+__pycache__
 
 # Other
 /logs/
