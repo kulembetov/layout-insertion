@@ -304,7 +304,11 @@ class BlockUtils:
             'corner_radius': get('corner_radius') if get('corner_radius') is not None else [0, 0, 0, 0],
         }
         text_content = get('text_content')
-        block_dict['words'] = TextUtils.count_words(text_content)
+        # Use existing 'words' if present in dict, else recalculate
+        if isinstance(block, dict) and 'words' in block and block['words'] is not None:
+            block_dict['words'] = block['words']
+        else:
+            block_dict['words'] = TextUtils.count_words(text_content)
         if get('sql_type') == 'background':
             color_found = False
             if slide_config and 'background' in slide_config:
