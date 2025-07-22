@@ -2,15 +2,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 import json
 
-from figma_api.backend.settings import FIGMA_TOKEN
-from figma_api.script.figma_service_ver_1 import FilterConfig, FilterMode, EnhancedFigmaExtractor
+from config.settings import FIGMA_TOKEN
+from django_script.figma_service_ver_2 import FilterConfig, FilterMode, EnhancedFigmaExtractor
 
 
 class APIReceiveJsonFromFigma(APIView):
-    """Returns Json."""
+    """Returns JSON."""
 
     def get(self, request, *args, **kwargs):
-        """Get Json."""
+        """Get JSON."""
 
         headers = {'X-Figma-Token': f'{FIGMA_TOKEN}'}
         file_id = request.data['file_id']
@@ -30,7 +30,8 @@ class APIReceiveJsonFromFigma(APIView):
                 return Response(result)
             
             elif filter_mode == FilterMode.BY_TYPE.value:
-                filter_config = FilterConfig(mode=FilterMode.BY_TYPE, target_container_types=filter_params)
+                # Корректируем фильтрацию по блокам, а не контейнерам
+                filter_config = FilterConfig(mode=FilterMode.SPECIFIC_BLOCKS, target_block_types=filter_params)
                 extractor = EnhancedFigmaExtractor(file_id, headers, filter_config=filter_config)
                 result = extractor.extract()
 
@@ -43,32 +44,4 @@ class APIReceiveJsonFromFigma(APIView):
             extractor = EnhancedFigmaExtractor(file_id, headers)
             result = extractor.extract()
 
-            with open("output.json", "w", encoding="utf-8") as outfile:
-                json.dump(result, outfile, ensure_ascii=False, indent=4)
-
-            return Response(result[0:1000])
-
-
-
-
-
-        
-
-        # Экстрактор без фильтрации (режим ALL)
-        # extractor = EnhancedFigmaExtractor(file_id, headers)
-        # result = extractor.extract()
-        # print(result)
-        
-        # Фильтрация по конкретным слайдам (режим SPECIFIC_SLIDES)
-        # filter_config = FilterConfig(mode=FilterMode.SPECIFIC_SLIDES, target_slides=['1cols',])
-        # extractor = EnhancedFigmaExtractor(file_id, headers, filter_config=filter_config)
-        # result = extractor.extract()
-        # print(result)
-
-        # Фильтрация по типу контейнера (режим BY_TYPE)
-        # filter_config = FilterConfig(mode=FilterMode.BY_TYPE, target_container_types=['FRAME','GROUP',])
-        # extractor = EnhancedFigmaExtractor(file_id, headers, filter_config=filter_config)
-        # result = extractor.extract()
-        # print(result)
-
-        return Response()
+        return Response(result)
