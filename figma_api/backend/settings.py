@@ -1,4 +1,3 @@
-from django.core.exceptions import ImproperlyConfigured
 from pathlib import Path
 import os
 from dotenv import load_dotenv
@@ -7,7 +6,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-SECRET_KEY = 'django-insecure-s1u(xvq7d&m%d59eo7cos7ka!d=qjj!1g3(vv2xdk3emhla56@'
+SECRET_KEY = os.environ.get("SECRET_KEY", "")
 DEBUG = True
 ALLOWED_HOSTS = []
 
@@ -22,6 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'rest_framework',
     'api_v1',
 ]
 
@@ -57,8 +57,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': os.getenv('POSTGRES_DB'), # Database name
+        'USER': os.getenv('POSTGRES_USER'), # User to connect to
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD'), # Password for this user
+        'HOST': os.getenv('POSTGRES_HOST'), # Address where the database server is deployed
+        'PORT': os.getenv('POSTGRES_PORT'), # The port which the database server uses
     }
 }
 
@@ -77,15 +81,29 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = 'ru-ru'
+TIME_ZONE = 'Europe/Moscow'
+
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
-# Figma 
 
+# Figma
 FIGMA_TOKEN = os.environ.get("FIGMA_TOKEN", "")
+FIGMA_FILE_ID = os.environ.get("FIGMA_FILE_ID", "")
+
+CACHE_ENABLED = True
+
+if CACHE_ENABLED:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": os.getenv("CACHE_LOCATION"),
+        }
+    }
