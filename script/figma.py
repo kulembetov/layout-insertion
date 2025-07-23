@@ -688,80 +688,79 @@ class EnhancedFigmaExtractor:
     def collect_enhanced_blocks(self, node: Dict[str, Any], frame_origin: Dict[str, int], 
                               slide_number: int, parent_container: str) -> List[ExtractedBlock]:
         blocks = []
-        if not node.get('absoluteBoundingBox'):
-            return blocks
-        # Centralized filtering for node
-        if not BlockFilterUtils.should_include_node_or_block(node, self.filter_config):
-            return blocks
-        name = node.get('name', '')
-        has_z = self.has_z_index_in_name(name)
-        # Only process nodes with z-index in the name
-        if has_z:
-            figma_type, sql_type = BlockTypeUtils.detect_block_type(node)
-            abs_box = node['absoluteBoundingBox']
-            left = abs_box['x'] - frame_origin['x']
-            top = abs_box['y'] - frame_origin['y']
-            dimensions = {
-                'x': round(left),
-                'y': round(top),
-                'w': round(abs_box['width']),
-                'h': round(abs_box['height'])
-            }
-            # Skip full-slide images unless 'precompiled' is in the name, but always include background blocks
-            name_lower = name.lower()
-            is_precompiled = 'precompiled' in name_lower
-            should_skip = (
-                sql_type == 'image' and  # Only skip images, not backgrounds
-                dimensions['x'] == 0 and
-                dimensions['y'] == 0 and
-                dimensions['w'] == 1200 and
-                dimensions['h'] == 675 and
-                not is_precompiled
-            )
-            if should_skip:
-                LogUtils.log_block_event(f"Skipping {sql_type} block {name} (full image 1200x675)", level='debug')
+        # Only create a block if node has absoluteBoundingBox
+        if node.get('absoluteBoundingBox'):
+            # Centralized filtering for node
+            if not BlockFilterUtils.should_include_node_or_block(node, self.filter_config):
+                pass  # skip block creation, but still recurse into children
             else:
-                styles = self.extract_text_styles(node, sql_type)
-                z_index = self.extract_z_index(name)
-                if z_index == 0:
-                    z_index = config.Z_INDEX_DEFAULTS.get(sql_type, config.Z_INDEX_DEFAULTS['default'])
-                styles['zIndex'] = z_index
-                has_corner_radius, corner_radius = self.extract_corner_radius(node)
-                text_content = None
-                text_like_types = ['text', 'blockTitle', 'slideTitle', 'subTitle', 'number', 'email', 'date', 'name', 'percentage']
-                if sql_type in text_like_types and node.get('type') == 'TEXT':
-                    text_content = node.get('characters', None)
-                
-                # Extract color information for background and other relevant blocks
-                node_color = None
-                if sql_type in config.BLOCK_TYPES['null_style_types']:
-                    node_color = ColorUtils.extract_color_info(node)[0] # Only get hex color
-                
-                block = ExtractedBlock(
-                    id=node['id'],
-                    figma_type=figma_type,
-                    sql_type=sql_type,
-                    name=name,
-                    dimensions=dimensions,
-                    styles=styles,
-                    slide_number=slide_number,
-                    parent_container=parent_container,
-                    is_target=True,
-                    has_corner_radius=has_corner_radius,
-                    corner_radius=corner_radius,
-                    text_content=text_content  # Pass text content
-                )
-                # Store the extracted color for later use
-                block.node_color = node_color
-                if BlockFilterUtils.should_include_node_or_block(block, self.filter_config):
-                    blocks.append(block)
-                    LogUtils.log_block_event(f"Added {sql_type} block: {name}")
-                    color_info = f" | Color: {node_color}" if node_color else ""
-                    LogUtils.log_block_event(
-                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{color_info}",
-                        level='debug'
+                name = node.get('name', '')
+                has_z = self.has_z_index_in_name(name)
+                # Only process nodes with z-index in the name
+                if has_z:
+                    figma_type, sql_type = BlockTypeUtils.detect_block_type(node)
+                    abs_box = node['absoluteBoundingBox']
+                    left = abs_box['x'] - frame_origin['x']
+                    top = abs_box['y'] - frame_origin['y']
+                    dimensions = {
+                        'x': round(left),
+                        'y': round(top),
+                        'w': round(abs_box['width']),
+                        'h': round(abs_box['height'])
+                    }
+                    # Skip full-slide images unless 'precompiled' is in the name, but always include background blocks
+                    name_lower = name.lower()
+                    is_precompiled = 'precompiled' in name_lower
+                    should_skip = (
+                        sql_type == 'image' and  # Only skip images, not backgrounds
+                        dimensions['x'] == 0 and
+                        dimensions['y'] == 0 and
+                        dimensions['w'] == 1200 and
+                        dimensions['h'] == 675 and
+                        not is_precompiled
                     )
-        # Recursively process children (skip children of hidden nodes)
+                    if should_skip:
+                        LogUtils.log_block_event(f"Skipping {sql_type} block {name} (full image 1200x675)", level='debug')
+                    else:
+                        styles = self.extract_text_styles(node, sql_type)
+                        z_index = self.extract_z_index(name)
+                        if z_index == 0:
+                            z_index = config.Z_INDEX_DEFAULTS.get(sql_type, config.Z_INDEX_DEFAULTS['default'])
+                        styles['zIndex'] = z_index
+                        has_corner_radius, corner_radius = self.extract_corner_radius(node)
+                        text_content = None
+                        text_like_types = ['text', 'blockTitle', 'slideTitle', 'subTitle', 'number', 'email', 'date', 'name', 'percentage']
+                        if sql_type in text_like_types and node.get('type') == 'TEXT':
+                            text_content = node.get('characters', None)
+                        # Extract color information for background and other relevant blocks
+                        node_color = None
+                        if sql_type in config.BLOCK_TYPES['null_style_types']:
+                            node_color = ColorUtils.extract_color_info(node)[0] # Only get hex color
+                        block = ExtractedBlock(
+                            id=node['id'],
+                            figma_type=figma_type,
+                            sql_type=sql_type,
+                            name=name,
+                            dimensions=dimensions,
+                            styles=styles,
+                            slide_number=slide_number,
+                            parent_container=parent_container,
+                            is_target=True,
+                            has_corner_radius=has_corner_radius,
+                            corner_radius=corner_radius,
+                            text_content=text_content  # Pass text content
+                        )
+                        # Store the extracted color for later use
+                        block.node_color = node_color
+                        if BlockFilterUtils.should_include_node_or_block(block, self.filter_config):
+                            blocks.append(block)
+                            LogUtils.log_block_event(f"Added {sql_type} block: {name}")
+                            color_info = f" | Color: {node_color}" if node_color else ""
+                            LogUtils.log_block_event(
+                                f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{color_info}",
+                                level='debug'
+                            )
+        # Always recurse into children, even if parent has no absoluteBoundingBox
         if node.get('children') and not (getattr(self.filter_config, 'exclude_hidden', True) and node.get('visible') is False):
             for child in node['children']:
                 blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
