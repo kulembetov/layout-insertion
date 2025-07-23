@@ -702,10 +702,10 @@ class EnhancedFigmaExtractor:
             left = abs_box['x'] - frame_origin['x']
             top = abs_box['y'] - frame_origin['y']
             dimensions = {
-                'x': self.round_to_nearest_five(left),
-                'y': self.round_to_nearest_five(top),
-                'w': self.round_to_nearest_five(abs_box['width']),
-                'h': self.round_to_nearest_five(abs_box['height'])
+                'x': round(left),
+                'y': round(top),
+                'w': round(abs_box['width']),
+                'h': round(abs_box['height'])
             }
             # Skip full-slide images unless 'precompiled' is in the name, but always include background blocks
             name_lower = name.lower()
