@@ -13,6 +13,7 @@ try:
 except ImportError:
     psycopg2 = None
 
+
 # --- UUIDv7 generator ---
 def generate_uuid7() -> str:
     """
@@ -20,7 +21,7 @@ def generate_uuid7() -> str:
     Implementation based on the draft RFC for UUID v7 - time-ordered
     """
     unix_ts_ms = int(time.time() * 1000)
-    ts_bytes = unix_ts_ms.to_bytes(6, byteorder='big')
+    ts_bytes = unix_ts_ms.to_bytes(6, byteorder="big")
     random_bytes = uuid.uuid4().bytes[6:]
     uuid_bytes = ts_bytes + random_bytes
     uuid_bytes = bytearray(uuid_bytes)
@@ -28,111 +29,130 @@ def generate_uuid7() -> str:
     uuid_bytes[8] = (uuid_bytes[8] & 0x3F) | 0x80
     return str(uuid.UUID(bytes=bytes(uuid_bytes)))
 
+
 # --- DB config parser ---
 def parse_db_config(ini_path):
     config = configparser.ConfigParser()
     config.read(ini_path)
-    db = config['postgresql']
+    db = config["postgresql"]
     return {
-        'host': db.get('host', 'localhost'),
-        'port': db.getint('port', 5432),
-        'user': db['user'],
-        'password': db['password'],
-        'database': db['database']
+        "host": db.get("host", "localhost"),
+        "port": db.getint("port", 5432),
+        "user": db["user"],
+        "password": db["password"],
+        "database": db["database"],
     }
+
 
 # --- Font mapping ---
 FONT_MAPPING = {
-    'arial': 'arial',
-    'roboto': 'roboto',
-    'oswald': 'oswald',
-    'inter': 'inter',
-    'montserrat': 'montserrat',
-    'open_sans': 'open_sans',
-    'ubuntu': 'ubuntu',
-    'manrope': 'manrope',
-    'nunito': 'nunito',
-    'raleway': 'raleway',
-    'merriweather': 'merriweather',
-    'playfair_display': 'playfair_display',
-    'roboto_slab': 'roboto_slab',
-    'rubik': 'rubik',
-    'montserrat_alternates': 'montserrat_alternates',
-    'eb_garamond': 'eb_garamond',
-    'pt_astra_serif': 'pt_astra_serif',
-    'roboto_serif': 'roboto_serif',
-    'unbounded': 'unbounded',
-    'onest': 'onest',
-    'comfortaa': 'comfortaa',
-    'pacifico': 'pacifico',
-    'exo2': 'exo2',
-    'ibm_plex_sans': 'ibm_plex_sans',
-    'actay': 'actay',
-    'actay_wide': 'actay_wide',
-    'bounded': 'bounded',
-    'advaken_sans': 'advaken_sans',
-    'onder': 'onder',
-    'oktyabrina_script': 'oktyabrina_script',
-    'geologican': 'geologican',
-    'vollda': 'vollda',
-    'oddval': 'oddval',
-    'g8': 'g8',
-    'feature_mono': 'feature_mono',
-    'sberbank': 'sberbank',
-    'gazprom': 'gazprom',
-    'sbermarketing': 'sbermarketing',
+    "arial": "arial",
+    "roboto": "roboto",
+    "oswald": "oswald",
+    "inter": "inter",
+    "montserrat": "montserrat",
+    "open_sans": "open_sans",
+    "ubuntu": "ubuntu",
+    "manrope": "manrope",
+    "nunito": "nunito",
+    "raleway": "raleway",
+    "merriweather": "merriweather",
+    "playfair_display": "playfair_display",
+    "roboto_slab": "roboto_slab",
+    "rubik": "rubik",
+    "montserrat_alternates": "montserrat_alternates",
+    "eb_garamond": "eb_garamond",
+    "pt_astra_serif": "pt_astra_serif",
+    "roboto_serif": "roboto_serif",
+    "unbounded": "unbounded",
+    "onest": "onest",
+    "comfortaa": "comfortaa",
+    "pacifico": "pacifico",
+    "exo2": "exo2",
+    "ibm_plex_sans": "ibm_plex_sans",
+    "actay": "actay",
+    "actay_wide": "actay_wide",
+    "bounded": "bounded",
+    "advaken_sans": "advaken_sans",
+    "onder": "onder",
+    "oktyabrina_script": "oktyabrina_script",
+    "geologican": "geologican",
+    "vollda": "vollda",
+    "oddval": "oddval",
+    "g8": "g8",
+    "feature_mono": "feature_mono",
+    "sberbank": "sberbank",
+    "gazprom": "gazprom",
+    "sbermarketing": "sbermarketing",
 }
+
 
 def normalize_font(font_name: str) -> str:
     """Normalize font name to match schema enum, fallback to lowercased name if not in mapping."""
     return FONT_MAPPING.get(font_name.lower(), font_name.lower())
 
+
 # --- Main logic ---
 def collect_block_type_colors_fonts(json_path):
-    with open(json_path, 'r', encoding='utf-8') as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         slides = json.load(f)
     block_type_to_colors = defaultdict(set)
     block_type_to_fonts = defaultdict(set)
     for slide in slides:
-        slide_config = slide.get('slideConfig', {})
+        slide_config = slide.get("slideConfig", {})
         for block_type, color_dict in slide_config.items():
             for palette_color, obj_list in color_dict.items():
                 for obj in obj_list:
-                    color = obj.get('color', '#ffffff').lower()
-                    font = normalize_font(obj.get('fontFamily', 'roboto'))
+                    color = obj.get("color", "#ffffff").lower()
+                    font = normalize_font(obj.get("fontFamily", "roboto"))
                     block_type_to_colors[block_type].add(color)
                     block_type_to_fonts[block_type].add(font)
     return block_type_to_colors, block_type_to_fonts
 
+
 def create_palette_configs(json_path):
-    with open(json_path, 'r', encoding='utf-8') as f:
+    with open(json_path, "r", encoding="utf-8") as f:
         slides = json.load(f)
     slide = slides[0]
-    palette_colors = slide.get('presentationPaletteColors', [])
+    palette_colors = slide.get("presentationPaletteColors", [])
     block_types = [
-        'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name', 'percentage',
-        'figure', 'icon', 'background', 'subTitle', 'number', 'logo'
+        "text",
+        "slideTitle",
+        "blockTitle",
+        "email",
+        "date",
+        "name",
+        "percentage",
+        "figure",
+        "icon",
+        "background",
+        "subTitle",
+        "number",
+        "logo",
     ]
     configs = []
     for palette_color in palette_colors:
         fonts = set()
-        config = {'id': generate_uuid7()}
+        config = {"id": generate_uuid7()}
         for block_type in block_types:
             color_array = None
             for slide in slides:
-                slide_config = slide.get('slideConfig', {})
+                slide_config = slide.get("slideConfig", {})
                 color_objs = slide_config.get(block_type, {}).get(palette_color, None)
                 if color_objs:
                     # Collect all unique fonts for this palette color
                     for obj in color_objs:
-                        fonts.add(normalize_font(obj.get('fontFamily', 'roboto')))
+                        fonts.add(normalize_font(obj.get("fontFamily", "roboto")))
                     # Use the color array from the first occurrence
                     if color_array is None:
-                        color_array = [obj.get('color', '#ffffff').lower() for obj in color_objs]
-            config[block_type] = color_array if color_array else ['#ffffff']
-        config['font'] = sorted(list(fonts))
+                        color_array = [
+                            obj.get("color", "#ffffff").lower() for obj in color_objs
+                        ]
+            config[block_type] = color_array if color_array else ["#ffffff"]
+        config["font"] = sorted(list(fonts))
         configs.append(config)
     return configs
+
 
 def confirm_db_execution(db_config):
     print("\n" + "=" * 60)
@@ -147,9 +167,9 @@ def confirm_db_execution(db_config):
     while True:
         try:
             response = input("\nDo you want to proceed? (yes/no): ").strip().lower()
-            if response in ['yes', 'y']:
+            if response in ["yes", "y"]:
                 return True
-            elif response in ['no', 'n']:
+            elif response in ["no", "n"]:
                 print("Execution cancelled by user.")
                 return False
             else:
@@ -158,101 +178,138 @@ def confirm_db_execution(db_config):
             print("\n\nExecution cancelled by user.")
             return False
 
+
 def _as_pg_array(val):
     """Convert a list or string to a Postgres array literal with curly braces."""
     if isinstance(val, list):
-        return '{' + ','.join(str(x) for x in val) + '}'
-    return '{' + str(val) + '}'
+        return "{" + ",".join(str(x) for x in val) + "}"
+    return "{" + str(val) + "}"
+
 
 def insert_block_layout_config_auto(json_path, db_config, csv_path):
     if not psycopg2:
-        print('psycopg2 is required for auto mode. Please install it.')
+        print("psycopg2 is required for auto mode. Please install it.")
         sys.exit(1)
-    
+
     conn = psycopg2.connect(**db_config)
     cur = conn.cursor()
-    
+
     try:
         configs = create_palette_configs(json_path)
         mapping = []
         # Determine all block types and their font columns
         block_types = [
-            'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name', 'percentage',
-            'figure', 'icon', 'background', 'subTitle', 'number', 'logo'
+            "text",
+            "slideTitle",
+            "blockTitle",
+            "email",
+            "date",
+            "name",
+            "percentage",
+            "figure",
+            "icon",
+            "background",
+            "subTitle",
+            "number",
+            "logo",
         ]
-        font_columns = [f'{bt}_font' for bt in block_types]
+        font_columns = [f"{bt}_font" for bt in block_types]
         for config in configs:
             # Check if a similar config already exists
-            cur.execute("""
+            cur.execute(
+                """
                 SELECT id FROM "BlockLayoutConfig" 
                 WHERE "text" = %s AND "slideTitle" = %s AND "blockTitle" = %s AND "font" = %s::"FontFamilyType"[]
                 LIMIT 1
-            """, (
-                _as_pg_array(config['text']),
-                _as_pg_array(config['slideTitle']),
-                _as_pg_array(config['blockTitle']),
-                _as_pg_array(config['font'])
-            ))
+            """,
+                (
+                    _as_pg_array(config["text"]),
+                    _as_pg_array(config["slideTitle"]),
+                    _as_pg_array(config["blockTitle"]),
+                    _as_pg_array(config["font"]),
+                ),
+            )
             existing = cur.fetchone()
             if existing:
                 config_id = existing[0]
                 print(f"[AUTO] Found existing config: {config_id}")
             else:
-                config_id = config['id']
+                config_id = config["id"]
                 # Insert new config
-                cur.execute("""
+                cur.execute(
+                    """
                     INSERT INTO "BlockLayoutConfig" (
                         "id", "text", "slideTitle", "blockTitle", "email", "date", "name", "percentage",
                         "figure", "icon", "background", "subTitle", "number", "logo", "font"
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::"FontFamilyType"[])
-                """, (
-                    config_id,
-                    _as_pg_array(config['text']),
-                    _as_pg_array(config['slideTitle']),
-                    _as_pg_array(config['blockTitle']),
-                    _as_pg_array(config['email']),
-                    _as_pg_array(config['date']),
-                    _as_pg_array(config['name']),
-                    _as_pg_array(config['percentage']),
-                    _as_pg_array(config['figure']),
-                    _as_pg_array(config['icon']),
-                    _as_pg_array(config['background']),
-                    _as_pg_array(config['subTitle']),
-                    _as_pg_array(config['number']),
-                    _as_pg_array(config['logo']),
-                    _as_pg_array(config['font'])
-                ))
+                """,
+                    (
+                        config_id,
+                        _as_pg_array(config["text"]),
+                        _as_pg_array(config["slideTitle"]),
+                        _as_pg_array(config["blockTitle"]),
+                        _as_pg_array(config["email"]),
+                        _as_pg_array(config["date"]),
+                        _as_pg_array(config["name"]),
+                        _as_pg_array(config["percentage"]),
+                        _as_pg_array(config["figure"]),
+                        _as_pg_array(config["icon"]),
+                        _as_pg_array(config["background"]),
+                        _as_pg_array(config["subTitle"]),
+                        _as_pg_array(config["number"]),
+                        _as_pg_array(config["logo"]),
+                        _as_pg_array(config["font"]),
+                    ),
+                )
                 print(f"[AUTO] Inserted new config: {config_id}")
             # Add to mapping, including all *_font columns
-            mapping.append({
-                'id': config_id,
-                'text': _as_pg_array(config['text']),
-                'slideTitle': _as_pg_array(config['slideTitle']),
-                'blockTitle': _as_pg_array(config['blockTitle']),
-                'email': _as_pg_array(config['email']),
-                'date': _as_pg_array(config['date']),
-                'name': _as_pg_array(config['name']),
-                'percentage': _as_pg_array(config['percentage']),
-                'figure': _as_pg_array(config['figure']),
-                'icon': _as_pg_array(config['icon']),
-                'background': _as_pg_array(config['background']),
-                'subTitle': _as_pg_array(config['subTitle']),
-                'number': _as_pg_array(config['number']),
-                'logo': _as_pg_array(config['logo']),
-                'font': _as_pg_array(config['font']),
-                **{col: str(config.get(col, [])) for col in font_columns}
-            })
+            mapping.append(
+                {
+                    "id": config_id,
+                    "text": _as_pg_array(config["text"]),
+                    "slideTitle": _as_pg_array(config["slideTitle"]),
+                    "blockTitle": _as_pg_array(config["blockTitle"]),
+                    "email": _as_pg_array(config["email"]),
+                    "date": _as_pg_array(config["date"]),
+                    "name": _as_pg_array(config["name"]),
+                    "percentage": _as_pg_array(config["percentage"]),
+                    "figure": _as_pg_array(config["figure"]),
+                    "icon": _as_pg_array(config["icon"]),
+                    "background": _as_pg_array(config["background"]),
+                    "subTitle": _as_pg_array(config["subTitle"]),
+                    "number": _as_pg_array(config["number"]),
+                    "logo": _as_pg_array(config["logo"]),
+                    "font": _as_pg_array(config["font"]),
+                    **{col: str(config.get(col, [])) for col in font_columns},
+                }
+            )
         conn.commit()
         # Write mapping to CSV, including *_font columns
         # Only include BlockLayoutConfig table columns in CSV
-        fieldnames = ['id', 'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name', 'percentage', 'figure', 'icon', 'background', 'subTitle', 'number', 'logo', 'font']
-        with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+        fieldnames = [
+            "id",
+            "text",
+            "slideTitle",
+            "blockTitle",
+            "email",
+            "date",
+            "name",
+            "percentage",
+            "figure",
+            "icon",
+            "background",
+            "subTitle",
+            "number",
+            "logo",
+            "font",
+        ]
+        with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(mapping)
         print(f"[AUTO] Mapping written to {csv_path}")
         print(f"[AUTO] Done. {len(mapping)} configs processed.")
-        
+
     except Exception as e:
         print(f"[AUTO] Error: {e}")
         conn.rollback()
@@ -261,13 +318,16 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
         cur.close()
         conn.close()
 
+
 def insert_block_layout_config_manual(json_path, csv_path):
     configs = create_palette_configs(json_path)
     mapping = []
     for config in configs:
+
         def format_array(arr):
             return _as_pg_array(arr)
-        sql = f'''INSERT INTO "BlockLayoutConfig" (
+
+        sql = f"""INSERT INTO "BlockLayoutConfig" (
     id, text, slideTitle, blockTitle, email, date, name, percentage,
     figure, icon, background, subTitle, number, logo, font
 ) VALUES (
@@ -287,56 +347,92 @@ def insert_block_layout_config_manual(json_path, csv_path):
     {format_array(config['logo'])},
     {format_array(config['font'])}
 );
-'''
+"""
         print(f"[MANUAL] {sql}")
-        mapping.append({
-            'id': config['id'],
-            'text': _as_pg_array(config['text']),
-            'slideTitle': _as_pg_array(config['slideTitle']),
-            'blockTitle': _as_pg_array(config['blockTitle']),
-            'email': _as_pg_array(config['email']),
-            'date': _as_pg_array(config['date']),
-            'name': _as_pg_array(config['name']),
-            'percentage': _as_pg_array(config['percentage']),
-            'figure': _as_pg_array(config['figure']),
-            'icon': _as_pg_array(config['icon']),
-            'background': _as_pg_array(config['background']),
-            'subTitle': _as_pg_array(config['subTitle']),
-            'number': _as_pg_array(config['number']),
-            'logo': _as_pg_array(config['logo']),
-            'font': _as_pg_array(config['font'])
-        })
-    fieldnames = ['id', 'text', 'slideTitle', 'blockTitle', 'email', 'date', 'name', 'percentage', 'figure', 'icon', 'background', 'subTitle', 'number', 'logo', 'font']
-    with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+        mapping.append(
+            {
+                "id": config["id"],
+                "text": _as_pg_array(config["text"]),
+                "slideTitle": _as_pg_array(config["slideTitle"]),
+                "blockTitle": _as_pg_array(config["blockTitle"]),
+                "email": _as_pg_array(config["email"]),
+                "date": _as_pg_array(config["date"]),
+                "name": _as_pg_array(config["name"]),
+                "percentage": _as_pg_array(config["percentage"]),
+                "figure": _as_pg_array(config["figure"]),
+                "icon": _as_pg_array(config["icon"]),
+                "background": _as_pg_array(config["background"]),
+                "subTitle": _as_pg_array(config["subTitle"]),
+                "number": _as_pg_array(config["number"]),
+                "logo": _as_pg_array(config["logo"]),
+                "font": _as_pg_array(config["font"]),
+            }
+        )
+    fieldnames = [
+        "id",
+        "text",
+        "slideTitle",
+        "blockTitle",
+        "email",
+        "date",
+        "name",
+        "percentage",
+        "figure",
+        "icon",
+        "background",
+        "subTitle",
+        "number",
+        "logo",
+        "font",
+    ]
+    with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(mapping)
     print(f"[MANUAL] Mapping written to {csv_path}")
     print(f"[MANUAL] Done. {len(mapping)} configs processed.")
 
+
 def main():
-    parser = argparse.ArgumentParser(description='Insert BlockLayoutConfig records from sql_generator_input.json')
-    parser.add_argument('--json', required=True, help='Path to sql_generator_input.json')
-    parser.add_argument('--mode', choices=['auto', 'manual'], default='manual', help='Insert mode: auto (DB) or manual (print SQL)')
-    parser.add_argument('--db', default='database.ini', help='Path to database.ini')
-    parser.add_argument('--csv', default='block_layout_config_mapping.csv', help='Path to output CSV mapping file')
+    parser = argparse.ArgumentParser(
+        description="Insert BlockLayoutConfig records from sql_generator_input.json"
+    )
+    parser.add_argument(
+        "--json", required=True, help="Path to sql_generator_input.json"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["auto", "manual"],
+        default="manual",
+        help="Insert mode: auto (DB) or manual (print SQL)",
+    )
+    parser.add_argument("--db", default="database.ini", help="Path to database.ini")
+    parser.add_argument(
+        "--csv",
+        default="block_layout_config_mapping.csv",
+        help="Path to output CSV mapping file",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.json):
         print(f"Error: JSON file not found: {args.json}")
         sys.exit(1)
 
-    block_type_to_colors, block_type_to_fonts = collect_block_type_colors_fonts(args.json)
-    
+    block_type_to_colors, block_type_to_fonts = collect_block_type_colors_fonts(
+        args.json
+    )
+
     if not block_type_to_colors:
         print("Error: No slideConfig data found in JSON")
         sys.exit(1)
-    
+
     print(f"Found {len(block_type_to_colors)} block types:")
     for bt in sorted(block_type_to_colors.keys()):
-        print(f"  {bt}: {len(block_type_to_colors[bt])} colors, {len(block_type_to_fonts[bt])} fonts")
-    
-    if args.mode == 'auto':
+        print(
+            f"  {bt}: {len(block_type_to_colors[bt])} colors, {len(block_type_to_fonts[bt])} fonts"
+        )
+
+    if args.mode == "auto":
         db_config = parse_db_config(args.db)
         if not confirm_db_execution(db_config):
             sys.exit(0)
@@ -344,5 +440,6 @@ def main():
     else:
         insert_block_layout_config_manual(args.json, args.csv)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
