@@ -1,6 +1,5 @@
 import os
 import sys
-import glob
 import psycopg2
 import argparse
 from configparser import ConfigParser
@@ -9,8 +8,10 @@ from configparser import ConfigParser
 class ConfigManager:
     """Manages database configuration loading and creation."""
 
-    def __init__(self, filename='database.ini', section='postgresql'):
-        self.filename = filename if os.path.isabs(filename) else os.path.abspath(filename)
+    def __init__(self, filename="database.ini", section="postgresql"):
+        self.filename = (
+            filename if os.path.isabs(filename) else os.path.abspath(filename)
+        )
         self.section = section
         print(f"Looking for config file at: {self.filename}")
 
@@ -28,20 +29,26 @@ class ConfigManager:
         if parser.has_section(self.section):
             return {param[0]: param[1] for param in parser.items(self.section)}
         else:
-            raise Exception(f"Section {self.section} not found in the {self.filename} file.")
+            raise Exception(
+                f"Section {self.section} not found in the {self.filename} file."
+            )
 
     def create_sample_config(self):
         """Create a sample config file for the user."""
-        with open(self.filename, 'w') as f:
-            f.write("""[postgresql]
+        with open(self.filename, "w") as f:
+            f.write(
+                """[postgresql]
 host=localhost
 database=your_database
 user=your_username
 password=your_password
 port=5432
-""")
+"""
+            )
         print(f"A sample configuration file '{self.filename}' has been created.")
-        print("Please update it with your database connection details and run the script again.")
+        print(
+            "Please update it with your database connection details and run the script again."
+        )
 
 
 class DatabaseManager:
@@ -74,17 +81,17 @@ class DatabaseManager:
         """
         # Remove SQL comments
         lines = []
-        for line in sql_content.split('\n'):
+        for line in sql_content.split("\n"):
             # Remove inline comments
-            if '--' in line:
-                line = line[:line.find('--')]
+            if "--" in line:
+                line = line[: line.find("--")]
             # Add non-empty lines
             if line.strip():
                 lines.append(line)
 
         # Join lines and split by semicolon
-        clean_sql = '\n'.join(lines)
-        statements = [stmt.strip() for stmt in clean_sql.split(';') if stmt.strip()]
+        clean_sql = "\n".join(lines)
+        statements = [stmt.strip() for stmt in clean_sql.split(";") if stmt.strip()]
         return statements
 
 
@@ -102,7 +109,9 @@ class SQLExecutor:
         if not os.path.isdir(self.sql_dir):
             print(f"Error: Directory '{self.sql_dir}' not found.")
             os.makedirs(self.sql_dir)
-            print(f"Created empty directory '{self.sql_dir}'. Please add SQL files and run again.")
+            print(
+                f"Created empty directory '{self.sql_dir}'. Please add SQL files and run again."
+            )
             return []
 
         # List all files in the directory for debugging
@@ -123,10 +132,10 @@ class SQLExecutor:
         # Recursively find all .sql files (case-insensitive), with per-directory logging
         sql_files = []
         for root, dirs, files in os.walk(self.sql_dir):
-            found_in_dir = [file for file in files if file.lower().endswith('.sql')]
+            found_in_dir = [file for file in files if file.lower().endswith(".sql")]
             if found_in_dir:
                 rel_root = os.path.relpath(root, self.sql_dir)
-                dir_label = '.' if rel_root == '.' else rel_root
+                dir_label = "." if rel_root == "." else rel_root
                 print(f"Found {len(found_in_dir)} .sql files in {dir_label}")
                 for file in found_in_dir:
                     sql_files.append(os.path.join(root, file))
@@ -162,9 +171,9 @@ class SQLExecutor:
         while True:
             try:
                 response = input("\nDo you want to proceed? (yes/no): ").strip().lower()
-                if response in ['yes', 'y']:
+                if response in ["yes", "y"]:
                     return True
-                elif response in ['no', 'n']:
+                elif response in ["no", "n"]:
                     print("Execution cancelled by user.")
                     return False
                 else:
@@ -199,14 +208,14 @@ class SQLExecutor:
         for file_path in sql_files:
             print(f"\nExecuting {os.path.basename(file_path)}:")
             try:
-                with open(file_path, "r", encoding='utf-8') as file:
+                with open(file_path, "r", encoding="utf-8") as file:
                     sql_content = file.read()
                     commands = self.db_manager.extract_sql_statements(sql_content)
 
                     file_success = True
                     for i, command in enumerate(commands, 1):
                         try:
-                            cursor.execute(command + ';')
+                            cursor.execute(command + ";")
                             conn.commit()
                             print(f"  Command {i}: Success")
                         except psycopg2.Error as e:
@@ -221,7 +230,9 @@ class SQLExecutor:
                 print(f"  Failed to open or process file: {e}")
 
         print("\n" + "=" * 50)
-        print(f"Execution summary: {successful_files}/{total_files} files executed successfully.")
+        print(
+            f"Execution summary: {successful_files}/{total_files} files executed successfully."
+        )
         print("=" * 50)
 
         cursor.close()
@@ -232,13 +243,21 @@ def main():
     parser = argparse.ArgumentParser(
         description="Execute SQL files from a directory against a PostgreSQL database."
     )
-    parser.add_argument('--input-dir', type=str, default='script/my_sql_output',
-                        help='Directory containing SQL files to execute (default: script/my_sql_output)')
-    parser.add_argument('--db-config', type=str, default='database.ini',
-                        help='Database configuration file (default: database.ini)')
-    
+    parser.add_argument(
+        "--input-dir",
+        type=str,
+        default="script/my_sql_output",
+        help="Directory containing SQL files to execute (default: script/my_sql_output)",
+    )
+    parser.add_argument(
+        "--db-config",
+        type=str,
+        default="database.ini",
+        help="Database configuration file (default: database.ini)",
+    )
+
     args = parser.parse_args()
-    
+
     print("SQL Files Execution Script")
     print("=" * 30)
     print(f"Current working directory: {os.getcwd()}")

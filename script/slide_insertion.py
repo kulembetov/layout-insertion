@@ -1775,21 +1775,27 @@ class SQLGenerator:
         type_key = slide_type  # For now, type_key is the same as slide_type
 
         # Use SLIDE_NUMBER_TO_NUMBER for icon url, but skip number for certain types
-        skip_number_types = set([
-            config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]
-        ])
+        skip_number_types = set(
+            [config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]]
+        )
         miniature_folder = camel_to_snake(slide_type)
         if slide_type in skip_number_types:
             icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout_name}{config.MINIATURE_EXTENSION}"
-            logger.info(f"[MiniaturePath] Skipped number: icon_url={icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})")
+            logger.info(
+                f"[MiniaturePath] Skipped number: icon_url={icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})"
+            )
         else:
             number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(slide_layout_number)
             if number_for_icon is not None:
                 icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout_name}{config.MINIATURE_EXTENSION}"
-                logger.info(f"[MiniaturePath] With number: icon_url={icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number}, number_for_icon={number_for_icon})")
+                logger.info(
+                    f"[MiniaturePath] With number: icon_url={icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number}, number_for_icon={number_for_icon})"
+                )
             else:
                 icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout_name}{config.MINIATURE_EXTENSION}"
-                logger.info(f"[MiniaturePath] Fallback: icon_url={icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})")
+                logger.info(
+                    f"[MiniaturePath] Fallback: icon_url={icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})"
+                )
 
         # Generate ID for slide layout
         slide_layout_id = self.id_generator.generate_uuid7()
@@ -1960,19 +1966,23 @@ class SQLGenerator:
         type_key = slide_type
         slide_layout.type_key = type_key  # camelCase
         slide_layout.type = slide_type  # camelCase
-        skip_number_types = set([
-            config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]
-        ])
+        skip_number_types = set(
+            [config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]]
+        )
         miniature_folder = camel_to_snake(slide_type)
         if slide_type in skip_number_types:
             slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout.name}{config.MINIATURE_EXTENSION}"
-            logger.info(f"[MiniaturePath] Skipped number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout.number})")
+            logger.info(
+                f"[MiniaturePath] Skipped number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout.number})"
+            )
         else:
             number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(
                 slide_layout.number, slide_layout.number
             )
             slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout.name}{config.MINIATURE_EXTENSION}"
-            logger.info(f"[MiniaturePath] With number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout.number}, number_for_icon={number_for_icon})")
+            logger.info(
+                f"[MiniaturePath] With number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout.number}, number_for_icon={number_for_icon})"
+            )
 
     def _generate_sql_queries(
         self, slide_layout, blocks, figure_blocks, precompiled_image_blocks
@@ -2189,21 +2199,27 @@ def _process_figma_slide(
     miniatures_base_path = config.MINIATURES_BASE_PATH
     slide_layout_name = slide_layout.name
     slide_layout_number = slide_layout.number
-    skip_number_types = set([
-        config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]
-    ])
+    skip_number_types = set(
+        [config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]]
+    )
     miniature_folder = camel_to_snake(slide_type)
     if slide_type in skip_number_types:
         slide_layout.icon_url = f"{miniatures_base_path}/{miniature_folder}/{slide_layout.name}{config.MINIATURE_EXTENSION}"
-        logger.info(f"[MiniaturePath] Skipped number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})")
+        logger.info(
+            f"[MiniaturePath] Skipped number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})"
+        )
     else:
         number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(slide_layout_number)
         if number_for_icon is not None:
             slide_layout.icon_url = f"{miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_layout_name}{config.MINIATURE_EXTENSION}"
-            logger.info(f"[MiniaturePath] With number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number}, number_for_icon={number_for_icon})")
+            logger.info(
+                f"[MiniaturePath] With number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number}, number_for_icon={number_for_icon})"
+            )
         else:
             slide_layout.icon_url = f"{miniatures_base_path}/{miniature_folder}/{slide_layout_name}{config.MINIATURE_EXTENSION}"
-            logger.info(f"[MiniaturePath] Fallback: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})")
+            logger.info(
+                f"[MiniaturePath] Fallback: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})"
+            )
     # Build Block objects with generated UUIDs
     blocks, precompiled_images, figure_blocks = _process_figma_blocks(
         slide, generator, strip_zindex
