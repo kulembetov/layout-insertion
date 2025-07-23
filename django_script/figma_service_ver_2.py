@@ -165,6 +165,13 @@ class EnhancedFigmaExtractor:
 
         except requests.exceptions.RequestException as e:
             print(f"Request error: {e}")
+            return {
+                'metadata': {
+                    'file_id': self.file_id,
+                    'error': str(e)
+                },
+                'slides': []
+            }
 
     # def traverse_and_extract(self, node: Dict[str, Any], parent_name: str = "") -> List[ExtractedSlide]:
     #     """Enhanced traversal with filtering"""
