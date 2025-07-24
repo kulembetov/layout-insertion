@@ -1,5 +1,5 @@
 import re
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 
 from api_v1.services.data_classes import ExtractedBlock
 from constants import BLOCKS
@@ -7,9 +7,6 @@ from api_v1.services.filter_service import FilterMode, FilterConfig
 
 
 # ================ Helpful functions ================
-
-mock: dict | ExtractedBlock = {}
-get = (lambda k: mock.get(k, None)) if isinstance(mock, dict) else (lambda k: getattr(mock, k, None))
 
 def safe_in(item: Any, container) -> bool:
     if not container:
@@ -119,27 +116,29 @@ class BlockBuilder:
         self.slide_config = slide_config
         self.block_dict: dict = {}
 
-    def _init_block_dict(self) -> None:
-        global mock
-        mock = self.block
+    def get(self, key: str) -> Optional[Any]:
+        if isinstance(self.block, dict):
+            return self.block.get(key, None)
+        return getattr(self.block, key, None)
 
+    def _init_block_dict(self) -> None:
         self.block_dict = {
-            'id': get('id'),
-            'name': get('name'),
-            'figma_type': get('figma_type'),
-            'sql_type': get('sql_type'),
-            'dimensions': get('dimensions'),
-            'styles': get('styles'),
-            'is_target': get('is_target'),
-            'needs_null_styles': get('sql_type') in BLOCKS.BLOCK_TYPES['null_style_types'],
-            'needs_z_index': get('sql_type') in BLOCKS.BLOCK_TYPES['z_index_types'],
+            'id': self.get('id'),
+            'name': self.get('name'),
+            'figma_type': self.get('figma_type'),
+            'sql_type': self.get('sql_type'),
+            'dimensions': self.get('dimensions'),
+            'styles': self.get('styles'),
+            'is_target': self.get('is_target'),
+            'needs_null_styles': self.get('sql_type') in BLOCKS.BLOCK_TYPES['null_style_types'],
+            'needs_z_index': self.get('sql_type') in BLOCKS.BLOCK_TYPES['z_index_types'],
             # Always include both fields for clarity and downstream use
-            'has_corner_radius': get('has_corner_radius') if get('has_corner_radius') is not None else False,
-            'corner_radius': get('corner_radius') if get('corner_radius') is not None else [0, 0, 0, 0],
+            'has_corner_radius': self.get('has_corner_radius') if self.get('has_corner_radius') is not None else False,
+            'corner_radius': self.get('corner_radius') if self.get('corner_radius') is not None else [0, 0, 0, 0],
         }
 
     def _fill_words(self) -> None:
-        text_content = get('text_content')
+        text_content = self.get('text_content')
         # Use existing 'words' if present in dict, else recalculate
         if isinstance(self.block, dict) and self.block.get('words'):
             self.block_dict['words'] = self.block['words']
@@ -151,23 +150,23 @@ class BlockBuilder:
             self._fill_by_background()
         elif sql_type == 'figure':
             self._fill_by_figure()
-        elif sql_type == 'image' and get('node_color'):
+        elif sql_type == 'image' and self.get('node_color'):
             self._fill_by_image()
         text_block_types = ['slideTitle', 'blockTitle', 'text', 'subTitle', 'number', 'email', 'date', 'name',
                             'percentage']
-        if get('sql_type') in text_block_types and safe_in(get('sql_type'), self.slide_config):
+        if self.get('sql_type') in text_block_types and safe_in(self.get('sql_type'), self.slide_config):
             self._fill_by_types()
 
     def __fill_color_var(self) -> None:
-        if get('node'):
-            color_hex, color_var = extract_color_info(get('node'))
+        if self.get('node'):
+            color_hex, color_var = extract_color_info(self.get('node'))
             if color_var:
                 self.block_dict['color_variable'] = color_var
 
     def __get_colors_and_fonts(self) -> tuple[list, list]:
         all_colors = []
         all_fonts = []
-        for color_hex, objects in self.slide_config[get('sql_type')].items():
+        for color_hex, objects in self.slide_config[self.get('sql_type')].items():
             all_colors.extend([o.get('color') for o in objects if o.get('color')])
             all_fonts.extend([o.get('fontFamily') for o in objects if o.get('fontFamily')])
 
@@ -183,15 +182,15 @@ class BlockBuilder:
                     self.block_dict['fontFamily'] = background_obj.get('fontFamily')
                     color_found = True
                     break
-        if not color_found and get('node_color'):
-            self.block_dict['color'] = get('node_color')
+        if not color_found and self.get('node_color'):
+            self.block_dict['color'] = self.get('node_color')
         self.__fill_color_var()
 
     def _fill_by_figure(self) -> None:
-        clean_name = extract_base_figure_name(get('name'))
+        clean_name = extract_base_figure_name(self.get('name'))
         self.block_dict['figureName'] = clean_name
-        if get('node_color'):
-            self.block_dict['color'] = get('node_color')
+        if self.get('node_color'):
+            self.block_dict['color'] = self.get('node_color')
         elif safe_in('figure', self.slide_config):
             all_colors, all_fonts = self.__get_colors_and_fonts()
             if all_colors:
@@ -217,7 +216,7 @@ class BlockBuilder:
         self.__fill_color_var()
 
     def _fill_by_image(self) -> None:
-        self.block_dict['color'] = get('node_color')
+        self.block_dict['color'] = self.get('node_color')
         self.__fill_color_var()
 
     def _fill_by_types(self) -> None:
@@ -240,13 +239,13 @@ class BlockBuilder:
 
     def extract_figure_info(self) -> Optional[dict]:
         """Extract and return figure_info dict for a figure block, or None if not a figure."""
-        if get('sql_type') != 'figure':
+        if self.get('sql_type') != 'figure':
             return None
         info = {
-            'id': get('id'),
-            'name': get('name'),
-            'color': get('color'),
-            'fontFamily': get('fontFamily'),
+            'id': self.get('id'),
+            'name': self.get('name'),
+            'color': self.get('color'),
+            'fontFamily': self.get('fontFamily'),
         }
         # Optionally enrich with slide_config if available
         if safe_in('figure', self.slide_config):
@@ -261,15 +260,15 @@ class BlockBuilder:
 
     def extract_precompiled_image_info(self) -> Optional[dict]:
         """Extract and return precompiled_image_info dict for a precompiled image block, or None if not applicable."""
-        if get('sql_type') != 'image':
+        if self.get('sql_type') != 'image':
             return None
         name = getattr(self.block, 'name', '')
         if not name.lower().startswith('image precompiled'):
             return None
         info = {
-            'id': get('id'),
+            'id': self.get('id'),
             'name': name,
-            'color': get('color'),
+            'color': self.get('color'),
         }
         # Optionally enrich with slide_config if available
         return info
@@ -277,14 +276,14 @@ class BlockBuilder:
     def build(self) -> dict:
         self._init_block_dict()
         self._fill_words()
-        self._fill_by_sql_type(get('sql_type'))
+        self._fill_by_sql_type(self.get('sql_type'))
         self._fill_info()
         return self.block_dict
 
 
 # ================ Block Filter Utils ================
 
-def _check_mode(mode: FilterMode, filter_config: FilterConfig):
+def _check_mode(mode: FilterMode, filter_config: FilterConfig, get: Callable) -> bool:
     if mode == FilterMode.ALL:
         return True
     if mode == FilterMode.SPECIFIC_SLIDES:
@@ -308,8 +307,10 @@ def should_include(node_or_block: dict | ExtractedBlock, filter_config) -> bool:
     Handles z-index, marker, visibility, and filter mode.
     Accepts either a Figma node (dict) or an ExtractedBlock/dict.
     """
-    global mock
-    mock = node_or_block
+    def get(key: str) -> Optional[Any]:
+        if isinstance(node_or_block, dict):
+            return node_or_block.get(key, None)
+        return getattr(node_or_block, key, None)
 
     # Exclude hidden
     if getattr(filter_config, 'exclude_hidden', True) and get('visible') is False:
@@ -327,4 +328,4 @@ def should_include(node_or_block: dict | ExtractedBlock, filter_config) -> bool:
             return False
     # Filter mode logic
     mode = getattr(filter_config, 'mode', None)
-    return _check_mode(mode, filter_config)
+    return _check_mode(mode, filter_config, get)
