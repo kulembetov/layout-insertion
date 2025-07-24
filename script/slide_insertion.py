@@ -45,6 +45,32 @@ with open("slide_layout_index_config_mapping.csv", "r") as csvfile:
         )
         slide_layout_index_config_mapping.append(config_obj)
 
+def load_block_layout_config_mapping() -> List[dict]:
+    """
+    Load block layout config mapping data from CSV file.
+
+    Returns:
+        List of dictionaries containing block layout config data
+    """
+    try:
+        block_layout_config_mapping = []
+        with open("block_layout_config_mapping.csv", "r") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                block_layout_config_mapping.append({
+                    "id": row["id"],
+                    "font": row.get("font", "{}"),
+                    "background": row.get("background", "{}")
+                })
+        logger.info(f"Loaded {len(block_layout_config_mapping)} block layout config mappings")
+        return block_layout_config_mapping
+    except FileNotFoundError:
+        logger.error("block_layout_config_mapping.csv not found")
+        return []
+    except Exception as e:
+        logger.error(f"Error loading block layout config mapping: {e}")
+        return []
+
 
 # Helper to set up the logger file handler in any mode
 def setup_slide_insertion_logger(output_dir):
@@ -128,6 +154,7 @@ class Block:
     )
     opacity: int = 1  # Always default to 1 if not provided
     words: int = 1  # Add words field, default 1
+    font_family: str = None  # Store the font family for font index extraction
 
 
 @dataclass
@@ -714,6 +741,8 @@ class BlockFactory:
         opacity = data.get("opacity", 1)
         # Words
         words = data.get("words", 1)
+        # Font family
+        font_family = data.get("font_family")
         # Flags
         needs_null_styles = data.get("needs_null_styles", False)
         needs_z_index = data.get("needs_z_index", False)
@@ -743,6 +772,7 @@ class BlockFactory:
             index=index,
             opacity=opacity,
             words=words,
+            font_family=font_family,
         )
 
     @staticmethod
@@ -848,8 +878,6 @@ class BlockTypes:
     ICON = "icon"
     SUBTITLE = "subTitle"
     NUMBER = "number"
-    LOGO = "logo"
-    # Add more as needed
 
 
 # ================ SQL Command Pattern ================
@@ -1099,7 +1127,7 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
 
         infographics_type = None
         slide_name = self.slide_layout.name.lower()
-        for pattern, config_data in config.SLIDE_LAYOUT_TO_INFOCRAPHICS_TYPE.items():
+        for pattern, config_data in config.SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE.items():
             if pattern in slide_name:
                 infographics_type = config_data["infographicsType"]
                 break
@@ -1157,14 +1185,19 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
     """Generates BlockLayoutIndexConfig SQL"""
 
     def __init__(
-        self, config: ConfigManager, id_generator: IdGenerator, blocks: List[Block]
+        self,
+        config: ConfigManager,
+        id_generator: IdGenerator,
+        blocks: List[Block],
+        block_layout_config_mapping: List[dict],
+        slide_config
     ):
         self.config = config
         self.id_generator = id_generator
         self.blocks = blocks
-        self.block_id_to_index_config_id = (
-            {}
-        )  # mapping block.id -> block_layout_index_config_id
+        self.block_layout_config_mapping = block_layout_config_mapping
+        self.block_id_to_index_config_id = {}
+        self.slide_config = slide_config
 
     def execute(self) -> str:
         """Generate BlockLayoutIndexConfig SQL"""
@@ -1176,24 +1209,37 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
         )
 
     def _format_block_layout_index_config_values(self) -> str:
-        """Format the values for BlockLayoutIndexConfig SQL"""
         values = []
+
         for block in self.blocks:
             # Only process blocks that have an index
             if block.index is not None:
-                # Generate a UUID for the record
-                block_layout_index_config_id = self.id_generator.generate_uuid7()
-                # Calculate indexColorId and indexFontId as block_index
+                self.block_id_to_index_config_id[block.id] = []
+
+                # Calculate indexColorId as block_index
                 index_color_id = block.index
-                index_font_id = block.index
-                # Save mapping for use in SlideLayoutIndexConfigCommand
-                self.block_id_to_index_config_id[block.id] = (
-                    block_layout_index_config_id
-                )
-                # Add the values to the list
-                values.append(
-                    f"    ('{block_layout_index_config_id}', '{block.id}', {index_color_id}, {index_font_id})"
-                )
+                index_font_id = 0
+
+                for slideConfigColor in self.slide_config[block.type]:
+                    # Generate a UUID for the record
+                    block_layout_index_config_id = self.id_generator.generate_uuid7()
+
+                    block_style = self.slide_config[block.type][slideConfigColor][block.index]
+
+                    # Поиск данных
+                    for config in self.block_layout_config_mapping:
+                        if slideConfigColor in config["background"]:
+                            fonts = parse_fonts_from_config(config)
+                            for index, font_family in enumerate(fonts):
+                                if font_family == block_style.get("fontFamily", 'arial'):
+                                    index_font_id = index
+
+                    self.block_id_to_index_config_id[block.id].append(block_layout_index_config_id)
+
+                    values.append(
+                        f"    ('{block_layout_index_config_id}', '{block.id}', {index_color_id}, {index_font_id})"
+                    )
+
         return ",\n".join(values)
 
 
@@ -1237,12 +1283,14 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
         slide_layout: SlideLayout,
         blocks: List[Block],
         block_id_to_index_config_id: dict = None,
+        slide_config = None,
     ):
         self.config = config
         self.id_generator = id_generator
         self.slide_layout = slide_layout
         self.blocks = blocks
-        self.block_id_to_index_config_id = block_id_to_index_config_id or {}
+        self.block_id_to_index_config_id = block_id_to_index_config_id
+        self.slide_config = slide_config
 
     def execute(self) -> str:
         """Generate SlideLayoutIndexConfig SQL"""
@@ -1258,29 +1306,25 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
         values = []
 
         for block in self.blocks:
-            # Only process blocks that have an index
+
+            block_layout_index_config_id = self.block_id_to_index_config_id.get(
+                block.id, block.id
+            )
+
             if block.index is not None:
-                # Get the slide layout ID
                 slide_layout_id = self.slide_layout.id
 
-                # For each presentation palette in the mapping, create a SlideLayoutIndexConfig record
-                for config in slide_layout_index_config_mapping:
+                for index, config in enumerate(slide_layout_index_config_mapping):
+                    slide_layout_index_config_id = self.id_generator.generate_uuid7()
+
                     presentation_palette_id = config.presentation_palette_id
-                    # Use the block_layout_config_id from the CSV mapping
+
                     block_layout_config_id = config.block_layout_config_id
 
-                    # Generate a UUID for the record
-                    slide_layout_index_config_id = self.id_generator.generate_uuid7()
-                    # Use the block index as the config number
                     config_number = 0
-                    # Use the actual BlockLayoutIndexConfig ID from the current generation
-                    block_layout_index_config_id = self.block_id_to_index_config_id.get(
-                        block.id, block.id
-                    )
 
-                    # Add the values to the list
                     values.append(
-                        f"    ('{slide_layout_index_config_id}', '{presentation_palette_id}', {config_number}, '{slide_layout_id}', '{block_layout_index_config_id}', '{block_layout_config_id}')"
+                        f"    ('{slide_layout_index_config_id}', '{presentation_palette_id}', {config_number}, '{slide_layout_id}', '{block_layout_index_config_id[index]}', '{block_layout_config_id}')"
                     )
         return ",\n".join(values)
 
@@ -1985,20 +2029,23 @@ class SQLGenerator:
             )
 
     def _generate_sql_queries(
-        self, slide_layout, blocks, figure_blocks, precompiled_image_blocks
+        self, slide_layout, blocks, figure_blocks, precompiled_image_blocks, slide_config = None
     ):
-        """Generate SQL queries for all entities"""
+        """Generate all SQL queries for the slide layout and blocks"""
         sql_queries = []
+        current_time = datetime.now().strftime(
+            self.config_manager.get_output_config()["timestamp_format"]
+        )
 
-        # Create timestamp for SQL comment header
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        sql_queries.append(f"-- Generated on {current_time}\n")
+        # Load block layout config mapping
+        block_layout_config_mapping = load_block_layout_config_mapping()
 
         # Create and execute all SQL commands
         # 1. BlockLayoutIndexConfigCommand first, to get mapping
         block_layout_index_config_cmd = BlockLayoutIndexConfigCommand(
-            self.config_manager, self.id_generator, blocks
+            self.config_manager, self.id_generator, blocks, block_layout_config_mapping, slide_config
         )
+
         block_layout_index_config_sql = block_layout_index_config_cmd.execute()
         block_id_to_index_config_id = (
             block_layout_index_config_cmd.block_id_to_index_config_id
@@ -2048,18 +2095,18 @@ class SQLGenerator:
 
         if block_layout_index_config_sql:
             sql_queries.append(block_layout_index_config_sql)
-        # 5. SlideLayoutIndexConfig (pass mapping)
+
         slide_layout_index_config_cmd = SlideLayoutIndexConfigCommand(
             self.config_manager,
             self.id_generator,
             slide_layout,
             blocks,
             block_id_to_index_config_id,
+            slide_config
         )
         slide_layout_index_config_sql = slide_layout_index_config_cmd.execute()
         if slide_layout_index_config_sql:
             sql_queries.append(slide_layout_index_config_sql)
-
         return "\n\n".join(sql_queries)
 
     def _write_sql_to_file(self, sql, slide_layout):
@@ -2122,6 +2169,8 @@ def auto_generate_sql_from_figma(
     """
     try:
         generator = SQLGenerator(config, output_dir=output_dir)
+
+
         output_dir = output_dir or config.OUTPUT_CONFIG["output_dir"]
         # Remove output directory if it exists
         if os.path.exists(output_dir):
@@ -2221,13 +2270,13 @@ def _process_figma_slide(
                 f"[MiniaturePath] Fallback: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout_number})"
             )
     # Build Block objects with generated UUIDs
-    blocks, precompiled_images, figure_blocks = _process_figma_blocks(
+    blocks, precompiled_images, figure_blocks, slide_config = _process_figma_blocks(
         slide, generator, strip_zindex
     )
     _ensure_background_and_watermark_blocks(slide_layout, blocks, generator)
     # Use SQLGenerator's internal methods to generate SQL and write to file
     sql = generator._generate_sql_queries(
-        slide_layout, blocks, figure_blocks, precompiled_images
+        slide_layout, blocks, figure_blocks, precompiled_images, slide_config
     )
     # Always use the folder from get_folder_for_slide_number for this slide number
     folder_name = generator.config_manager.get_folder_for_slide_number(
@@ -2254,7 +2303,26 @@ def _process_figma_blocks(
     block_id_map = {}
     precompiled_images = []
     figure_blocks = []
+
+    # Extract font family mapping from slideConfig
+    font_family_map = {}
+    slide_config = slide.get("slideConfig", {})
+    for block_type, color_configs in slide_config.items():
+        for color_hex, font_configs in color_configs.items():
+            if isinstance(font_configs, list) and len(font_configs) > 0:
+                font_family = font_configs[0].get("fontFamily", "arial")
+                font_family_map[(block_type, color_hex)] = font_family
+            elif isinstance(font_configs, dict) and "fontFamily" in font_configs:
+                font_family = font_configs.get("fontFamily", "arial")
+                font_family_map[(block_type, color_hex)] = font_family
+
+    logger.info(f"Extracted {len(font_family_map)} font family mappings from slideConfig")
+
     for block in slide["blocks"]:
+        if block["type"] not in slide_config:
+            logger.warning(f"Block type '{block_type}' not found in slideConfig for this slide. Skipping block: {block}")
+            continue
+
         block_uuid = generator.id_generator.generate_uuid7()
         block_id_map[block["id"]] = block_uuid
         styles = dict(block["styles"]) if block.get("styles") else {}
@@ -2275,6 +2343,27 @@ def _process_figma_blocks(
         block_index = BlockNameUtils.extract_index(original_block_name, block["type"])
         clean_block_name = BlockNameUtils.normalize_name(original_block_name)
         words = block.get("words", 1)
+
+        # Extract font family from slideConfig based on block type and color
+        font_family = None
+        block_type = block["type"]
+
+        # Try to find font family by block type and color
+        if normalized_color:
+            font_family = font_family_map.get((block_type, normalized_color))
+
+        # If not found, try to find by block type only
+        if not font_family:
+            for (config_block_type, config_color), config_font in font_family_map.items():
+                if config_block_type == block_type:
+                    font_family = config_font
+                    break
+
+        # Default fallback
+        if not font_family:
+            font_family = "arial"
+            logger.warning(f"No font family found for block '{block_type}' (color: {normalized_color}), using default 'arial'")
+
         block_dict = dict(block)
         block_dict.update(
             {
@@ -2284,6 +2373,7 @@ def _process_figma_blocks(
                 "styles": styles,
                 "opacity": opacity,
                 "words": words,
+                "font_family": font_family,
             }
         )
         block_dict["figure_info"] = BlockFactory.extract_figure_info(
@@ -2298,7 +2388,7 @@ def _process_figma_blocks(
             figure_blocks.append(block_obj.figure_info)
         if block_obj.precompiled_image_info:
             precompiled_images.extend(block_obj.precompiled_image_info)
-    return blocks, precompiled_images, figure_blocks
+    return blocks, precompiled_images, figure_blocks, slide_config
 
 
 def _ensure_background_and_watermark_blocks(
@@ -2415,6 +2505,63 @@ class BlockNameUtils:
         name = re.sub(r"_\d+$", "", name)
         # Remove extra spaces
         return name.strip()
+
+
+def parse_fonts_from_config(config: dict) -> list[str]:
+    """
+    Parse fonts from a block layout config.
+
+    Args:
+        config: Dictionary containing block layout config data with a 'font' field
+
+    Returns:
+        List of font names extracted from the config
+    """
+    font_str = config.get("font", "{}")
+    if not font_str or font_str == "{}":
+        return []
+    # Remove { and } and split by comma
+    font_str = font_str.strip("{}")
+    return [font.strip() for font in font_str.split(",") if font.strip()]
+
+
+class FontIndexUtils:
+    """Utility class for font index operations in block layout configurations."""
+
+    @staticmethod
+    def get_font_index(font_family: str, block_layout_config_id: str, block_layout_config_mapping: List[dict]) -> int:
+        """
+        Get the font index for a given font family from the block layout config mapping.
+
+        Args:
+            font_family: The font family name to find
+            block_layout_config_id: The ID of the block layout config to search in
+            block_layout_config_mapping: List of block layout config dictionaries
+
+        Returns:
+            The index (0-based) of the font in the font array, or 0 if not found
+        """
+        if not font_family:
+            return 0
+
+        # Find the matching block layout config
+        for config in block_layout_config_mapping:
+            if config["id"] == block_layout_config_id:
+                fonts = parse_fonts_from_config(config)
+                normalized_font = normalize_font_family(font_family)
+
+                # Find the index of the font in the array
+                for i, font in enumerate(fonts):
+                    if normalize_font_family(font) == normalized_font:
+                        return i
+
+                # Font not found, return 0
+                logger.warning(f"Font '{font_family}' not found in config {block_layout_config_id}, using index 0")
+                return 0
+
+        # Config not found, return 0
+        logger.warning(f"Block layout config {block_layout_config_id} not found, using font index 0")
+        return 0
 
 
 def main():
