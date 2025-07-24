@@ -1,27 +1,89 @@
 import os
+from enum import Enum
+from typing import Dict, List, TypedDict, Optional
 from dotenv import load_dotenv
 
 load_dotenv()
 
 """
-Configuration file for the SQL Generator
-Contains all default values, templates, and configurations
+========================
+ Environment Variables
+========================
 """
+FIGMA_FILE_ID: str = os.environ.get("FIGMA_FILE_ID", "")
+FIGMA_TOKEN: str = os.environ.get("FIGMA_TOKEN", "")
 
-FIGMA_FILE_ID = os.environ.get("FIGMA_FILE_ID", "")
-FIGMA_TOKEN = os.environ.get("FIGMA_TOKEN", "")
+"""
+========================
+ Figma Node/Block Constants
+========================
+"""
+FIGMA_KEY_ABS_BOX = "absoluteBoundingBox"
+FIGMA_KEY_CHILDREN = "children"
+FIGMA_KEY_NAME = "name"
+FIGMA_KEY_TYPE = "type"
+FIGMA_TYPE_TEXT = "TEXT"
+FIGMA_TYPE_RECTANGLE = "RECTANGLE"
+FIGMA_TYPE_FRAME = "FRAME"
+FIGMA_TYPE_GROUP = "GROUP"
+FIGMA_KEY_STYLE = "style"
+FIGMA_KEY_CORNER_RADIUS = "cornerRadius"
+FIGMA_KEY_RECT_CORNER_RADII = "rectangleCornerRadii"
+FIGMA_KEY_VISIBLE = "visible"
+FIGMA_KEY_CHARACTERS = "characters"
+FIGMA_KEY_SLIDE_COLORS = "slideColors"
+FIGMA_KEY_FONT_FAMILY = "fontFamily"
+BLOCK_TYPE_FIGURE = "figure"
+BLOCK_TYPE_IMAGE = "image"
+BLOCK_TYPE_BACKGROUND = "background"
 
-# Base path for slide layout miniatures
-MINIATURES_BASE_PATH = "/assets/miniatures/raiffeisen"
+"""
+========================
+ Enums for Types
+========================
+"""
+class SlideLayoutType(str, Enum):
+    CLASSIC = "classic"
+    MANY_TEXT = "manyText"
+    FEW_TEXT = "fewText"
+    OPTIMAL_TEXT = "optimalText"
+    CHART = "chart"
+    TABLE = "table"
+    INFOGRAPHICS = "infographics"
+    TITLE = "title"
+    LAST = "last"
+    OTHER = "other"
 
-# Default ColorSettings ID to use for all blocks
-DEFAULT_COLOR_SETTINGS_ID = "019565bd-99ce-792c-86fd-0188712beb9b"
+class BlockType(str, Enum):
+    TEXT = "text"
+    SLIDE_TITLE = "slideTitle"
+    BLOCK_TITLE = "blockTitle"
+    EMAIL = "email"
+    DATE = "date"
+    NAME = "name"
+    PERCENTAGE = "percentage"
+    IMAGE = "image"
+    INFOGRAPHIK = "infographik"
+    TABLE = "table"
+    FIGURE = "figure"
+    ICON = "icon"
+    BACKGROUND = "background"
+    WATERMARK = "watermark"
+    SUBTITLE = "subTitle"
+    NUMBER = "number"
+    CHART = "chart"
 
-# Default color
-DEFAULT_COLOR = "#ffffff"
+"""
+========================
+ TypedDicts for Structured Configs
+========================
+"""
+class PrecompiledImagesConfig(TypedDict):
+    base_url: str
+    default_colors: List[str]
+    prefix: List[str]
 
-# Precompiled Images configuration
-PRECOMPILED_IMAGES = {
+PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
     "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen",
     "default_colors": [
         "#bae4e4",  # мятно-бирюзовый
@@ -35,8 +97,129 @@ PRECOMPILED_IMAGES = {
     "prefix": ["Green", "Blue", "Sky", "Purple", "Gray", "Pink", "Orange"],
 }
 
-# Slide layout types enum
-SLIDE_LAYOUT_TYPES = {
+"""
+========================
+ Defaults and Templates
+========================
+"""
+MINIATURES_BASE_PATH: str = "/assets/miniatures/raiffeisen"
+DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"
+DEFAULT_COLOR: str = "#ffffff"
+MINIATURE_EXTENSION: str = ".png"
+
+DEFAULT_VALUES: Dict[str, object] = {
+    "slide_layout_name": "grid_cards_horizontal",
+    "slide_layout_number": 9,
+    "presentation_layout_id": "0197c55e-1c1b-7760-9525-f51752cf23e2",
+    "slide_layout_type": SlideLayoutType.CLASSIC,
+    "num_blocks": 5,
+}
+
+"""
+========================
+ SQL Templates
+========================
+"""
+SQL_TEMPLATES: Dict[str, str] = {
+    "slide_layout": """-- Create SlideLayout
+INSERT INTO "SlideLayout" (
+    "id", "name", "number", "isActive", "presentationLayoutId",
+    "imagesCount", "maxTokensPerBlock", "maxWordsPerSentence", "minWordsPerSentence", "sentences",
+    "isLast", "forGeneration"
+) VALUES (
+    '{slide_layout_id}',
+    '{slide_layout_name}',
+    {slide_layout_number},
+    true,
+    '{presentation_layout_id}',
+    0,
+    300,
+    15,
+    10,
+    1,
+    {is_last},
+    {for_generation}
+)
+RETURNING *;""",
+    "block_layout": """-- Create BlockLayouts
+INSERT INTO "BlockLayout" ("id", "slideLayoutId", "blockLayoutType")
+VALUES
+{block_layout_values}
+RETURNING *;""",
+    "block_styles": """-- Create BlockLayoutStyles
+INSERT INTO "BlockLayoutStyles" ("blockLayoutId", "textVertical", "textHorizontal", "fontSize", "weight", "zIndex", "color", "opacity", "textTransform", "borderRadius", "colorSettingsId")
+VALUES
+{styles_values}
+RETURNING *;""",
+    "block_dimensions": """-- Create BlockLayoutDimensions
+INSERT INTO "BlockLayoutDimensions" ("blockLayoutId", "x", "y", "w", "h")
+VALUES
+{dimension_values}
+RETURNING *;""",
+    "figure": """-- Create Figures
+INSERT INTO "Figure" ("id", "blockLayoutId", "name")
+VALUES
+{figure_values}
+RETURNING *;""",
+    "precompiled_image": """-- Create PrecompiledImages
+INSERT INTO "PrecompiledImage" ("id", "blockLayoutId", "url", "color")
+VALUES
+{precompiled_image_values}
+RETURNING *;""",
+    "slide_layout_additional_info": """-- Create SlideLayoutAdditionalInfo
+INSERT INTO "SlideLayoutAdditionalInfo" (
+    "slideLayoutId", "percentesCount", "maxSymbolsInBlock", "hasHeaders", "type", "iconUrl", "infographicsType"
+) VALUES (
+    '{slide_layout_id}',
+    {percentesCount},
+    {maxSymbolsInBlock},
+    {hasHeaders},
+    '{type}'::"SlideLayoutType",
+    '{icon_url}',
+    {infographics_type}
+)
+RETURNING *;""",
+    "slide_layout_dimensions": """-- Create SlideLayoutDimensions
+INSERT INTO "SlideLayoutDimensions" (
+    "slideLayoutId", "x", "y", "w", "h"
+) VALUES (
+    '{slide_layout_id}',
+    {x},
+    {y},
+    {w},
+    {h}
+)
+RETURNING *;""",
+    "slide_layout_styles": """-- Create SlideLayoutStyles
+INSERT INTO "SlideLayoutStyles" (
+    "slideLayoutId"
+) VALUES (
+    '{slide_layout_id}'
+)
+RETURNING *;""",
+    "block_layout_index_config": """-- Create BlockLayoutIndexConfig
+INSERT INTO "BlockLayoutIndexConfig" (
+    "id", "blockLayoutId", "indexColorId", "indexFontId"
+)
+VALUES
+{block_layout_index_config_values}
+RETURNING *;""",
+    "slide_layout_index_config": """-- Create SlideLayoutIndexConfig
+INSERT INTO "SlideLayoutIndexConfig" (
+    "id", "presentationPaletteId", "configNumber", "slideLayoutId", "blockLayoutIndexConfigId", "blockLayoutConfigId"
+)
+VALUES
+{slide_layout_index_config_values}
+RETURNING *;""",
+    "block_layout_limit": """-- Create BlockLayoutLimit\nINSERT INTO "BlockLayoutLimit" ("minWords", "maxWords", "blockLayoutId")\nVALUES\n{block_layout_limit_values}\nRETURNING *;""",
+}
+
+"""
+========================
+ Mappings and Lookups
+========================
+"""
+SLIDE_LAYOUT_TYPES: Dict[str, str] = {
     "classic": "classic",
     "many_text": "manyText",
     "few_text": "fewText",
@@ -49,8 +232,7 @@ SLIDE_LAYOUT_TYPES = {
     "other": "other",
 }
 
-# Automatic blocks configuration
-AUTO_BLOCKS = {
+AUTO_BLOCKS: Dict[str, object] = {
     "add_background": True,  # Always add background by default
     "add_watermark": False,  # Default to not adding watermark
     "background": {
@@ -65,17 +247,7 @@ AUTO_BLOCKS = {
     },
 }
 
-# Default values for user inputs
-DEFAULT_VALUES = {
-    "slide_layout_name": "grid_cards_horizontal",
-    "slide_layout_number": 9,
-    "presentation_layout_id": "0197c55e-1c1b-7760-9525-f51752cf23e2",
-    "slide_layout_type": SLIDE_LAYOUT_TYPES["classic"],
-    "num_blocks": 5,
-}
-
-# Block type groups
-BLOCK_TYPES = {
+BLOCK_TYPES: Dict[str, List[str]] = {
     "null_style_types": [
         "infographik",
         "figure",
@@ -124,7 +296,7 @@ BLOCK_TYPES = {
     ],
 }
 
-BLOCK_TYPE_MIN_WORDS = {
+BLOCK_TYPE_MIN_WORDS: Dict[str, int] = {
     "slideTitle": 3,
     "subTitle": 5,
     "blockTitle": 1,
@@ -136,8 +308,7 @@ BLOCK_TYPE_MIN_WORDS = {
     "email": 1,
 }
 
-# Default Z-index mappings
-Z_INDEX_DEFAULTS = {
+Z_INDEX_DEFAULTS: Dict[str, int] = {
     "background": 0,
     "watermark": 10,
     "figure": 1,
@@ -157,8 +328,7 @@ Z_INDEX_DEFAULTS = {
     "default": 1,
 }
 
-# Default dimensions for different block types
-DEFAULT_DIMENSIONS = {
+DEFAULT_DIMENSIONS: Dict[str, Dict[str, int]] = {
     "background": {"x": 0, "y": 0, "w": 1200, "h": 675},
     "slideTitle": {"x": 37, "y": 37, "w": 1125, "h": 85},
     "subTitle": {"x": 37, "y": 250, "w": 875, "h": 65},
@@ -168,8 +338,7 @@ DEFAULT_DIMENSIONS = {
     "default": {"x": 37, "y": 230, "w": 1125, "h": 405},
 }
 
-# Default styles by block type
-DEFAULT_STYLES = {
+DEFAULT_STYLES: Dict[str, Dict[str, object]] = {
     "slideTitle": {
         "text_vertical": "top",
         "text_horizontal": "left",
@@ -438,7 +607,7 @@ FIGMA_TO_SQL_BLOCK_MAPPING = {
 }
 
 # Infographics type mapping based on slide layout name patterns
-SLIDE_LAYOUT_TO_INFOCRAPHICS_TYPE = {
+SLIDE_LAYOUT_TO_INFORAPHICS_TYPE = {
     "step_by_step": {"infographicsType": "grid_timeline"},
     "grid_cards_horizontal": {"infographicsType": "grid"},
     "grid_cards_vertical": {"infographicsType": "grid"},
@@ -449,12 +618,4 @@ SLIDE_LAYOUT_TO_INFOCRAPHICS_TYPE = {
     "center_circle_chart": {"infographicsType": "pie"},
     "center_ring_chart": {"infographicsType": "pie"},
     "center_bar_chart": {"infographicsType": "bar"},
-}
-
-SLIDE_FOLDER_TO_MINIATURE_NUMBER = {
-    "5cols": 5,
-    "6cols": 6,
-    "7cols": 7,
-    "8cols": 8,
-    "9cols": 9,
 }
