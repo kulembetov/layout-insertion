@@ -226,11 +226,11 @@ def main():
                 out.write("-- Generated delete statements for {}\n\n".format(fname))
                 for table in DELETE_ORDER:
                     key_col = KEY_COLUMNS[table]
-                    for id_ in ids[table]:
+                    id_list = ids[table]
+                    if id_list:
+                        id_str = ", ".join(f"'{id_}'" for id_ in id_list)
                         out.write(f"-- Delete from {table}\n")
-                        out.write(
-                            f'DELETE FROM "{table}" WHERE "{key_col}" = \'{id_}\';\n'
-                        )
+                        out.write(f'DELETE FROM "{table}" WHERE "{key_col}" IN ({id_str});\n')
                 out.write("\n")
         print(f"  Completed group: {group}")
 
