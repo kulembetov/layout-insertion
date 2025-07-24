@@ -33,6 +33,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.csv
 MANIFEST
 
 # Virtual environments
@@ -55,6 +56,6 @@ Thumbs.db
 .venv
 __pycache__
 
-# Other
+/my_output/
+/my_sql_output/
 /logs/
-output.json
