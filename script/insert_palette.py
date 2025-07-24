@@ -89,7 +89,7 @@ def insert_palette_auto(pairs, db_config, csv_path):
     for layout_id, color in pairs:
         palette_id = generate_uuid7()
         total += 1
-        print(f"[AUTO] Trying: layout_id={layout_id}, color={color} ... ", end="")
+        print(f"Trying: layout_id={layout_id}, color={color} ... ", end="")
         cur.execute(
             'SELECT id FROM "PresentationPalette" WHERE "presentationLayoutId"=%s AND color=%s',
             (layout_id, color),
@@ -112,13 +112,13 @@ def insert_palette_auto(pairs, db_config, csv_path):
             )
             inserted += 1
         conn.commit()
-    print(f"[AUTO] Summary: Attempted {total}, Inserted {inserted}, Skipped {skipped}")
+    print(f"Summary: Attempted {total}, Inserted {inserted}, Skipped {skipped}")
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = ["id", "presentationLayoutId", "color"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(mapping)
-    print(f"[AUTO] Mapping written to {csv_path}")
+    print(f"Mapping written to {csv_path}")
     cur.close()
     conn.close()
 
@@ -128,17 +128,17 @@ def insert_palette_manual(pairs, csv_path):
     for layout_id, color in pairs:
         palette_id = generate_uuid7()
         sql = f"INSERT INTO \"PresentationPalette\" (id, \"presentationLayoutId\", color) VALUES ('{palette_id}', '{layout_id}', '{color}');"
-        print(f"[MANUAL] {sql}")
+        print(f"{sql}")
         mapping.append(
             {"id": palette_id, "presentationLayoutId": layout_id, "color": color}
         )
-    print(f"[MANUAL] Summary: Generated {len(pairs)} SQL statements.")
+    print(f"Summary: Generated {len(pairs)} SQL statements.")
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = ["id", "presentationLayoutId", "color"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(mapping)
-    print(f"[MANUAL] Mapping written to {csv_path}")
+    print(f"Mapping written to {csv_path}")
 
 
 def main():
