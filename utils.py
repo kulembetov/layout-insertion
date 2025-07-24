@@ -2,7 +2,7 @@ import re
 from typing import Optional, Any
 
 from api_v1.services.data_classes import ExtractedBlock
-from constants.blocks import BLOCK_TYPES
+from constants import BLOCKS
 from api_v1.services.filter_service import FilterMode, FilterConfig
 
 
@@ -131,8 +131,8 @@ class BlockBuilder:
             'dimensions': get('dimensions'),
             'styles': get('styles'),
             'is_target': get('is_target'),
-            'needs_null_styles': get('sql_type') in BLOCK_TYPES['null_style_types'],
-            'needs_z_index': get('sql_type') in BLOCK_TYPES['z_index_types'],
+            'needs_null_styles': get('sql_type') in BLOCKS.BLOCK_TYPES['null_style_types'],
+            'needs_z_index': get('sql_type') in BLOCKS.BLOCK_TYPES['z_index_types'],
             # Always include both fields for clarity and downstream use
             'has_corner_radius': get('has_corner_radius') if get('has_corner_radius') is not None else False,
             'corner_radius': get('corner_radius') if get('corner_radius') is not None else [0, 0, 0, 0],
@@ -209,6 +209,7 @@ class BlockBuilder:
                             break
                     if 'color' in self.block_dict:
                         break
+
             if all_colors and 'color' not in self.block_dict:
                 self.block_dict['color'] = all_colors[0]
             if all_fonts and 'fontFamily' not in self.block_dict:
@@ -239,13 +240,13 @@ class BlockBuilder:
 
     def extract_figure_info(self) -> Optional[dict]:
         """Extract and return figure_info dict for a figure block, or None if not a figure."""
-        if getattr(self.block, 'sql_type', None) != 'figure':
+        if get('sql_type') != 'figure':
             return None
         info = {
-            'id': getattr(self.block, 'id', None),
-            'name': getattr(self.block, 'name', None),
-            'color': getattr(self.block, 'color', None),
-            'fontFamily': getattr(self.block, 'fontFamily', None)
+            'id': get('id'),
+            'name': get('name'),
+            'color': get('color'),
+            'fontFamily': get('fontFamily'),
         }
         # Optionally enrich with slide_config if available
         if safe_in('figure', self.slide_config):
@@ -260,15 +261,15 @@ class BlockBuilder:
 
     def extract_precompiled_image_info(self) -> Optional[dict]:
         """Extract and return precompiled_image_info dict for a precompiled image block, or None if not applicable."""
-        if getattr(self.block, 'sql_type', None) != 'image':
+        if get('sql_type') != 'image':
             return None
         name = getattr(self.block, 'name', '')
         if not name.lower().startswith('image precompiled'):
             return None
         info = {
-            'id': getattr(self.block, 'id', None),
+            'id': get('id'),
             'name': name,
-            'color': getattr(self.block, 'color', None)
+            'color': get('color'),
         }
         # Optionally enrich with slide_config if available
         return info
