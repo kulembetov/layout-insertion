@@ -607,7 +607,7 @@ FIGMA_TO_SQL_BLOCK_MAPPING = {
 }
 
 # Infographics type mapping based on slide layout name patterns
-SLIDE_LAYOUT_TO_INFORAPHICS_TYPE = {
+SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE = {
     "step_by_step": {"infographicsType": "grid_timeline"},
     "grid_cards_horizontal": {"infographicsType": "grid"},
     "grid_cards_vertical": {"infographicsType": "grid"},
