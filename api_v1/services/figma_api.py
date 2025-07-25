@@ -1,19 +1,13 @@
 import requests
-import json
-
-from typing import Any, Optional
 from api_v1.services.filter_service import FilterConfig
 from typing import Dict, List, Any, Tuple, Optional
-import config
-import logging
-import os
 from logger import setup_logger
-from .checker import Checker
+# from .checker import Checker
 from .filter_service import FilterMode, FilterConfig
-from utils import should_include, extract_color_info, extract_base_figure_name, BlockBuilder
+from .utils import should_include, extract_color_info, extract_base_figure_name, BlockBuilder, Checker
 from .data_classes import ExtractedBlock, ExtractedSlide
 import re
-from constants import BLOCKS, SLIDES, CONSTANTS, TEMPLATES
+from api_v1.constants import BLOCKS, SLIDES, CONSTANTS, TEMPLATES
 
 logg = setup_logger(__name__)
 
@@ -72,7 +66,7 @@ class FigmaAPI:
         response.raise_for_status()
         return response.json()['document']['children']
 
-    def extract(self, filter_config) -> dict[str, Any]:
+    def extract(self) -> dict[str, Any]:
 
         try:
             pages = self.fetch()
@@ -196,7 +190,8 @@ class FigmaAPI:
         
         # Checks for the 'ready to dev' label.
         if not Checker.check_marker(
-            node, getattr(self.filter_config, 'ready_to_dev_marker', '')
+            getattr(self.filter_config, 'ready_to_dev_marker', ''),
+            node.get('name', '')
         ):
             return False
         
@@ -457,7 +452,7 @@ class FigmaAPI:
     
     def extract_text_styles(self, node: Dict[str, Any], sql_type: str) -> Dict[str, Any]:
         """Extract text styling information with config defaults (no color)."""
-        defaults = BLOCKS.DEFAULT_STYLES.get(sql_type, BLOCKS.DEFAULT_STYLES['default'])
+        defaults = CONSTANTS.DEFAULT_STYLES.get(sql_type, CONSTANTS.DEFAULT_STYLES['default'])
         styles = {
             'textVertical': defaults['text_vertical'],
             'textHorizontal': defaults['text_horizontal'],
