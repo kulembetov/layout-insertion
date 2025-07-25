@@ -1117,13 +1117,16 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
         slide_type_camel = config.SLIDE_NUMBER_TO_TYPE.get(
             self.slide_layout.number, self.slide_layout.type
         )
-        # Set hasHeaders True if any block is of type 'blockTitle' or 'percentage'
+        
+        # Count actual percentage blocks
+        percentes_count = 0
         has_headers = additional_info["hasHeaders"]
         if self.blocks:
             for block in self.blocks:
+                if block.type == "percentage":
+                    percentes_count += 1
                 if block.type in ("blockTitle", "percentage"):
                     has_headers = True
-                    break
 
         infographics_type = None
         slide_name = self.slide_layout.name.lower()
@@ -1138,7 +1141,7 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
 
         return self.config.get_sql_template("slide_layout_additional_info").format(
             slide_layout_id=self.slide_layout.id,
-            percentesCount=additional_info["percentesCount"],
+            percentesCount=percentes_count,
             maxSymbolsInBlock=additional_info["maxSymbolsInBlock"],
             hasHeaders=str(has_headers).lower(),
             type=slide_type_camel,  # always camelCase
