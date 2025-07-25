@@ -176,6 +176,20 @@ python3 slide_deletion.py
 - Supports selective deletion based on slide numbers or block types.
 - Useful for cleaning up test data or removing outdated content.
 
+### `migrate_images.py`
+- **Purpose:** Migrates images from Google Drive to Yandex Cloud Object Storage
+- **Functionality:** 
+  - Downloads images from a specified Google Drive folder
+  - Uploads them to Yandex Cloud S3-compatible storage
+  - Supports various image formats (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
+  - Handles OAuth authentication with Google Drive API
+  - Uses S3-compatible interface for Yandex Cloud storage
+- **Configuration:** 
+  - Requires `.env` file with Yandex Cloud credentials and Google Drive folder ID
+  - Requires `credentials.json` file from Google Cloud Console for Google Drive API access
+- **Dependencies:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`
+- **Usage:** Run the script to migrate all images from Google Drive to Yandex Cloud storage
+
 ---
 
 # Структура проекта
@@ -359,4 +373,18 @@ python3 slide_deletion.py
 ### `slide_deletion.py`
 - Удаляет слайды, блоки и изображения из базы данных.
 - Поддерживает выборочное удаление по номерам слайдов или типам блоков.
-- Полезен для очистки тестовых данных или удаления устаревшего контента. 
+- Полезен для очистки тестовых данных или удаления устаревшего контента.
+
+### `migrate_images.py`
+- **Назначение:** Мигрирует изображения из Google Drive в Yandex Cloud Object Storage
+- **Функциональность:** 
+  - Скачивает изображения из указанной папки Google Drive
+  - Загружает их в S3-совместимое хранилище Yandex Cloud
+  - Поддерживает различные форматы изображений (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
+  - Обрабатывает OAuth аутентификацию с Google Drive API
+  - Использует S3-совместимый интерфейс для хранилища Yandex Cloud
+- **Конфигурация:** 
+  - Требует файл `.env` с учетными данными Yandex Cloud и ID папки Google Drive
+  - Требует файл `credentials.json` из Google Cloud Console для доступа к Google Drive API
+- **Зависимости:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`
+- **Использование:** Запустите скрипт для миграции всех изображений из Google Drive в хранилище Yandex Cloud 

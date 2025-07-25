@@ -1,9 +1,7 @@
 .env
-/my_output/
-/my_sql_output/
+script/my_output/
+script/my_sql_output/
 *.csv
 __pycache__/
-.venv
-__pycache__
-.idea
-/logs/
+credentials.json
+token.json
