@@ -16,38 +16,6 @@ import re
 from constants import BLOCKS, SLIDES, CONSTANTS, TEMPLATES
 
 logg = setup_logger(__name__)
-# ================ Logging Utility ================
-class LogUtils:
-    @staticmethod
-    def log_block_event(message, level='info'):
-        """Unified logging for block/frame events, respects config.VERBOSE."""
-        global block_logger
-        if block_logger:
-            if level == 'debug':
-                block_logger.debug(message)
-            else:
-                block_logger.info(message)
-        if hasattr(config, 'VERBOSE') and getattr(config, 'VERBOSE', False):
-            print(message)
-
-# Set up block logger dynamically based on output directory
-block_logger = None
-block_log_handler = None
-
-def setup_block_logger(output_dir):
-    global block_logger, block_log_handler
-    if block_logger and block_log_handler:
-        block_logger.removeHandler(block_log_handler)
-    block_logger = logging.getLogger('block_processing')
-    block_logger.setLevel(logging.INFO)
-    log_path = os.path.join(output_dir, 'figma.log')
-    # Ensure the output directory exists
-    os.makedirs(output_dir, exist_ok=True)
-    block_log_handler = logging.FileHandler(log_path, mode='w', encoding='utf-8')
-    block_log_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
-    block_logger.addHandler(block_log_handler)
-
-
 
 class FigmaAPI:
     def __init__(self, *, file_id: Optional[str] = None, token: Optional[str] = None, filter_config: Optional[FilterConfig] = None) -> None:
@@ -104,17 +72,12 @@ class FigmaAPI:
         response.raise_for_status()
         return response.json()['document']['children']
 
-    def extract(self) -> dict[str, Any]:
+    def extract(self, filter_config) -> dict[str, Any]:
 
         try:
             pages = self.fetch()
-            # print(pages)
-            # with open("1_pages.json", "w", encoding="utf-8") as outfile:
-            #     json.dump(pages, outfile, ensure_ascii=False, indent=4)
-
             all_slides = []
             for page in pages:
-                # LogUtils.log_block_event(f"\nProcessing page: {page.get('name', 'Unnamed')}")
                 logg.info(f"\nProcessing page: {page.get('name', 'Unnamed')}")
                 page_slides = self.traverse_and_extract(page)
                 all_slides.extend(page_slides)
@@ -173,8 +136,6 @@ class FigmaAPI:
         slides = []
         
         if self.is_target_frame(node):
-            # LogUtils.log_block_event(f"Found target frame: \"{node['name']}\"")
-            # LogUtils.log_block_event(f"Parent container: \"{parent_name}\"")
             logg.info(f"Found target frame: \"{node['name']}\"")
             logg.info(f"Parent container: \"{parent_name}\"")
 
@@ -211,7 +172,7 @@ class FigmaAPI:
                 # Attach the original node for color extraction
                 slide._figma_node = node
                 slides.append(slide)
-                LogUtils.log_block_event(f"Slide {slide_number} ({slide_type}) with {len(blocks)} blocks")
+                logg.info(f"Slide {slide_number} ({slide_type}) with {len(blocks)} blocks")
             
             return slides
 
@@ -272,189 +233,175 @@ class FigmaAPI:
         """Normalize font weight to valid values (300, 400, 700)"""
         if weight is None:
             return 400
-
-
-
-
-
-
-
-
-
-
-
-
-    # Отрефакторить ==================================================================================================
-    def collect_enhanced_blocks(self, node: Dict[str, Any], frame_origin: Dict[str, int], 
-                              slide_number: int, parent_container: str) -> List[ExtractedBlock]:
-        blocks = []
-        if not node.get('absoluteBoundingBox'):
-            return blocks
         
-        # Centralized filtering for node
-        if not should_include(node, self.filter_config):
-            return blocks
-        name = node.get('name', '')
-        has_z = Checker.check_z_index(name)
-
-        # Only process nodes with z-index in the name
-        if has_z:
-            figma_type, sql_type = self.detect_block_type(node)
-            abs_box = node['absoluteBoundingBox']
-            left = abs_box['x'] - frame_origin['x']
-            top = abs_box['y'] - frame_origin['y']
-            dimensions = {
-                'x': self.round_to_nearest_five(left),
-                'y': self.round_to_nearest_five(top),
-                'w': self.round_to_nearest_five(abs_box['width']),
-                'h': self.round_to_nearest_five(abs_box['height'])
-            }
-            # Skip full-slide images unless 'precompiled' is in the name, but always include background blocks
-            name_lower = name.lower()
-            is_precompiled = 'precompiled' in name_lower
-            should_skip = (
-                sql_type == 'image' and  # Only skip images, not backgrounds
-                dimensions['x'] == 0 and
-                dimensions['y'] == 0 and
-                dimensions['w'] == 1200 and
-                dimensions['h'] == 675 and
-                not is_precompiled
-            )
-            if should_skip:
-                LogUtils.log_block_event(f"Skipping {sql_type} block {name} (full image 1200x675)", level='debug')
-            else:
-                styles = self.extract_text_styles(node, sql_type)
-                z_index = self.extract_z_index(name)
-                if z_index == 0:
-                    z_index = CONSTANTS.Z_INDEX_DEFAULTS.get(sql_type, CONSTANTS.Z_INDEX_DEFAULTS['default'])
-                styles['zIndex'] = z_index
-                has_corner_radius, corner_radius = self.extract_corner_radius(node)
-                text_content = None
-                text_like_types = ['text', 'blockTitle', 'slideTitle', 'subTitle', 'number', 'email', 'date', 'name', 'percentage']
-                if sql_type in text_like_types and node.get('type') == 'TEXT':
-                    text_content = node.get('characters', None)
-                
-                # Extract color information for background and other relevant blocks
-                node_color = None
-                if sql_type in BLOCKS.BLOCK_TYPES['null_style_types']:
-                    node_color = extract_color_info(node)[0] # Only get hex color
-                
-                block = ExtractedBlock(
-                    id=node['id'],
-                    figma_type=figma_type,
-                    sql_type=sql_type,
-                    name=name,
-                    dimensions=dimensions,
-                    styles=styles,
-                    slide_number=slide_number,
-                    parent_container=parent_container,
-                    is_target=True,
-                    has_corner_radius=has_corner_radius,
-                    corner_radius=corner_radius,
-                    text_content=text_content  # Pass text content
-                )
-                # Store the extracted color for later use
-                block.node_color = node_color
-                if should_include(block, self.filter_config):
-                    blocks.append(block)
-                    LogUtils.log_block_event(f"Added {sql_type} block: {name}")
-                    color_info = f" | Color: {node_color}" if node_color else ""
-                    LogUtils.log_block_event(
-                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{color_info}",
-                        level='debug'
-                    )
-        # Recursively process children (skip children of hidden nodes)
-        if node.get('children') and not (getattr(self.filter_config, 'exclude_hidden', True) and node.get('visible') is False):
-            for child in node['children']:
-                blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
-        return blocks
-
     def detect_block_type(self, node: dict) -> Tuple[str, str]:
         """Detect block type from a Figma node, returning (figma_type, sql_type). Always returns a valid sql_type."""
+
         name = node.get('name', '').lower()
         node_type = node.get('type', '')
         clean_name = re.sub(r'\s*z-index.*$', '', name)
+
         # Check for explicit mappings first, prioritize longer patterns
         sorted_patterns = sorted(CONSTANTS.FIGMA_TO_SQL_BLOCK_MAPPING.items(), key=lambda x: len(x[0]), reverse=True)
         for pattern, sql_type in sorted_patterns:
             if pattern in clean_name:
                 if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
                     return pattern, sql_type
-        # Infer from Figma node type with heuristics
-        if node_type == 'TEXT':
-            if any(keyword in clean_name for keyword in ['title', 'heading', 'header', 'h1', 'h2']):
-                if any(keyword in clean_name for keyword in ['slide', 'main']):
-                    sql_type = 'slideTitle'
-                    if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                        return 'slideTitle', sql_type
-                sql_type = 'blockTitle'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'blockTitle', sql_type
-            elif any(keyword in clean_name for keyword in ['subtitle', 'sub', 'subheading']):
-                sql_type = 'subTitle'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'subTitle', sql_type
-            elif any(keyword in clean_name for keyword in ['number', 'num', 'count']):
-                sql_type = 'number'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'number', sql_type
-            elif any(keyword in clean_name for keyword in ['email', '@', 'mail']):
-                sql_type = 'email'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'email', sql_type
-            elif any(keyword in clean_name for keyword in ['date', 'time', 'year', 'month']):
-                sql_type = 'date'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'date', sql_type
-            elif any(keyword in clean_name for keyword in ['name', 'author', 'person']):
-                sql_type = 'name'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'name', sql_type
-            elif any(keyword in clean_name for keyword in ['percent', '%', 'percentage']):
-                sql_type = 'percentage'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'percentage', sql_type
-            sql_type = 'text'
-            if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                return 'text', sql_type
-        elif node_type == 'RECTANGLE':
-            if any(keyword in clean_name for keyword in ['background', 'bg', 'backdrop']):
-                sql_type = 'background'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'background', sql_type
-            elif any(keyword in clean_name for keyword in ['icon', 'symbol']):
-                sql_type = 'icon'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'icon', sql_type
-            elif any(keyword in clean_name for keyword in ['image', 'img', 'photo', 'picture']):
-                sql_type = 'image'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'image', sql_type
-            sql_type = 'figure'
-            if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                return 'figure', sql_type
-        elif node_type in ['FRAME', 'GROUP']:
-            if any(keyword in clean_name for keyword in ['table', 'grid', 'data']):
-                sql_type = 'table'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'table', sql_type
-            elif any(keyword in clean_name for keyword in ['chart', 'graph']):
-                sql_type = 'table'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'table', sql_type
-            elif any(keyword in clean_name for keyword in ['infographic', 'infographik', 'visual']):
-                sql_type = 'infographik'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'infographik', sql_type
-            elif any(keyword in clean_name for keyword in ['watermark', 'mark']):
-                sql_type = 'watermark'
-                if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                    return 'watermark', sql_type
-            sql_type = 'figure'
-            if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
-                return 'figure', sql_type
-        # Default fallback
+                
+        type_mappings = {
+            'TEXT': [
+                (['title', 'heading', 'header', 'h1', 'h2'], {'sql_type': 'blockTitle'}),
+                (['slide', 'main'], {'sql_type': 'slideTitle'} if any(kw in clean_name for kw in ['title', 'heading', 'header', 'h1', 'h2']) else None),
+                (['subtitle', 'sub', 'subheading'], {'sql_type': 'subTitle'}),
+                (['number', 'num', 'count'], {'sql_type': 'number'}),
+                (['email', '@', 'mail'], {'sql_type': 'email'}),
+                (['date', 'time', 'year', 'month'], {'sql_type': 'date'}),
+                (['name', 'author', 'person'], {'sql_type': 'name'}),
+                (['percent', '%', 'percentage'], {'sql_type': 'percentage'}),
+                ([], {'sql_type': 'text'})
+            ],
+            'RECTANGLE': [
+                (['background', 'bg', 'backdrop'], {'sql_type': 'background'}),
+                (['icon', 'symbol'], {'sql_type': 'icon'}),
+                (['image', 'img', 'photo', 'picture'], {'sql_type': 'image'}),
+                ([], {'sql_type': 'figure'})
+            ],
+            'FRAME': [
+                (['table', 'grid', 'data'], {'sql_type': 'table'}),
+                (['chart', 'graph'], {'sql_type': 'table'}),
+                (['infographic', 'infographik', 'visual'], {'sql_type': 'infographik'}),
+                (['watermark', 'mark'], {'sql_type': 'watermark'}),
+                ([], {'sql_type': 'figure'})
+            ],
+            'GROUP': [
+                (['table', 'grid', 'data'], {'sql_type': 'table'}),
+                (['chart', 'graph'], {'sql_type': 'table'}),
+                (['infographic', 'infographik', 'visual'], {'sql_type': 'infographik'}),
+                (['watermark', 'mark'], {'sql_type': 'watermark'}),
+                ([], {'sql_type': 'figure'})
+            ]
+        }
+
+        mappings_for_node = type_mappings.get(node_type, [])
+        for keywords, mapping in mappings_for_node:
+            if not keywords or any(keyword in clean_name for keyword in keywords):
+                sql_type = mapping.get('sql_type')
+                if sql_type and sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
+                    return clean_name, sql_type
         return 'text', 'text'
+
+    def count_sentences(self, text: str) -> int:
+        if not text:
+            return 0
+        split_result = [s for s in re.split(r'[.!?]', text)]
+        n = len([s for s in split_result if s.strip()])
+        return n if n > 0 else 1
+    
+    def normalize_font_family(self, font_family: str) -> str:
+        if not font_family:
+            return ""
+        return re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
+    
+    def _update_figure_config_with_names(self, slide_config, blocks):
+        figure_blocks_by_name = {}
+        
+        for block in blocks:
+            if block.sql_type != 'figure':
+                continue
+
+            base_name = extract_base_figure_name(block.name)
+            figure_blocks_by_name[base_name] = block
+            logg.info(f"[figureBlocks] Found figure block: '{block.name}' -> base_name: '{base_name}'")
+
+        new_figure_config = {}
+
+        for color_hex, obj_list in slide_config['figure'].items():
+            figure_objects = []
+            
+            for obj in obj_list:
+                figure_name = obj.get('figureName', '')
+                if not figure_name:
+                    continue
+                    
+                font_family = obj.get('fontFamily')
+                normalized_font_family = self.normalize_font_family(font_family)
+                fill_color = obj.get('color')
+                matching_block = figure_blocks_by_name.get(extract_base_figure_name(figure_name))
+                clean_figure_name = extract_base_figure_name(figure_name)
+                
+                if matching_block is not None:
+                    clean_figure_name = extract_base_figure_name(matching_block.name)
+                    logg.info(f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
+                else:
+                    logg.info(f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
+
+                figure_obj = {
+                    "color": fill_color,
+                    "fontFamily": normalized_font_family,
+                    "figureName": clean_figure_name
+                }
+                figure_objects.append(figure_obj)
+            new_figure_config[color_hex] = figure_objects
+        slide_config['figure'] = new_figure_config
+        logg.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_by_name)} figure blocks")
+
+    def _extract_slide_config(self, slide_node):
+        """ Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer. Also extracts presentation palette colors found in the slideColors table. :param slide_node: Slide XML representation containing hidden slideColors table :return: tuple(config_dict, list_of_palette_colors) """
+        config_dict = {}
+        palette_colors = set()
+
+        if not slide_node or not slide_node.get("children"):
+            return config_dict, []
+
+        for child in slide_node["children"]:
+            if child.get("name") != "slideColors":
+                continue
+
+            logg.info("[slideColors] Found slideColors table in slide")
+
+            for block in child.get("children", []):
+                block_type = block.get("name")
+                logg.info(f"[slideColors] Processing block type: {block_type}")
+
+                block_colors = {}
+                for color_group in block.get("children", []):
+                    color_hex = color_group.get("name").lower() if color_group.get("name") else ""
+                    palette_colors.add(color_hex)
+
+                    logg.info(f"[slideColors] Processing color group: {color_hex}")
+
+                    block_objs = []
+                    for text_child in color_group.get("children", []):
+                        if text_child.get("type") != "TEXT":
+                            continue
+
+                        obj = {
+                            "color": extract_color_info(text_child)[0],  # Use 'color' instead of 'fill'
+                            "fontFamily": self.normalize_font_family(
+                                text_child["style"].get("fontFamily")
+                            ),
+                        }
+
+                        if block_type == "figure":
+                            obj["figureName"] = text_child.get("name", "").strip()
+
+                        color_var = extract_color_info(text_child)[1]
+                        if color_var:
+                            obj["color_variable"] = color_var
+
+                        logg.info(
+                            f"[slideColors] Found figure in {color_hex}: "
+                            f"name='{obj.get('figureName')}'; color={obj['color']}; font={obj['fontFamily']}"
+                        )
+
+                        block_objs.append(obj)
+
+                    block_colors[color_hex] = block_objs
+
+                config_dict[block_type] = block_colors
+                logg.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
+
+        return config_dict, sorted(palette_colors)
     
     def _slide_to_dict(self, slide: ExtractedSlide) -> Dict[str, Any]:
         """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs. Add slideColors extraction."""
@@ -497,172 +444,7 @@ class FigmaAPI:
             'presentationPaletteColors': presentation_palette_colors
         }
     
-    def count_sentences(self, text: str) -> int:
-        if not text:
-            return 0
-        split_result = [s for s in re.split(r'[.!?]', text)]
-        n = len([s for s in split_result if s.strip()])
-        return n if n > 0 else 1
-
-    def _extract_slide_config(self, slide_node):
-        """Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer. For 'figure', each color group is a dict with 'index_to_font_fill' mapping index (1,2,3) to color/fontFamily.
-        
-        Note: This method specifically processes the hidden 'slideColors' table regardless of visibility,
-        as it's intentionally hidden but contains necessary configuration data.
-        Now also returns a set of all color hexes (presentation palette colors) found in the slideColors table."""
-        config_dict = {}
-        palette_colors = set()
-        if not slide_node or not slide_node.get('children'):
-            return config_dict, []
-        for child in slide_node['children']:
-            if child.get('name') == 'slideColors':
-                if block_logger:
-                    block_logger.info(f"[slideColors] Found slideColors table in slide")
-                for block in child.get('children', []):
-                    block_type = block.get('name')
-                    if block_logger:
-                        block_logger.info(f"[slideColors] Processing block type: {block_type}")
-                    block_colors = {}
-                    for color_group in block.get('children', []):
-                        color_hex = color_group.get('name')
-                        if color_hex:
-                            color_hex = color_hex.lower() 
-                            palette_colors.add(color_hex)
-                        if block_logger:
-                            block_logger.info(f"[slideColors] Processing color group: {color_hex}")
-                        block_objs = []
-                        for text_child in color_group.get('children', []):
-                            if text_child.get('type') == 'TEXT':
-                                obj = {}
-                                color_val, color_var = extract_color_info(text_child)
-                                obj['color'] = color_val  # Use 'color' instead of 'fill'
-                                if color_var:
-                                    obj['color_variable'] = color_var
-                                font_family = None
-                                if 'style' in text_child and 'fontFamily' in text_child['style']:
-                                    font_family = text_child['style']['fontFamily']
-                                obj['fontFamily'] = self.normalize_font_family(font_family)
-                                if block_type == 'figure':
-                                    idx = text_child.get('name', '').strip()
-                                    obj['figureName'] = idx
-                                    if block_logger:
-                                        block_logger.info(f"[slideColors] Found figure in {color_hex}: name='{idx}', color={color_val}, font={font_family}")
-                                block_objs.append(obj)
-                        block_colors[color_hex] = block_objs
-                    config_dict[block_type] = block_colors
-                    if block_logger:
-                        block_logger.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
-                        for color_hex, obj_list in block_colors.items():
-                            block_logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
-        return config_dict, sorted(palette_colors)
-    
-    def normalize_font_family(self, font_family: str) -> str:
-        if not font_family:
-            return ""
-        return re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
-    
-    def _update_figure_config_with_names(self, slide_config, blocks):
-        # Collect all figure blocks with their info
-        figure_blocks_info = []
-        for block in blocks:
-            if block.sql_type == 'figure':
-                base_name = extract_base_figure_name(block.name)
-                figure_blocks_info.append({
-                    'base_name': base_name,
-                    'block': block
-                })
-                if block_logger:
-                    block_logger.info(f"[figureBlocks] Found figure block: '{block.name}' -> base_name: '{base_name}'")
-        new_figure_config = {}
-        for color_hex, obj_list in slide_config['figure'].items():
-            figure_objects = []
-            
-            # Process ALL figure entries from slideColors, not just the ones that have corresponding blocks
-            for obj in obj_list:
-                figure_name = obj.get('figureName', '')
-                if figure_name:
-                    # Try to find a matching block in the main structure
-                    matching_block = None
-                    for fig in figure_blocks_info:
-                        base_name = fig['base_name']
-                        index_match = re.search(r'_(\d+)$', base_name)
-                        if index_match and index_match.group(1) == figure_name:
-                            matching_block = fig['block']
-                            break
-                    
-                    # Create figure object for this entry
-                    font_family = obj.get('fontFamily')
-                    font_family = self.normalize_font_family(font_family)
-                    fill = obj.get('color')
-                    
-                    # Always try to extract the proper figure name from the figure blocks
-                    clean_figure_name = figure_name  # Default to slideColors name
-                    
-                    # Try to find a matching block to get the proper name
-                    found_match = False
-                    for fig in figure_blocks_info:
-                        base_name = fig['base_name']
-                        index_match = re.search(r'_(\d+)$', base_name)
-                        if index_match and index_match.group(1) == figure_name:
-                            # Found matching block, extract proper name
-                            clean_figure_name = re.sub(r'_(\d+)$', '', base_name)
-                            if block_logger:
-                                block_logger.info(f"[figureConfig] Found exact index match for '{figure_name}', using name: '{clean_figure_name}'")
-                            found_match = True
-                            break
-                    
-                    # If no exact match, try to find by z-index or other patterns
-                    if not found_match:
-                        for fig in figure_blocks_info:
-                            base_name = fig['base_name']
-                            # Try to match by z-index if available
-                            z_index_match = re.search(r'z-index\s*(\d+)', fig['block'].name)
-                            if z_index_match and z_index_match.group(1) == figure_name:
-                                clean_figure_name = re.sub(r'_(\d+)$', '', base_name)
-                                if block_logger:
-                                    block_logger.info(f"[figureConfig] Found z-index match for '{figure_name}', using name: '{clean_figure_name}'")
-                                found_match = True
-                                break
-                    
-                    # If still no match, try to find by position in the list (assuming order matters)
-                    if not found_match and len(figure_blocks_info) > 0:
-                        # Use the first available block name as fallback
-                        first_block = figure_blocks_info[0]
-                        clean_figure_name = re.sub(r'_(\d+)$', '', first_block['base_name'])
-                        if block_logger:
-                            block_logger.info(f"[figureConfig] No match found for '{figure_name}', using fallback name: '{clean_figure_name}'")
-                    
-                    if block_logger:
-                        if matching_block:
-                            block_logger.info(f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill}, font: {font_family}")
-                        else:
-                            block_logger.info(f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill}, font: {font_family}")
-                    
-                    figure_obj = {
-                        "color": fill,
-                        "fontFamily": font_family,
-                        "figureName": clean_figure_name
-                    }
-                    figure_objects.append(figure_obj)
-            
-            new_figure_config[color_hex] = figure_objects
-        slide_config['figure'] = new_figure_config
-        
-        # Summary logging
-        if block_logger:
-            block_logger.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_info)} figure blocks")
-            for fig_info in figure_blocks_info:
-                clean_name = re.sub(r'_(\d+)$', '', fig_info['base_name'])
-                block_logger.info(f"[figureConfig] Block '{fig_info['base_name']}' -> looking for '{clean_name}' in slideColors")
-    
-    def _block_to_dict(self, block: ExtractedBlock, slide_config=None) -> Dict[str, Any]:
-        # Now just call build_block_dict for all block dict construction
-        return BlockBuilder(block, slide_config).build()
-
-
-
-
-# Вынести в отдельный класс
+    # МБ Вынести в отдельный класс ===================================================================
 
     def extract_figure_index(self, name: str) -> str:
         """Extract the trailing index (e.g., '_2') from a figure name, or return ''."""
@@ -732,3 +514,93 @@ class FigmaAPI:
                 if match:
                     return int(match[0])
         return 0
+    
+    def _block_to_dict(self, block: ExtractedBlock, slide_config=None) -> Dict[str, Any]:
+        # Now just call build_block_dict for all block dict construction
+        return BlockBuilder(block, slide_config).build()
+
+    # Отрефакторить ==================================================================================================
+    def collect_enhanced_blocks(self, node: Dict[str, Any], frame_origin: Dict[str, int], 
+                              slide_number: int, parent_container: str) -> List[ExtractedBlock]:
+        blocks = []
+        if not node.get('absoluteBoundingBox'):
+            return blocks
+        
+        # Centralized filtering for node
+        if not should_include(node, self.filter_config):
+            return blocks
+        name = node.get('name', '')
+        has_z = Checker.check_z_index(name)
+
+        # Only process nodes with z-index in the name
+        if has_z:
+            figma_type, sql_type = self.detect_block_type(node)
+            abs_box = node['absoluteBoundingBox']
+            left = abs_box['x'] - frame_origin['x']
+            top = abs_box['y'] - frame_origin['y']
+            dimensions = {
+                'x': self.round_to_nearest_five(left),
+                'y': self.round_to_nearest_five(top),
+                'w': self.round_to_nearest_five(abs_box['width']),
+                'h': self.round_to_nearest_five(abs_box['height'])
+            }
+            # Skip full-slide images unless 'precompiled' is in the name, but always include background blocks
+            name_lower = name.lower()
+            is_precompiled = 'precompiled' in name_lower
+            should_skip = (
+                sql_type == 'image' and  # Only skip images, not backgrounds
+                dimensions['x'] == 0 and
+                dimensions['y'] == 0 and
+                dimensions['w'] == 1200 and
+                dimensions['h'] == 675 and
+                not is_precompiled
+            )
+            if should_skip:
+                logg.info(f"Skipping {sql_type} block {name} (full image 1200x675)", level='debug')
+            else:
+                styles = self.extract_text_styles(node, sql_type)
+                z_index = self.extract_z_index(name)
+                if z_index == 0:
+                    z_index = CONSTANTS.Z_INDEX_DEFAULTS.get(sql_type, CONSTANTS.Z_INDEX_DEFAULTS['default'])
+                styles['zIndex'] = z_index
+                has_corner_radius, corner_radius = self.extract_corner_radius(node)
+                text_content = None
+                text_like_types = ['text', 'blockTitle', 'slideTitle', 'subTitle', 'number', 'email', 'date', 'name', 'percentage']
+                if sql_type in text_like_types and node.get('type') == 'TEXT':
+                    text_content = node.get('characters', None)
+                
+                # Extract color information for background and other relevant blocks
+                node_color = None
+                if sql_type in BLOCKS.BLOCK_TYPES['null_style_types']:
+                    node_color = extract_color_info(node)[0] # Only get hex color
+                
+                block = ExtractedBlock(
+                    id=node['id'],
+                    figma_type=figma_type,
+                    sql_type=sql_type,
+                    name=name,
+                    dimensions=dimensions,
+                    styles=styles,
+                    slide_number=slide_number,
+                    parent_container=parent_container,
+                    is_target=True,
+                    has_corner_radius=has_corner_radius,
+                    corner_radius=corner_radius,
+                    text_content=text_content  # Pass text content
+                )
+                # Store the extracted color for later use
+                block.node_color = node_color
+                if should_include(block, self.filter_config):
+                    blocks.append(block)
+                    logg.info(f"Added {sql_type} block: {name}")
+                    color_info = f" | Color: {node_color}" if node_color else ""
+                    logg.info(
+                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{color_info}",
+                    )
+        # Recursively process children (skip children of hidden nodes)
+        if node.get('children') and not (getattr(self.filter_config, 'exclude_hidden', True) and node.get('visible') is False):
+            for child in node['children']:
+                blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
+        return blocks
+    
+    
