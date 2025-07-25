@@ -1117,7 +1117,7 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
         slide_type_camel = config.SLIDE_NUMBER_TO_TYPE.get(
             self.slide_layout.number, self.slide_layout.type
         )
-        
+
         # Count actual percentage blocks
         percentes_count = 0
         has_headers = additional_info["hasHeaders"]
@@ -2322,10 +2322,6 @@ def _process_figma_blocks(
     logger.info(f"Extracted {len(font_family_map)} font family mappings from slideConfig")
 
     for block in slide["blocks"]:
-        if block["type"] not in slide_config:
-            logger.warning(f"Block type '{block_type}' not found in slideConfig for this slide. Skipping block: {block}")
-            continue
-
         block_uuid = generator.id_generator.generate_uuid7()
         block_id_map[block["id"]] = block_uuid
         styles = dict(block["styles"]) if block.get("styles") else {}
