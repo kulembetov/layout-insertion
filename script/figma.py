@@ -1247,7 +1247,6 @@ class FigmaToSQLIntegrator:
                     "name": block_dict.get("name", ""),
                     "dimensions": block_dict.get("dimensions", {}),
                     "styles": dict(block_dict.get("styles", {})),
-                    "z_index": block_dict.get("styles", {}).get("zIndex"),
                     "needs_null_styles": block_dict.get("needs_null_styles", False),
                     "needs_z_index": block_dict.get("needs_z_index", False),
                     "corner_radius": block_dict.get("corner_radius"),
@@ -1273,7 +1272,6 @@ class FigmaToSQLIntegrator:
                 "type": "background",
                 "color": config.AUTO_BLOCKS["background"]["color"],
                 "dimensions": config.AUTO_BLOCKS["background"]["dimensions"],
-                "z_index": config.AUTO_BLOCKS["background"]["z_index"],
             }
 
         # Watermark blocks
@@ -1283,13 +1281,11 @@ class FigmaToSQLIntegrator:
                 "dimensions": config.AUTO_BLOCKS["last_slide"]["watermark1"][
                     "dimensions"
                 ],
-                "z_index": config.Z_INDEX_DEFAULTS["watermark"],
             }
         elif config.AUTO_BLOCKS.get("add_watermark", False):
             auto_blocks["watermark"] = {
                 "type": "watermark",
                 "dimensions": config.AUTO_BLOCKS["watermark"]["dimensions"],
-                "z_index": config.Z_INDEX_DEFAULTS["watermark"],
             }
 
         return auto_blocks
@@ -1416,7 +1412,7 @@ class FigmaToSQLIntegrator:
             lines.append(f"-- Block {i+1}: {block['type']}")
             lines.append(f"--   Name: {block['name']}")
             lines.append(f"--   Dimensions: {block['dimensions']}")
-            lines.append(f"--   Z-Index: {block['z_index']}")
+            lines.append(f"--   Z-Index: {block['styles'].get('zIndex', 'N/A')}")
             lines.append(f"--   Styles: {block['styles']}")
             if block.get("corner_radius"):
                 lines.append(f"--   Corner Radius: {block['corner_radius']}")
@@ -1480,14 +1476,14 @@ class FigmaToSQLIntegrator:
                 instructions.append(f"**Auto Blocks:**")
                 for block_name, block_info in slide["auto_blocks"].items():
                     instructions.append(
-                        f"- {block_name.title()}: {block_info['type']} (z-index: {block_info.get('z_index', 'default')})"
+                        f"- {block_name.title()}: {block_info['type']}"
                     )
 
             instructions.append(f"**User Blocks:**")
             for j, block in enumerate(slide["blocks"]):
                 instructions.append(f"  {j+1}. **{block['type']}** - {block['name']}")
                 instructions.append(f"     - Dimensions: {block['dimensions']}")
-                instructions.append(f"     - Z-Index: {block['z_index']}")
+                instructions.append(f"     - Z-Index: {block['styles'].get('zIndex', 'N/A')}")
                 instructions.append(f"     - Null Styles: {block['needs_null_styles']}")
 
                 if not block["needs_null_styles"]:
