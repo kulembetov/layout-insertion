@@ -1,17 +1,70 @@
 import re
+import json
 from typing import Optional, Any, Callable
 
 from api_v1.services.data_classes import ExtractedBlock
-from constants import BLOCKS
+from api_v1.constants import BLOCKS, TYPES, CONSTANTS, SLIDES
 from api_v1.services.filter_service import FilterMode, FilterConfig
 
 
-# ================ Helpful functions ================
+# ================ Helpful functions & classes ================
+
+def json_dump(obj, filename: str):
+    with open(filename, "w", encoding="utf-8") as outfile:
+        json.dump(obj, outfile, ensure_ascii=False, indent=4)
+
 
 def safe_in(item: Any, container) -> bool:
     if not container:
         return False
     return item in container
+
+
+class Checker:
+    @staticmethod
+    def check_z_index(name: str) -> bool:
+        """Checks if the frame name contains a Z-index. """
+        return 'z-index' in name
+
+    @staticmethod
+    def check_dimensions(absolute_bounding_box: dict) -> bool:
+        """Checks whether the frame size matches the target width and height."""
+        width_diff = abs(absolute_bounding_box['width'] - CONSTANTS.FIGMA_CONFIG['TARGET_WIDTH'])
+        height_diff = abs(absolute_bounding_box['height'] - CONSTANTS.FIGMA_CONFIG['TARGET_HEIGHT'])
+        return width_diff < 1 and height_diff < 1
+
+    @staticmethod
+    def check_min_area(absolute_bounding_box: dict, min_area: int) -> bool:
+        """Checks whether the frame area exceeds the minimum threshold."""
+        area = absolute_bounding_box['width'] * absolute_bounding_box['height']
+        return area >= min_area
+
+    @staticmethod
+    def check_marker(ready_to_dev_marker: str, name: str) -> bool:
+        """Checks for the 'ready to dev' label."""
+        if ready_to_dev_marker:
+            return ready_to_dev_marker.lower() in name.lower()
+        return True
+
+
+def round5(value: float) -> int:
+    """Round value to nearest 5"""
+    return round(value / 5) * 5
+
+
+def get_slide_number(parent_name: str) -> int:
+    """Get slide number from parent container name (case-insensitive, trimmed). Use config.py as the only source of truth."""
+    key = parent_name.strip().lower()
+    return SLIDES.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, None)
+
+
+def detect_slide_type(container_name: str, slide_number: int) -> str:
+    """Detect slide type using only config.py as the source of truth."""
+    # Use config mapping for container name to slide number
+    key = container_name.strip().lower()
+    number = SLIDES.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, slide_number)
+    # Use config mapping for slide number to type
+    return SLIDES.SLIDE_NUMBER_TO_TYPE.get(number, 'classic')
 
 
 # ================ Text Utils ================
@@ -100,6 +153,13 @@ def normalize_font_family(font_family: str) -> str:
     if not font_family:
         return ""
     return re.sub(r'[^a-z0-9_]', '', font_family.strip().lower().replace(' ', '_').replace('-', '_'))
+
+
+def normalize_font_weight(weight: Any) -> Optional[int]:
+    """Normalize font weight to valid values (300, 400, 700)"""
+    if weight is None:
+        return 400
+    return None
 
 
 # ================ Block Utils ================
@@ -313,17 +373,17 @@ def should_include(node_or_block: dict | ExtractedBlock, filter_config) -> bool:
         return getattr(node_or_block, key, None)
 
     # Exclude hidden
-    if getattr(filter_config, 'exclude_hidden', True) and get('visible') is False:
+    if getattr(filter_config, 'exclude_hidden', True) and get(TYPES.FIGMA_KEY_VISIBLE) is False:
         return False
+
+    name = get(TYPES.FIGMA_KEY_NAME) or ''
     # Marker check
     marker = getattr(filter_config, 'ready_to_dev_marker', None)
     if marker:
-        name = get('name') or ''
         if marker.lower() not in name.lower():
             return False
     # Z-index requirement
     if getattr(filter_config, 'require_z_index', True):
-        name = get('name') or ''
         if 'z-index' not in name:
             return False
     # Filter mode logic
