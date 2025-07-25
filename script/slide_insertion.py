@@ -625,7 +625,7 @@ class BlockFactory:
                 "textHorizontal": None,
                 "fontSize": None,
                 "weight": None,
-                "zIndex": bg_config["z_index"],
+                "zIndex": self.config.get_default_z_index("background"),
                 "textTransform": None,
                 "color": "#ffffff",
             },
@@ -1950,7 +1950,7 @@ class SQLGenerator:
                 "textHorizontal": None,
                 "fontSize": None,
                 "weight": None,
-                "zIndex": bg_config["z_index"],
+                "zIndex": self.config.get_default_z_index("background"),
                 "textTransform": None,
                 "color": "#ffffff",
             }
