@@ -238,7 +238,6 @@ AUTO_BLOCKS: Dict[str, object] = {
     "background": {
         "color": "#ffffff",
         "dimensions": {"x": 0, "y": 0, "w": 1200, "h": 675},
-        "z_index": 0,
     },
     "watermark": {"dimensions": {"x": 1065, "y": 636, "w": 118, "h": 26}},
     # Special configuration for last slide (slide number -1)
