@@ -1215,6 +1215,10 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
         values = []
 
         for block in self.blocks:
+
+            if block.type in ["table", "infographik", "image"]:
+                continue
+
             # Only process blocks that have an index
             if block.index is not None:
                 self.block_id_to_index_config_id[block.id] = []
@@ -1309,6 +1313,9 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
         values = []
 
         for block in self.blocks:
+
+            if block.type in ["table", "infographik", "image"]:
+                continue
 
             block_layout_index_config_id = self.block_id_to_index_config_id.get(
                 block.id, block.id
