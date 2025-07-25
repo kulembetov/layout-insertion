@@ -1,5 +1,5 @@
 # SQL templates for generating queries
-SQL_TEMPLATES = {
+SQL_TEMPLATES: dict[str, str] = {
     "slide_layout": """-- Create SlideLayout
 INSERT INTO "SlideLayout" (
     "id", "name", "number", "isActive", "presentationLayoutId",
