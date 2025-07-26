@@ -121,7 +121,7 @@ class SQLValidator:
         self, results: List[Dict], files_with_issues: int, total_files: int
     ):
         """Write validation results to the output file."""
-        with open(self.output_file, "w") as f:
+        with open(self.output_file, "w", encoding="utf-8") as f:
             f.write("SQL Validation Results\n")
             f.write("====================\n\n")
 

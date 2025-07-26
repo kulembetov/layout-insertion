@@ -8,9 +8,6 @@ This repository is organized to support a full workflow from Figma design extrac
 - `sql_pollution.py`: Executes validated SQL files against the target PostgreSQL database.
 - `slide_deletion.py`: Handles deletion of slides, blocks, and images from the database, supporting selective and batch operations.
 - `insert_palette.py`, `insert_block_layout_config.py`, `match_block_layout_presentation_palette.py`: Scripts for managing palette and block layout configuration, including mapping and matching between Figma and database structures.
-- `color_config.py`, `color_pipeline.py`: Utilities for color extraction, normalization, and pipeline processing.
-- `duo_color_insertion.py`, `duo_figure_insertion.py`, `monochrome_color_insertion.py`, `monochrome_figure_insertion.py`: Scripts for handling color and figure insertions for different presentation styles.
-- `clean.py`, `clean_sql_timestamp.py`: Utility scripts for cleaning up data or timestamps.
 - `config.py`: Central configuration file for all scripts, storing Figma API credentials, mappings, and default values.
 - `database.ini`: Stores database connection parameters for PostgreSQL.
 - `schema.prisma`: Prisma schema file for Node.js backend integration.
@@ -35,6 +32,7 @@ It ensures that all slide layouts, blocks, styles, and related assets are consis
 - **BlockLayout**: Stores each block (text, image, figure, etc.) belonging to a slide.
 - **BlockLayoutStyles**: Stores style information for each block (color, font, alignment, etc.).
 - **BlockLayoutDimensions**: Stores position and size for each block.
+- **BlockLayoutLimit**: stores the amount of words for a block
 - **Figure**: Stores figure-specific data (if present).
 - **PrecompiledImage**: Stores references to precompiled images and their color variants.
 - **SlideLayoutAdditionalInfo**: Stores extra metadata for slides (e.g., max symbols, headers).
@@ -99,7 +97,7 @@ python match_block_layout_presentation_palette.py
 python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Validate SQL
-python sql_validator.py --input-dir script/my_sql_output
+python sql_validator.py --input-dir my_sql_output
 
 # 7. Apply SQL to DB
 python sql_pollution.py
@@ -153,28 +151,134 @@ python3 slide_deletion.py
 ## Script Descriptions
 
 ### `figma.py`
-- Extracts slides and blocks from Figma.
-- Handles color, z-index, style, and block type extraction.
-- Outputs JSON files for further processing.
+- **Purpose:** Extracts and normalizes design data from Figma files for SQL generation
+- **Functionality:** 
+  - Connects to Figma API using authentication tokens
+  - Extracts slides, blocks, styles, and metadata from Figma designs
+  - Normalizes block types, colors, fonts, and dimensions
+  - Handles z-index ordering and corner radius extraction
+  - Processes comments and text content from Figma nodes
+  - Validates font weights against allowed values (300, 400, 700)
+  - Generates two output files: raw extraction and SQL-ready data
+- **Configuration:** 
+  - Requires `config.py` with Figma API credentials and mappings
+  - Uses environment variables for FIGMA_FILE_ID and FIGMA_TOKEN
+  - Supports filtering by slide numbers, block types, or containers
+- **Dependencies:** `requests`, `json`, `os`, `re`, `logging`, `config`
+- **Usage:** `python figma.py --mode slides --slides 1 2 3 --output-dir my_output`
 
 ### `slide_insertion.py`
-- Reads the normalized JSON.
-- Generates SQL for all relevant tables.
-- Supports both auto and manual modes.
+- **Purpose:** Generates SQL files from normalized Figma data for database population
+- **Functionality:** 
+  - Reads normalized JSON from figma.py output
+  - Generates INSERT statements for all database tables
+  - Handles slide layouts, blocks, styles, dimensions, and figures
+  - Supports auto and manual modes for data processing
+  - Creates SQL files organized by slide layout type
+  - Validates data against config.py constraints
+  - Generates comprehensive SQL instructions and documentation
+- **Configuration:** 
+  - Uses `config.py` for all default values and mappings
+  - Requires `database.ini` for database connection parameters
+  - Supports custom output directories and file naming
+- **Dependencies:** `json`, `os`, `logging`, `config`, `argparse`
+- **Usage:** `python slide_insertion.py --auto-from-figma input.json --output-dir sql_output`
 
 ### `sql_validator.py`
-- Validates SQL files for syntax, completeness, and referential integrity.
+- **Purpose:** Validates generated SQL files for syntax and referential integrity
+- **Functionality:** 
+  - Checks SQL syntax for all generated files
+  - Validates foreign key relationships between tables
+  - Ensures required fields are present and properly formatted
+  - Verifies UUID formats and data type consistency
+  - Generates detailed validation reports with error locations
+  - Supports batch validation of entire SQL directories
+- **Configuration:** 
+  - Reads `database.ini` for connection parameters
+  - Uses config.py for validation rules and constraints
+  - Supports custom validation rules and error reporting
+- **Dependencies:** `psycopg2`, `os`, `logging`, `config`, `argparse`
+- **Usage:** `python sql_validator.py --input-dir sql_output`
 
 ### `sql_pollution.py`
-- Applies validated SQL to the database, handling all dependencies and order.
-
-### `database.ini`
-- Stores database connection settings in INI format.
+- **Purpose:** Executes validated SQL files against PostgreSQL database
+- **Functionality:** 
+  - Connects to PostgreSQL database using connection parameters
+  - Executes SQL files in correct order to maintain referential integrity
+  - Handles transaction management and rollback on errors
+  - Supports batch execution of multiple SQL files
+  - Provides detailed execution logs and error reporting
+  - Ensures data consistency across all database tables
+- **Configuration:** 
+  - Requires `database.ini` with PostgreSQL connection details
+  - Uses config.py for execution order and table dependencies
+  - Supports custom execution parameters and error handling
+- **Dependencies:** `psycopg2`, `os`, `logging`, `config`, `argparse`
+- **Usage:** `python sql_pollution.py`
 
 ### `slide_deletion.py`
-- Deletes slides, blocks, and images from the database.
-- Supports selective deletion based on slide numbers or block types.
-- Useful for cleaning up test data or removing outdated content.
+- **Purpose:** Handles deletion of slides, blocks, and images from database
+- **Functionality:** 
+  - Deletes slides and associated blocks by slide number
+  - Removes specific block types across multiple slides
+  - Handles cascading deletes for related data (figures, images, styles)
+  - Supports selective deletion based on slide layout types
+  - Generates deletion SQL files for review before execution
+  - Provides safe deletion with confirmation prompts
+- **Configuration:** 
+  - Uses `database.ini` for database connection
+  - Supports custom deletion patterns and filters
+  - Generates organized deletion SQL files by layout type
+- **Dependencies:** `psycopg2`, `os`, `logging`, `config`, `argparse`
+- **Usage:** `python slide_deletion.py --slides 1 2 3 --output-dir deletion_sql`
+
+### `insert_palette.py`
+- **Purpose:** Manages presentation palette configuration and color settings
+- **Functionality:** 
+  - Inserts color palette data into PresentationPalette table
+  - Supports manual and automatic mode for data insertion
+  - Handles CSV mapping files for palette configuration
+  - Validates color values and palette relationships
+  - Generates palette SQL files for database insertion
+  - Manages color settings IDs and default configurations
+- **Configuration:** 
+  - Requires CSV mapping file for palette data
+  - Uses `database.ini` for automatic mode database connection
+  - Supports custom palette configurations and color schemes
+- **Dependencies:** `csv`, `json`, `psycopg2`, `argparse`, `config`
+- **Usage:** `python insert_palette.py --json input.json --mode auto --csv mapping.csv`
+
+### `insert_block_layout_config.py`
+- **Purpose:** Manages block layout configuration and styling settings
+- **Functionality:** 
+  - Inserts block layout configuration data into database
+  - Handles block type mappings and default styles
+  - Supports manual and automatic configuration modes
+  - Validates block layout relationships and constraints
+  - Generates configuration SQL files for database insertion
+  - Manages block layout IDs and style inheritance
+- **Configuration:** 
+  - Uses JSON input from figma.py extraction
+  - Requires `database.ini` for automatic mode
+  - Supports custom block layout configurations
+- **Dependencies:** `json`, `psycopg2`, `argparse`, `config`
+- **Usage:** `python insert_block_layout_config.py --json input.json --mode auto`
+
+### `match_block_layout_presentation_palette.py`
+- **Purpose:** Matches block layout configurations with presentation palettes
+- **Functionality:** 
+  - Creates relationships between block layouts and color palettes
+  - Handles palette-block matching based on configuration rules
+  - Generates matching SQL files for database insertion
+  - Validates palette-block relationships and constraints
+  - Supports custom matching rules and configurations
+  - Manages palette-block index configurations
+- **Configuration:** 
+  - Uses existing block layout and palette data from database
+  - Requires `database.ini` for database connection
+  - Supports custom matching algorithms and rules
+- **Dependencies:** `psycopg2`, `json`, `argparse`, `config`
+- **Usage:** `python match_block_layout_presentation_palette.py`
 
 ### `migrate_images.py`
 - **Purpose:** Migrates images from Google Drive to Yandex Cloud Object Storage
@@ -188,7 +292,7 @@ python3 slide_deletion.py
   - Requires `.env` file with Yandex Cloud credentials and Google Drive folder ID
   - Requires `credentials.json` file from Google Cloud Console for Google Drive API access
 - **Dependencies:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`
-- **Usage:** Run the script to migrate all images from Google Drive to Yandex Cloud storage
+- **Usage:** Run the script to migrate all images from Google Drive to Yandex Cloud storage 
 
 ---
 
@@ -202,9 +306,6 @@ python3 slide_deletion.py
 - `sql_pollution.py`: Выполняет валидированные SQL-файлы в целевой базе PostgreSQL.
 - `slide_deletion.py`: Удаляет слайды, блоки и изображения из базы, поддерживает выборочное и пакетное удаление.
 - `insert_palette.py`, `insert_block_layout_config.py`, `match_block_layout_presentation_palette.py`: Скрипты для управления палитрами и конфигурацией блоков, включая сопоставление между Figma и структурой базы.
-- `color_config.py`, `color_pipeline.py`: Утилиты для извлечения, нормализации и обработки цветов.
-- `duo_color_insertion.py`, `duo_figure_insertion.py`, `monochrome_color_insertion.py`, `monochrome_figure_insertion.py`: Скрипты для работы с цветами и фигурами для разных стилей презентаций.
-- `clean.py`, `clean_sql_timestamp.py`: Вспомогательные скрипты для очистки данных или временных меток.
 - `config.py`: Центральный конфиг для всех скриптов, хранит параметры Figma API, маппинги и значения по умолчанию.
 - `database.ini`: Параметры подключения к PostgreSQL.
 - `schema.prisma`: Файл схемы Prisma для интеграции с Node.js backend.
@@ -227,6 +328,7 @@ python3 slide_deletion.py
 - **BlockLayout**: каждый блок (текст, изображение, фигура и т.д.), принадлежащий слайду
 - **BlockLayoutStyles**: стили для каждого блока (цвет, шрифт, выравнивание и т.д.)
 - **BlockLayoutDimensions**: позиция и размер каждого блока
+- **BlockLayoutLimit**: лимиты по количеству слов для блока
 - **Figure**: данные о фигурах (если есть)
 - **PrecompiledImage**: ссылки на преподготовленные изображения и их цветовые варианты
 - **SlideLayoutAdditionalInfo**: дополнительные метаданные слайда (максимум символов, заголовки и т.д.)
@@ -352,39 +454,145 @@ python3 slide_deletion.py
 ## Описание скриптов
 
 ### `figma.py`
-- Извлекает слайды и блоки из Figma
-- Обрабатывает цвета, z-index, стили и типы блоков
-- Выводит JSON для дальнейшей обработки
+- **Назначение:** Извлекает и нормализует данные дизайна из файлов Figma для генерации SQL
+- **Функциональность:** 
+  - Подключается к API Figma с использованием токенов аутентификации
+  - Извлекает слайды, блоки, стили и метаданные из дизайнов Figma
+  - Нормализует типы блоков, цвета, шрифты и размеры
+  - Обрабатывает порядок z-index и извлечение радиуса углов
+  - Обрабатывает комментарии и текстовое содержимое из узлов Figma
+  - Проверяет толщину шрифтов на соответствие разрешенным значениям (300, 400, 700)
+  - Генерирует два выходных файла: сырое извлечение и данные, готовые для SQL
+- **Конфигурация:** 
+  - Требует `config.py` с учетными данными API Figma и сопоставлениями
+  - Использует переменные окружения для FIGMA_FILE_ID и FIGMA_TOKEN
+  - Поддерживает фильтрацию по номерам слайдов, типам блоков или контейнерам
+- **Зависимости:** `requests`, `json`, `os`, `re`, `logging`, `config`
+- **Использование:** `python figma.py --mode slides --slides 1 2 3 --output-dir my_output`
 
 ### `slide_insertion.py`
-- Читает нормализованный JSON
-- Генерирует SQL для всех таблиц
-- Поддерживает авто- и ручной режимы
+- **Назначение:** Генерирует SQL файлы из нормализованных данных Figma для заполнения базы данных
+- **Функциональность:** 
+  - Читает нормализованный JSON из вывода figma.py
+  - Генерирует операторы INSERT для всех таблиц базы данных
+  - Обрабатывает макеты слайдов, блоки, стили, размеры и фигуры
+  - Поддерживает автоматический и ручной режимы обработки данных
+  - Создает SQL файлы, организованные по типам макетов слайдов
+  - Проверяет данные на соответствие ограничениям config.py
+  - Генерирует исчерпывающие SQL инструкции и документацию
+- **Конфигурация:** 
+  - Использует `config.py` для всех значений по умолчанию и сопоставлений
+  - Требует `database.ini` для параметров подключения к базе данных
+  - Поддерживает пользовательские выходные каталоги и именование файлов
+- **Зависимости:** `json`, `os`, `logging`, `config`, `argparse`
+- **Использование:** `python slide_insertion.py --auto-from-figma input.json --output-dir sql_output`
 
 ### `sql_validator.py`
-- Валидирует SQL-файлы на синтаксис, полноту и связи
+- **Назначение:** Проверяет сгенерированные SQL файлы на синтаксис и ссылочную целостность
+- **Функциональность:** 
+  - Проверяет синтаксис SQL для всех сгенерированных файлов
+  - Проверяет отношения внешних ключей между таблицами
+  - Обеспечивает присутствие и правильное форматирование обязательных полей
+  - Проверяет форматы UUID и согласованность типов данных
+  - Генерирует подробные отчеты о проверке с указанием местоположения ошибок
+  - Поддерживает пакетную проверку целых каталогов SQL
+- **Конфигурация:** 
+  - Читает `database.ini` для параметров подключения
+  - Использует config.py для правил проверки и ограничений
+  - Поддерживает пользовательские правила проверки и отчеты об ошибках
+- **Зависимости:** `psycopg2`, `os`, `logging`, `config`, `argparse`
+- **Использование:** `python sql_validator.py --input-dir sql_output`
 
 ### `sql_pollution.py`
-- Применяет SQL к базе данных, учитывая все зависимости и порядок
-
-### `database.ini`
-- Хранит параметры подключения к базе данных в формате INI
+- **Назначение:** Выполняет проверенные SQL файлы в базе данных PostgreSQL
+- **Функциональность:** 
+  - Подключается к базе данных PostgreSQL, используя параметры подключения
+  - Выполняет SQL файлы в правильном порядке для поддержания ссылочной целостности
+  - Обрабатывает управление транзакциями и откат при ошибках
+  - Поддерживает пакетное выполнение нескольких SQL файлов
+  - Предоставляет подробные журналы выполнения и отчеты об ошибках
+  - Обеспечивает согласованность данных во всех таблицах базы данных
+- **Конфигурация:** 
+  - Требует `database.ini` с подробностями подключения PostgreSQL
+  - Использует config.py для порядка выполнения и зависимостей таблиц
+  - Поддерживает пользовательские параметры выполнения и обработку ошибок
+- **Зависимости:** `psycopg2`, `os`, `logging`, `config`, `argparse`
+- **Использование:** `python sql_pollution.py`
 
 ### `slide_deletion.py`
-- Удаляет слайды, блоки и изображения из базы данных.
-- Поддерживает выборочное удаление по номерам слайдов или типам блоков.
-- Полезен для очистки тестовых данных или удаления устаревшего контента.
+- **Назначение:** Обрабатывает удаление слайдов, блоков и изображений из базы данных
+- **Функциональность:** 
+  - Удаляет слайды и связанные блоки по номеру слайда
+  - Удаляет определенные типы блоков в нескольких слайдах
+  - Обрабатывает каскадные удаления связанных данных (фигуры, изображения, стили)
+  - Поддерживает селективное удаление на основе типов макетов слайдов
+  - Генерирует SQL файлы удаления для просмотра перед выполнением
+  - Обеспечивает безопасное удаление с запросами подтверждения
+- **Конфигурация:** 
+  - Использует `database.ini` для подключения к базе данных
+  - Поддерживает пользовательские шаблоны удаления и фильтры
+  - Генерирует организованные SQL файлы удаления по типам макетов
+- **Зависимости:** `psycopg2`, `os`, `logging`, `config`, `argparse`
+- **Использование:** `python slide_deletion.py --slides 1 2 3 --output-dir deletion_sql`
+
+### `insert_palette.py`
+- **Назначение:** Управляет конфигурацией палитры презентации и настройками цветов
+- **Функциональность:** 
+  - Вставляет данные цветовой палитры в таблицу PresentationPalette
+  - Поддерживает ручной и автоматический режимы вставки данных
+  - Обрабатывает CSV файлы сопоставления для конфигурации палитры
+  - Проверяет значения цветов и отношения палитр
+  - Генерирует SQL файлы палитры для вставки в базу данных
+  - Управляет ID настроек цветов и конфигурациями по умолчанию
+- **Конфигурация:** 
+  - Требует CSV файл сопоставления для данных палитры
+  - Использует `database.ini` для подключения к базе данных в автоматическом режиме
+  - Поддерживает пользовательские конфигурации палитр и цветовые схемы
+- **Зависимости:** `csv`, `json`, `psycopg2`, `argparse`, `config`
+- **Использование:** `python insert_palette.py --json input.json --mode auto --csv mapping.csv`
+
+### `insert_block_layout_config.py`
+- **Назначение:** Управляет конфигурацией макета блоков и настройками стилей
+- **Функциональность:** 
+  - Вставляет данные конфигурации макета блоков в базу данных
+  - Обрабатывает сопоставления типов блоков и стили по умолчанию
+  - Поддерживает ручной и автоматический режимы конфигурации
+  - Проверяет отношения макетов блоков и ограничения
+  - Генерирует SQL файлы конфигурации для вставки в базу данных
+  - Управляет ID макетов блоков и наследованием стилей
+- **Конфигурация:** 
+  - Использует JSON ввод из извлечения figma.py
+  - Требует `database.ini` для автоматического режима
+  - Поддерживает пользовательские конфигурации макетов блоков
+- **Зависимости:** `json`, `psycopg2`, `argparse`, `config`
+- **Использование:** `python insert_block_layout_config.py --json input.json --mode auto`
+
+### `match_block_layout_presentation_palette.py`
+- **Назначение:** Сопоставляет конфигурации макетов блоков с палитрами презентации
+- **Функциональность:** 
+  - Создает отношения между макетами блоков и цветовыми палитрами
+  - Обрабатывает сопоставление палитра-блок на основе правил конфигурации
+  - Генерирует SQL файлы сопоставления для вставки в базу данных
+  - Проверяет отношения палитра-блок и ограничения
+  - Поддерживает пользовательские правила сопоставления и конфигурации
+  - Управляет конфигурациями индексов палитра-блок
+- **Конфигурация:** 
+  - Использует существующие данные макетов блоков и палитр из базы данных
+  - Требует `database.ini` для подключения к базе данных
+  - Поддерживает пользовательские алгоритмы сопоставления и правила
+- **Зависимости:** `psycopg2`, `json`, `argparse`, `config`
+- **Использование:** `python match_block_layout_presentation_palette.py`
 
 ### `migrate_images.py`
-- **Назначение:** Мигрирует изображения из Google Drive в Yandex Cloud Object Storage
+- **Назначение:** Переносит изображения из Google Drive в объектное хранилище Yandex Cloud
 - **Функциональность:** 
-  - Скачивает изображения из указанной папки Google Drive
-  - Загружает их в S3-совместимое хранилище Yandex Cloud
+  - Загружает изображения из указанной папки Google Drive
+  - Выгружает их в S3-совместимое хранилище Yandex Cloud
   - Поддерживает различные форматы изображений (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
-  - Обрабатывает OAuth аутентификацию с Google Drive API
+  - Обрабатывает OAuth аутентификацию с API Google Drive
   - Использует S3-совместимый интерфейс для хранилища Yandex Cloud
 - **Конфигурация:** 
   - Требует файл `.env` с учетными данными Yandex Cloud и ID папки Google Drive
-  - Требует файл `credentials.json` из Google Cloud Console для доступа к Google Drive API
+  - Требует файл `credentials.json` из Google Cloud Console для доступа к API Google Drive
 - **Зависимости:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`
-- **Использование:** Запустите скрипт для миграции всех изображений из Google Drive в хранилище Yandex Cloud 
+- **Использование:** Запустите скрипт для переноса всех изображений из Google Drive в хранилище Yandex Cloud

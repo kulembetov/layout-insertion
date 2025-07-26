@@ -35,7 +35,7 @@ class ConfigManager:
 
     def create_sample_config(self):
         """Create a sample config file for the user."""
-        with open(self.filename, "w") as f:
+        with open(self.filename, "w", encoding="utf-8") as f:
             f.write(
                 """[postgresql]
 host=localhost

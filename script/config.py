@@ -39,6 +39,21 @@ BLOCK_TYPE_BACKGROUND = "background"
 
 """
 ========================
+ Figma Configuration
+========================
+"""
+FIGMA_CONFIG = {
+    "TARGET_WIDTH": 1200,
+    "TARGET_HEIGHT": 675,
+    "OUTPUT_DIR": "figma_extract",
+    "OUTPUT_FILE": "extracted_data",
+}
+
+# Valid font weights - ONLY these are allowed
+VALID_FONT_WEIGHTS = [300, 400, 700]
+
+"""
+========================
  Enums for Types
 ========================
 """
