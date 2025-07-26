@@ -1,5 +1,10 @@
 # Environment variables
 .env
+
+/my_output/
+/my_sql_output/
+
+*.csv
 .env.local
 .env.*.local
 
@@ -54,7 +59,9 @@ venv.bak/
 .DS_Store
 Thumbs.db
 .venv
-__pycache__
+
+
+
 
 /my_output/
 /my_sql_output/
