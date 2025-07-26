@@ -2,12 +2,12 @@ import re
 import json
 from typing import Optional, Any, Callable
 
-from api_v1.services.data_classes import ExtractedBlock
+from .data_classes import ExtractedBlock
 from api_v1.constants import BLOCKS, TYPES, CONSTANTS, SLIDES
-from api_v1.services.filter_service import FilterMode, FilterConfig
+from .filter_service import FilterMode, FilterConfig
 
 
-# ================ Helpful functions & classes ================
+# ================ Helpful functions ================
 
 def json_dump(obj, filename: str):
     with open(filename, "w", encoding="utf-8") as outfile:
@@ -19,6 +19,8 @@ def safe_in(item: Any, container) -> bool:
         return False
     return item in container
 
+
+# ================ Check utils ================
 
 class Checker:
     @staticmethod
@@ -47,6 +49,8 @@ class Checker:
         return True
 
 
+# =========== !REFACTOR ==================
+
 def round5(value: float) -> int:
     """Round value to nearest 5"""
     return round(value / 5) * 5
@@ -67,6 +71,64 @@ def detect_slide_type(container_name: str, slide_number: int) -> str:
     return SLIDES.SLIDE_NUMBER_TO_TYPE.get(number, 'classic')
 
 
+def detect_block_type(node: dict) -> tuple[str, str]:
+    """Detect block type from a Figma node, returning (figma_type, sql_type). Always returns a valid sql_type."""
+
+    name = node.get('name', '').lower()
+    node_type = node.get('type', '')
+    clean_name = re.sub(r'\s*z-index.*$', '', name)
+
+    # Check for explicit mappings first, prioritize longer patterns
+    sorted_patterns = sorted(CONSTANTS.FIGMA_TO_SQL_BLOCK_MAPPING.items(), key=lambda x: len(x[0]), reverse=True)
+    for pattern, sql_type in sorted_patterns:
+        if pattern in clean_name:
+            if sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
+                return pattern, sql_type
+
+    type_mappings = {
+        'TEXT': [
+            (['title', 'heading', 'header', 'h1', 'h2'], {'sql_type': 'blockTitle'}),
+            (['slide', 'main'], {'sql_type': 'slideTitle'} if any(
+                kw in clean_name for kw in ['title', 'heading', 'header', 'h1', 'h2']) else None),
+            (['subtitle', 'sub', 'subheading'], {'sql_type': 'subTitle'}),
+            (['number', 'num', 'count'], {'sql_type': 'number'}),
+            (['email', '@', 'mail'], {'sql_type': 'email'}),
+            (['date', 'time', 'year', 'month'], {'sql_type': 'date'}),
+            (['name', 'author', 'person'], {'sql_type': 'name'}),
+            (['percent', '%', 'percentage'], {'sql_type': 'percentage'}),
+            ([], {'sql_type': 'text'})
+        ],
+        'RECTANGLE': [
+            (['background', 'bg', 'backdrop'], {'sql_type': 'background'}),
+            (['icon', 'symbol'], {'sql_type': 'icon'}),
+            (['image', 'img', 'photo', 'picture'], {'sql_type': 'image'}),
+            ([], {'sql_type': 'figure'})
+        ],
+        'FRAME': [
+            (['table', 'grid', 'data'], {'sql_type': 'table'}),
+            (['chart', 'graph'], {'sql_type': 'table'}),
+            (['infographic', 'infographik', 'visual'], {'sql_type': 'infographik'}),
+            (['watermark', 'mark'], {'sql_type': 'watermark'}),
+            ([], {'sql_type': 'figure'})
+        ],
+        'GROUP': [
+            (['table', 'grid', 'data'], {'sql_type': 'table'}),
+            (['chart', 'graph'], {'sql_type': 'table'}),
+            (['infographic', 'infographik', 'visual'], {'sql_type': 'infographik'}),
+            (['watermark', 'mark'], {'sql_type': 'watermark'}),
+            ([], {'sql_type': 'figure'})
+        ]
+    }
+
+    mappings_for_node = type_mappings.get(node_type, [])
+    for keywords, mapping in mappings_for_node:
+        if not keywords or any(keyword in clean_name for keyword in keywords):
+            sql_type = mapping.get('sql_type')
+            if sql_type and sql_type in BLOCKS.BLOCK_TYPES['block_layout_type_options']:
+                return clean_name, sql_type
+    return 'text', 'text'
+
+
 # ================ Text Utils ================
 
 def count_words(text: str) -> int:
@@ -83,33 +145,9 @@ def count_sentences(text: str) -> int:
     return n if n > 0 else 1
 
 
-# ================ Figure Utils ================
+# ================ Extract Utils ================
 
-def extract_base_figure_name(name: str) -> str:
-    """Extract the base figure name from a block name (e.g., 'figure (logoRfs_0)' -> 'logoRfs')."""
-    if not name:
-        return ''
-    name_match = re.search(r'\(([^)]+)\)', name)
-    if name_match:
-        base_name = name_match.group(1)
-        # Remove trailing _<number> if present
-        base_name = re.sub(r'_(\d+)$', '', base_name)
-        return base_name
-    return name
-
-
-def extract_figure_index(name: str) -> str:
-    """Extract the trailing index (e.g., '_2') from a figure name, or return ''."""
-    if not name:
-        return ''
-    index_match = re.search(r'_(\d+)$', name)
-    if index_match:
-        return index_match.group(1)
-    return ''
-
-
-# ================ Color Utils ================
-
+# codeblock for 'extract_color_info', don't use/import this
 def _hex_and_color_var(fill: dict) -> tuple[Optional[str], Optional[str]]:
     c = fill['color']
     r = int(round(c.get('r', 0) * 255))
@@ -129,22 +167,175 @@ def _hex_and_color_var(fill: dict) -> tuple[Optional[str], Optional[str]]:
     return hex_color, color_variable
 
 
-def extract_color_info(node: dict) -> tuple[Optional[str], Optional[str]]:
-    """
-    Extracts the first visible solid fill color and its variable/style from a Figma node.
-    Returns (hex_color, color_variable_id).
-    """
-    fills: Optional[list] = node.get('fills')
-    if fills and isinstance(fills, list):
-        for fill in fills:
-            if fill.get('visible', True) and fill.get('type') == 'SOLID' and 'color' in fill:
-                return _hex_and_color_var(fill)
+class Extractor:
+    @staticmethod
+    def extract_base_figure_name(name: str) -> str:
+        """Extract the base figure name from a block name (e.g., 'figure (logoRfs_0)' -> 'logoRfs')."""
+        if not name:
+            return ''
+        name_match = re.search(r'\(([^)]+)\)', name)
+        if name_match:
+            base_name = name_match.group(1)
+            # Remove trailing _<number> if present
+            base_name = re.sub(r'_(\d+)$', '', base_name)
+            return base_name
+        return name
 
-    # Fallback: check for direct color field
-    color = node.get('color')
-    if color and isinstance(color, str):
-        return color.lower(), None
-    return None, None
+    @staticmethod
+    def extract_figure_index(name: str) -> str:
+        """Extract the trailing index (e.g., '_2') from a figure name, or return ''."""
+        if not name:
+            return ''
+        index_match = re.search(r'_(\d+)$', name)
+        if index_match:
+            return index_match.group(1)
+        return ''
+
+    @staticmethod
+    def extract_text_styles(node: dict[str, Any], sql_type: str) -> dict[str, Any]:
+        """Extract text styling information with config defaults (no color)."""
+        defaults = CONSTANTS.DEFAULT_STYLES.get(sql_type, CONSTANTS.DEFAULT_STYLES['default'])
+        styles = {
+            'textVertical': defaults['text_vertical'],
+            'textHorizontal': defaults['text_horizontal'],
+            'fontSize': defaults['font_size'],
+            'weight': defaults['weight'],
+            'textTransform': defaults['text_transform']
+        }
+        style = node.get('style', {})
+        if style:
+            # Prefer Figma's actual values if present
+            text_align_vertical = style.get('textAlignVertical', '').lower()
+            if text_align_vertical in ['top', 'middle', 'bottom']:
+                styles['textVertical'] = text_align_vertical
+            elif text_align_vertical == 'center':
+                styles['textVertical'] = 'middle'
+            # Figma's textAlignHorizontal: 'LEFT', 'CENTER', 'RIGHT' (case-insensitive)
+            text_align_horizontal = style.get('textAlignHorizontal', '').lower()
+            if text_align_horizontal in ['left', 'center', 'right']:
+                styles['textHorizontal'] = text_align_horizontal
+            if 'fontSize' in style:
+                styles['fontSize'] = round(style['fontSize'])
+            if 'fontWeight' in style:
+                styles['weight'] = normalize_font_weight(style['fontWeight'])
+        return styles
+
+    @staticmethod
+    def extract_corner_radius(node: dict[str, Any]) -> tuple[bool, list[int]]:
+        """Extract corner radius information"""
+        corner_radius = [0, 0, 0, 0]  # Default: all corners 0
+        has_corner_radius = False
+
+        # Check for cornerRadius property
+        if 'cornerRadius' in node:
+            radius = node['cornerRadius']
+            if isinstance(radius, (int, float)) and radius > 0:
+                corner_radius = [int(radius)] * 4
+                has_corner_radius = True
+
+        # Check for individual corner radii
+        if 'rectangleCornerRadii' in node:
+            radii = node['rectangleCornerRadii']
+            if isinstance(radii, list) and len(radii) == 4:
+                corner_radius = [int(r) for r in radii]
+                has_corner_radius = any(r > 0 for r in corner_radius)
+
+        return has_corner_radius, corner_radius
+
+    @staticmethod
+    def extract_z_index(name: str) -> int:
+        """Extract z-index from node name"""
+        if 'z-index' in name:
+            parts = name.split('z-index')
+            if len(parts) > 1:
+                after = parts[1].strip()
+                match = re.findall(r'\d+', after)
+                if match:
+                    return int(match[0])
+        return 0
+
+    @staticmethod
+    def extract_color_info(node: dict) -> tuple[Optional[str], Optional[str]]:
+        """
+        Extracts the first visible solid fill color and its variable/style from a Figma node.
+        Returns (hex_color, color_variable_id).
+        """
+        fills: Optional[list] = node.get('fills')
+        if fills and isinstance(fills, list):
+            for fill in fills:
+                if fill.get('visible', True) and fill.get('type') == 'SOLID' and 'color' in fill:
+                    return _hex_and_color_var(fill)
+
+        # Fallback: check for direct color field
+        color = node.get('color')
+        if color and isinstance(color, str):
+            return color.lower(), None
+        return None, None
+
+    @staticmethod
+    def extract_slide_config(slide_node):
+        # !REFACTOR
+        """
+        Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer.
+        Also extracts presentation palette colors found in the slideColors table.
+        :param slide_node: Slide XML representation containing hidden slideColors table
+        :return: tuple(config_dict, list_of_palette_colors)
+        """
+        config_dict = {}
+        palette_colors = set()
+
+        if not slide_node or not slide_node.get("children"):
+            return config_dict, []
+
+        for child in slide_node["children"]:
+            if child.get("name") != "slideColors":
+                continue
+
+            # logg.info("[slideColors] Found slideColors table in slide")
+
+            for block in child.get("children", []):
+                block_type = block.get("name")
+                # logg.info(f"[slideColors] Processing block type: {block_type}")
+
+                block_colors = {}
+                for color_group in block.get("children", []):
+                    color_hex = color_group.get("name").lower() if color_group.get("name") else ""
+                    palette_colors.add(color_hex)
+
+                    # logg.info(f"[slideColors] Processing color group: {color_hex}")
+
+                    block_objs = []
+                    for text_child in color_group.get("children", []):
+                        if text_child.get("type") != "TEXT":
+                            continue
+
+                        obj = {
+                            "color": Extractor.extract_color_info(text_child)[0],  # Use 'color' instead of 'fill'
+                            "fontFamily": normalize_font_family(
+                                text_child["style"].get("fontFamily")
+                            ),
+                        }
+
+                        if block_type == "figure":
+                            obj["figureName"] = text_child.get("name", "").strip()
+
+                        color_var = Extractor.extract_color_info(text_child)[1]
+                        if color_var:
+                            obj["color_variable"] = color_var
+
+                        # logg.info(
+                        #     f"[slideColors] Found figure in {color_hex}: "
+                        #     f"name='{obj.get('figureName')}'; color={obj['color']}; font={obj['fontFamily']}"
+                        # )
+
+                        block_objs.append(obj)
+
+                    block_colors[color_hex] = block_objs
+
+                config_dict[block_type] = block_colors
+                # logg.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
+
+        return config_dict, sorted(palette_colors)
 
 
 # ================ Font Utils ================
@@ -164,6 +355,7 @@ def normalize_font_weight(weight: Any) -> Optional[int]:
 
 # ================ Block Utils ================
 
+# use/import only 'block_to_dict' function
 class BlockBuilder:
     """
     Build a block dictionary from an ExtractedBlock or dict and optional slide_config.
@@ -219,7 +411,7 @@ class BlockBuilder:
 
     def __fill_color_var(self) -> None:
         if self.get('node'):
-            color_hex, color_var = extract_color_info(self.get('node'))
+            color_hex, color_var = Extractor.extract_color_info(self.get('node'))
             if color_var:
                 self.block_dict['color_variable'] = color_var
 
@@ -247,7 +439,7 @@ class BlockBuilder:
         self.__fill_color_var()
 
     def _fill_by_figure(self) -> None:
-        clean_name = extract_base_figure_name(self.get('name'))
+        clean_name = Extractor.extract_base_figure_name(self.get('name'))
         self.block_dict['figureName'] = clean_name
         if self.get('node_color'):
             self.block_dict['color'] = self.get('node_color')
@@ -258,7 +450,7 @@ class BlockBuilder:
             if all_fonts:
                 self.block_dict['all_fonts'] = list(set(all_fonts))
 
-            figure_index = extract_figure_index(clean_name)
+            figure_index = Extractor.extract_figure_index(clean_name)
             if figure_index:
                 for color_hex, figure_objects in self.slide_config['figure'].items():
                     for figure_obj in figure_objects:
@@ -294,10 +486,10 @@ class BlockBuilder:
 
     def _fill_info(self) -> None:
         # Always add figure_info and precompiled_image_info for consistency
-        self.block_dict['figure_info'] = self.extract_figure_info()
-        self.block_dict['precompiled_image_info'] = self.extract_precompiled_image_info()
+        self.block_dict['figure_info'] = self._extract_figure_info()
+        self.block_dict['precompiled_image_info'] = self._extract_precompiled_image_info()
 
-    def extract_figure_info(self) -> Optional[dict]:
+    def _extract_figure_info(self) -> Optional[dict]:
         """Extract and return figure_info dict for a figure block, or None if not a figure."""
         if self.get('sql_type') != 'figure':
             return None
@@ -318,7 +510,7 @@ class BlockBuilder:
                         break
         return info
 
-    def extract_precompiled_image_info(self) -> Optional[dict]:
+    def _extract_precompiled_image_info(self) -> Optional[dict]:
         """Extract and return precompiled_image_info dict for a precompiled image block, or None if not applicable."""
         if self.get('sql_type') != 'image':
             return None
@@ -341,8 +533,14 @@ class BlockBuilder:
         return self.block_dict
 
 
+def block_to_dict(block: ExtractedBlock, slide_config: Optional[dict] = None):
+    # Convert block to dict construction
+    return BlockBuilder(block, slide_config).build()
+
+
 # ================ Block Filter Utils ================
 
+# codeblock for 'should_include', don't use/import this
 def _check_mode(mode: FilterMode, filter_config: FilterConfig, get: Callable) -> bool:
     if mode == FilterMode.ALL:
         return True
