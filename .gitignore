@@ -1,6 +1,7 @@
 .env
 script/my_output/
 script/my_sql_output/
+script/slide_deletion/
 *.csv
 __pycache__/
 credentials.json

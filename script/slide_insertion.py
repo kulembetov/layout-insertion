@@ -2140,7 +2140,7 @@ class SQLGenerator:
         )
         output_file = os.path.join(output_dir, file_name)
         # Write SQL to file
-        with open(output_file, "w") as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             f.write(sql)
         logger.info(f"\nSQL has been generated and saved to {output_file}")
         return output_file
