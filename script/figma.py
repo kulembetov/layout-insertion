@@ -37,104 +37,7 @@ def setup_block_logger(output_dir):
 
 # ================ Constants and Mappings ================
 
-FIGMA_CONFIG = {
-    "TARGET_WIDTH": 1200,
-    "TARGET_HEIGHT": 675,
-    "OUTPUT_DIR": "figma_extract",
-    "OUTPUT_FILE": "extracted_data",
-}
-
-# Valid font weights - ONLY these are allowed
-VALID_FONT_WEIGHTS = [300, 400, 700]
-
-# Z-index defaults from config
-Z_INDEX_DEFAULTS = {
-    "background": 0,
-    "watermark": 10,
-    "figure": 1,
-    "image": 2,
-    "icon": 2,
-    "infographik": 2,
-    "table": 2,
-    "text": 3,
-    "slideTitle": 3,
-    "subTitle": 3,
-    "blockTitle": 3,
-    "number": 3,
-    "email": 3,
-    "date": 3,
-    "name": 3,
-    "percentage": 3,
-    "default": 1,
-}
-
-# Default dimensions from config
-DEFAULT_DIMENSIONS = {
-    "background": {"x": 0, "y": 0, "w": 1200, "h": 675},
-    "slideTitle": {"x": 37, "y": 37, "w": 1125, "h": 85},
-    "subTitle": {"x": 37, "y": 250, "w": 875, "h": 65},
-    "blockTitle": {"x": 37, "y": 37, "w": 575, "h": 30},
-    "text": {"x": 37, "y": 37, "w": 575, "h": 85},
-    "number": {"x": 77, "y": 315, "w": 320, "h": 50},
-    "default": {"x": 37, "y": 230, "w": 1125, "h": 405},
-}
-
-# Default styles from config
-DEFAULT_STYLES = {
-    "slideTitle": {
-        "text_vertical": "top",
-        "text_horizontal": "left",
-        "font_size": 50,
-        "weight": 700,
-        "text_transform": "none",
-    },
-    "subTitle": {
-        "text_vertical": "top",
-        "text_horizontal": "left",
-        "font_size": 25,
-        "weight": 400,
-        "text_transform": "none",
-    },
-    "blockTitle": {
-        "text_vertical": "top",
-        "text_horizontal": "left",
-        "font_size": 25,
-        "weight": 700,
-        "text_transform": "none",
-    },
-    "text": {
-        "text_vertical": "top",
-        "text_horizontal": "left",
-        "font_size": 20,
-        "weight": 400,
-        "text_transform": "none",
-    },
-    "number": {
-        "text_vertical": "top",
-        "text_horizontal": "center",
-        "font_size": 50,
-        "weight": 700,
-        "text_transform": "none",
-    },
-    "default": {
-        "text_vertical": "top",
-        "text_horizontal": "left",
-        "font_size": 20,
-        "weight": 400,
-        "text_transform": "none",
-    },
-}
-
-# Slide type detection patterns
-SLIDE_TYPE_PATTERNS = {
-    "title": ["hero", "title", "cover"],
-    "table": ["table", "grid"],
-    "chart": ["chart", "graph", "data"],
-    "infographics": ["infographic", "infographik", "visual"],
-    "few_text": ["1cols", "2cols"],
-    "optimal_text": ["3cols"],
-    "many_text": ["4cols", "5cols", "6cols", "7cols", "8cols", "9cols", "10cols"],
-}
+# All constants moved to config.py
 
 # ================ Data Classes and Enums ================
 
@@ -780,11 +683,11 @@ class FigmaExtractor:
 
         # Map font weights to nearest valid value
         if weight_num <= 350:
-            return 300
+            return config.VALID_FONT_WEIGHTS[0]  # 300
         elif weight_num <= 550:
-            return 400
+            return config.VALID_FONT_WEIGHTS[1]  # 400
         else:
-            return 700
+            return config.VALID_FONT_WEIGHTS[2]  # 700
 
     def extract_text_styles(
         self, node: Dict[str, Any], sql_type: str
@@ -854,8 +757,8 @@ class FigmaExtractor:
             return False
         abs_box = BlockUtils.get_node_property(node, "absoluteBoundingBox")
         # Check dimensions
-        width_match = abs(abs_box["width"] - FIGMA_CONFIG["TARGET_WIDTH"]) < 1
-        height_match = abs(abs_box["height"] - FIGMA_CONFIG["TARGET_HEIGHT"]) < 1
+        width_match = abs(abs_box["width"] - config.FIGMA_CONFIG["TARGET_WIDTH"]) < 1
+        height_match = abs(abs_box["height"] - config.FIGMA_CONFIG["TARGET_HEIGHT"]) < 1
         if not (width_match and height_match):
             return False
         # Check minimum area
@@ -917,13 +820,13 @@ class FigmaExtractor:
                 sql_type == "image"
                 and dimensions["x"] == 0
                 and dimensions["y"] == 0
-                and dimensions["w"] == 1200
-                and dimensions["h"] == 675
+                and dimensions["w"] == config.FIGMA_CONFIG["TARGET_WIDTH"]
+                and dimensions["h"] == config.FIGMA_CONFIG["TARGET_HEIGHT"]
                 and not is_precompiled
             )
             if should_skip:
                 LogUtils.log_block_event(
-                    f"Skipping {sql_type} block {name} (full image 1200x675)",
+                    f"Skipping {sql_type} block {name} (full image {config.FIGMA_CONFIG['TARGET_WIDTH']}x{config.FIGMA_CONFIG['TARGET_HEIGHT']})",
                     level="debug",
                 )
             else:
@@ -1237,8 +1140,8 @@ class FigmaExtractor:
                     blocks=blocks,
                     frame_id=node["id"],
                     dimensions={
-                        "w": FIGMA_CONFIG["TARGET_WIDTH"],
-                        "h": FIGMA_CONFIG["TARGET_HEIGHT"],
+                        "w": config.FIGMA_CONFIG["TARGET_WIDTH"],
+                        "h": config.FIGMA_CONFIG["TARGET_HEIGHT"],
                     },
                 )
                 # Attach the original node for color extraction
@@ -1302,7 +1205,7 @@ class FigmaExtractor:
             return {
                 "metadata": {
                     "file_id": self.file_id,
-                    "figma_config": FIGMA_CONFIG,
+                    "figma_config": config.FIGMA_CONFIG,
                     "extraction_summary": summary,
                     "filter_config": {
                         "mode": self.filter_config.mode.value,
@@ -1314,7 +1217,7 @@ class FigmaExtractor:
                         "valid_block_types": config.BLOCK_TYPES[
                             "block_layout_type_options"
                         ],
-                        "valid_font_weights": VALID_FONT_WEIGHTS,
+                        "valid_font_weights": config.VALID_FONT_WEIGHTS,
                         "slide_layout_types": config.SLIDE_LAYOUT_TYPES,
                     },
                 },
@@ -1389,11 +1292,11 @@ class FigmaExtractor:
         """Save extracted data to file"""
         if not data:
             return ""
-        if not os.path.exists(FIGMA_CONFIG["OUTPUT_DIR"]):
-            os.makedirs(FIGMA_CONFIG["OUTPUT_DIR"])
+        if not os.path.exists(config.FIGMA_CONFIG["OUTPUT_DIR"]):
+            os.makedirs(config.FIGMA_CONFIG["OUTPUT_DIR"])
 
         if not output_file:
-            output_file = f"{FIGMA_CONFIG['OUTPUT_DIR']}/{FIGMA_CONFIG['OUTPUT_FILE']}_config_compatible.json"
+            output_file = f"{config.FIGMA_CONFIG['OUTPUT_DIR']}/{config.FIGMA_CONFIG['OUTPUT_FILE']}_config_compatible.json"
 
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -1547,15 +1450,15 @@ class FigmaToSQLIntegrator:
             block_type, config.DEFAULT_STYLES["default"]
         )
 
-        # Ensure font weight is valid (300, 400, 700)
+        # Ensure font weight is valid
         weight = figma_styles.get("weight", defaults["weight"])
-        if weight not in [300, 400, 700]:
+        if weight not in config.VALID_FONT_WEIGHTS:
             if weight <= 350:
-                weight = 300
+                weight = config.VALID_FONT_WEIGHTS[0]  # 300
             elif weight <= 550:
-                weight = 400
+                weight = config.VALID_FONT_WEIGHTS[1]  # 400
             else:
-                weight = 700
+                weight = config.VALID_FONT_WEIGHTS[2]  # 700
 
         return {
             "textVertical": figma_styles.get("textVertical", defaults["text_vertical"]),
@@ -1622,7 +1525,7 @@ class FigmaToSQLIntegrator:
             sql_content = self._create_sql_for_slide(slide)
             filename = f"slide_{slide['slide_layout_number']:02d}_{slide['slide_layout_name']}.sql"
 
-            with open(f"{sql_dir}/{filename}", "w") as f:
+            with open(f"{sql_dir}/{filename}", "w", encoding="utf-8") as f:
                 f.write(sql_content)
 
             LogUtils.log_block_event(f"   Generated SQL: {filename}")
@@ -1781,7 +1684,7 @@ class FigmaToSQLIntegrator:
         )
         instructions.append("- `sql_instructions.md`: This instruction file")
 
-        with open(f"{output_dir}/sql_instructions.md", "w") as f:
+        with open(f"{output_dir}/sql_instructions.md", "w", encoding="utf-8") as f:
             f.write("\n".join(instructions))
 
 
@@ -1881,7 +1784,7 @@ def example_usage():
                 is_valid_type = (
                     block["sql_type"] in config.BLOCK_TYPES["block_layout_type_options"]
                 )
-                is_valid_weight = block["styles"]["weight"] in [300, 400, 700]
+                is_valid_weight = block["styles"]["weight"] in config.VALID_FONT_WEIGHTS
                 LogUtils.log_block_event(
                     f"    • {block['sql_type']}: Type OK: {is_valid_type}, Weight OK: {is_valid_weight}"
                 )
@@ -1939,7 +1842,7 @@ class BatchFigmaProcessor:
 
         weight_analysis = {
             "total_blocks": 0,
-            "weight_distribution": {300: 0, 400: 0, 700: 0},
+            "weight_distribution": {weight: 0 for weight in config.VALID_FONT_WEIGHTS},
             "invalid_weights_found": [],
             "slides_analyzed": len(all_data["slides"]),
         }
@@ -1949,7 +1852,7 @@ class BatchFigmaProcessor:
                 weight_analysis["total_blocks"] += 1
                 weight = block["styles"]["weight"]
 
-                if weight in [300, 400, 700]:
+                if weight in config.VALID_FONT_WEIGHTS:
                     weight_analysis["weight_distribution"][weight] += 1
                 else:
                     weight_analysis["invalid_weights_found"].append(
