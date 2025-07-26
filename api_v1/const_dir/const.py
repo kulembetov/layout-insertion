@@ -1,4 +1,5 @@
 from .types import PrecompiledImagesConfig, SlideLayoutType
+from typing import Any
 
 # Precompiled Images configuration
 PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
@@ -27,7 +28,7 @@ DEFAULT_COLOR: str = "#ffffff"
 MINIATURE_EXTENSION: str = ".png"
 
 # Default values for user inputs
-DEFAULT_VALUES: dict[str, object] = {
+DEFAULT_VALUES: dict[str, Any] = {
     "slide_layout_name": "grid_cards_horizontal",
     "slide_layout_number": 9,
     "presentation_layout_id": "0197c55e-1c1b-7760-9525-f51752cf23e2",
@@ -68,7 +69,7 @@ DEFAULT_DIMENSIONS: dict[str, dict[str, int]] = {
     "default": {"x": 37, "y": 230, "w": 1125, "h": 405},
 }
 
-DEFAULT_STYLES: dict[str, dict[str, object]] = {
+DEFAULT_STYLES: dict[str, dict[str, Any]] = {
     "slideTitle": {
         "text_vertical": "top",
         "text_horizontal": "left",
@@ -162,7 +163,7 @@ FIGMA_TO_SQL_BLOCK_MAPPING: dict[str, str] = {
     "label": "text",
 }
 
-FIGMA_CONFIG: dict[str, object] = {
+FIGMA_CONFIG: dict[str, Any] = {
     'TARGET_WIDTH': 1200,
     'TARGET_HEIGHT': 675,
     'OUTPUT_DIR': 'figma_extract',
