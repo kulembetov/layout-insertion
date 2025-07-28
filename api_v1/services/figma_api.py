@@ -1,7 +1,7 @@
 import requests
 
 from typing import Any, Optional
-from log_utils import setup_logger
+from log_utils import setup_logger, logs
 
 from .filters.filter_settings import FilterMode, FilterConfig
 from .utils import Checker, Extractor, should_include, round5, get_slide_number, detect_slide_type, \
@@ -11,8 +11,10 @@ from .data_classes import ExtractedBlock, ExtractedSlide
 from api_v1.constants import BLOCKS, SLIDES, CONSTANTS
 
 
-logg = setup_logger(__name__)
+logger = setup_logger(__name__)
 
+
+@logs(logger, on=True)
 class FigmaAPI:
     def __init__(self, *, file_id: Optional[str] = None, token: Optional[str] = None, filter_config: Optional[FilterConfig] = None) -> None:
         self._file_id = file_id
@@ -70,12 +72,12 @@ class FigmaAPI:
 
 
     # =========== Extract codeblocks ==============
-
+    @logs(logger, on=True)
     def _get_slides(self) -> list[ExtractedSlide]:
         pages = self.fetch()
         all_slides = []
         for page in pages:
-            logg.info(f"\nProcessing page: {page.get('name', 'Unnamed')}")
+            logger.info(f"\nProcessing page: {page.get('name', 'Unnamed')}")
             page_slides = self.traverse_and_extract(page)
             all_slides.extend(page_slides)
 
@@ -150,14 +152,14 @@ class FigmaAPI:
             }
 
     # =============================================
-
+    @logs(logger, on=True)
     def traverse_and_extract(self, node: dict[str, Any], parent_name: str = "") -> list[ExtractedSlide]:
         """Enhanced traversal with filtering"""
         slides = []
         
         if self.is_target_frame(node):
-            logg.info(f"Found target frame: \"{node['name']}\"")
-            logg.info(f"Parent container: \"{parent_name}\"")
+            logger.info(f"Found target frame: \"{node['name']}\"")
+            logger.info(f"Parent container: \"{parent_name}\"")
 
             frame_origin = {
                 'x': node['absoluteBoundingBox']['x'],
@@ -192,7 +194,7 @@ class FigmaAPI:
                 # Attach the original node for color extraction
                 slide._figma_node = node
                 slides.append(slide)
-                logg.info(f"Slide {slide_number} ({slide_type}) with {len(blocks)} blocks")
+                logger.info(f"Slide {slide_number} ({slide_type}) with {len(blocks)} blocks")
             
             return slides
 
@@ -234,6 +236,7 @@ class FigmaAPI:
         return True
 
     @staticmethod
+    @logs(logger, on=True)
     def _update_figure_config_with_names(slide_config, blocks):
         # !REFACTOR
         figure_blocks_by_name = {}
@@ -244,7 +247,7 @@ class FigmaAPI:
 
             base_name = Extractor.extract_base_figure_name(block.name)
             figure_blocks_by_name[base_name] = block
-            logg.info(f"[figureBlocks] Found figure block: '{block.name}' -> base_name: '{base_name}'")
+            logger.info(f"[figureBlocks] Found figure block: '{block.name}' -> base_name: '{base_name}'")
 
         new_figure_config = {}
 
@@ -264,9 +267,9 @@ class FigmaAPI:
                 
                 if matching_block is not None:
                     clean_figure_name = Extractor.extract_base_figure_name(matching_block.name)
-                    logg.info(f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
+                    logger.info(f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
                 else:
-                    logg.info(f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
+                    logger.info(f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
 
                 figure_obj = {
                     "color": fill_color,
@@ -276,7 +279,7 @@ class FigmaAPI:
                 figure_objects.append(figure_obj)
             new_figure_config[color_hex] = figure_objects
         slide_config['figure'] = new_figure_config
-        logg.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_by_name)} figure blocks")
+        logger.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_by_name)} figure blocks")
 
 
     def _slide_to_dict(self, slide: ExtractedSlide) -> dict[str, Any]:
@@ -325,6 +328,7 @@ class FigmaAPI:
 
 
     # TO-DO: refactor ==========================================================================
+    @logs(logger, on=True)
     def collect_enhanced_blocks(self, node: dict[str, Any], frame_origin: dict[str, int], 
                               slide_number: int, parent_container: str) -> list[ExtractedBlock]:
         blocks = []
@@ -361,7 +365,7 @@ class FigmaAPI:
                 not is_precompiled
             )
             if should_skip:
-                logg.info(f"Skipping {sql_type} block {name} (full image 1200x675)", level='debug')
+                logger.debug(f"Skipping {sql_type} block {name} (full image 1200x675)")
             else:
                 styles = Extractor.extract_text_styles(node, sql_type)
                 z_index = Extractor.extract_z_index(name)
@@ -397,9 +401,9 @@ class FigmaAPI:
                 block.node_color = node_color
                 if should_include(block, self.filter_config):
                     blocks.append(block)
-                    logg.info(f"Added {sql_type} block: {name}")
+                    logger.info(f"Added {sql_type} block: {name}")
                     color_info = f" | Color: {node_color}" if node_color else ""
-                    logg.info(
+                    logger.info(
                         f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{color_info}",
                     )
         # Recursively process children (skip children of hidden nodes)
@@ -407,4 +411,3 @@ class FigmaAPI:
             for child in node['children']:
                 blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
         return blocks
-    
