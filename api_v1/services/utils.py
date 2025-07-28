@@ -2,9 +2,9 @@ import re
 import json
 from typing import Optional, Any, Callable
 
-from .data_classes import ExtractedBlock
+from api_v1.services.data_classes import ExtractedBlock
 from api_v1.constants import BLOCKS, TYPES, CONSTANTS, SLIDES
-from .filters.filter_settings import FilterMode, FilterConfig
+from api_v1.services.filters.filter_settings import FilterMode, FilterConfig
 
 
 # ================ Helpful functions ================

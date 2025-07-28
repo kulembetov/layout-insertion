@@ -101,47 +101,67 @@ def logs(logger: logging.Logger, *, on: bool = True):
     return deco
 
 
-# Example usage
-if __name__ == "__main__":
-    logger = setup_logger(__name__)
-
-    @logs(logger, on=True)
-    def foo():
-        logger.info(f"function 'foo'")
-
-    @logs(logger, on=False)
-    def bar():
-        logger.info(f"function 'bar'")
-
-    foo() # log on
-    bar() # log off
-
-    @logs(logger, on=True)
-    class Foo:
-        @logs(logger, on=True)
-        def a(self):
-            logger.info(f"method 'a'")
-
-        @logs(logger, on=False)
-        def b(self):
-            logger.info(f"method 'b'")
-
-
-    @logs(logger, on=False)
-    class Bar:
-        @logs(logger, on=True)
-        def x(self):
-            logger.info(f"method 'x'")
-
-        @logs(logger, on=False)
-        def y(self):
-            logger.info(f"method 'y'")
-
-    _foo = Foo()
-    _bar = Bar()
-
-    _foo.a() # log on
-    _foo.b() # log off
-
-    _bar.x() # log off
-    _bar.y() # log off
+# # Example usage
+# if __name__ == "__main__":
+#     logger = setup_logger(__name__)
+#
+#     @logs(logger, on=True)
+#     def foo():
+#         logger.info(f"function 'foo'")
+#
+#     @logs(logger, on=False)
+#     def bar():
+#         logger.info(f"function 'bar'")
+#
+#     foo() # log on
+#     bar() # log off
+#
+#     @logs(logger, on=True)
+#     class Foo:
+#         @logs(logger, on=True)
+#         def a(self):
+#             logger.info(f"method 'a'")
+#
+#         @logs(logger, on=False)
+#         def b(self):
+#             logger.info(f"method 'b'")
+#
+#
+#     @logs(logger, on=False)
+#     class Bar:
+#         @logs(logger, on=True)
+#         def x(self):
+#             logger.info(f"method 'x'")
+#
+#         @logs(logger, on=False)
+#         def y(self):
+#             logger.info(f"method 'y'")
+#
+#     _foo = Foo()
+#     _bar = Bar()
+#
+#     _foo.a() # log on
+#     _foo.b() # log off
+#
+#     _bar.x() # log off
+#     _bar.y() # log off
+#
+#     @logs(logger, on=True)
+#     def multiple(x, y):
+#          logger.info(f"x={x}, y={y}")
+#          mul = x * y
+#          logger.info(f"x * y = {mul}")
+#          return mul
+#
+#     @logs(logger, on=False)
+#     def volume(a, b, h):
+#         sq = multiple(a, b)
+#         logger.info(f"Square: {sq}")
+#         vol = multiple(sq, h)
+#         logger.info(f"Volume: {vol}")
+#         return vol
+#
+#     v = volume(1, 2, 3)
+#     logger.info(f"[FINAL LOG] Volume: {v}")
+#
+#     del logger, foo, bar, Foo, Bar, _foo, _bar, multiple, volume, v
