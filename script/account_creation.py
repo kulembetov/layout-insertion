@@ -10,8 +10,8 @@ import sys
 import uuid
 import hashlib
 import secrets
-import getpass
 import configparser
+import random
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional, Dict, Any, List
@@ -161,13 +161,33 @@ class DatabaseManager:
 class PasswordHasher:
     @staticmethod
     def generate_salt() -> str:
-        """Generate a random salt."""
-        return secrets.token_hex(32)
+        """Generate a random salt between 64-127 bytes (matches Node.js implementation)."""
+        salt_length = random.randint(64, 127)  # Same range as Math.floor(Math.random() * 64 + 64)
+        return secrets.token_bytes(salt_length).hex()
     
     @staticmethod
     def hash_password(password: str, salt: str) -> str:
-        """Hash password with salt using SHA-256."""
-        return hashlib.sha256((password + salt).encode()).hexdigest()
+        """Hash password with salt using scrypt (matches Node.js crypto.scrypt)."""
+        # Convert hex salt back to bytes
+        salt_bytes = bytes.fromhex(salt)
+        
+        # Use scrypt with Node.js default parameters:
+        # N=16384, r=8, p=1, dklen=64 (same as Node.js crypto.scrypt)
+        derived_key = hashlib.scrypt(
+            password.encode('utf-8'), 
+            salt=salt_bytes, 
+            n=16384,  # CPU/memory cost parameter
+            r=8,      # Block size parameter  
+            p=1,      # Parallelization parameter
+            dklen=64  # Derived key length (64 bytes = 128 hex chars)
+        )
+        return derived_key.hex()
+    
+    @staticmethod
+    def verify_password(password: str, stored_hash: str, salt: str) -> bool:
+        """Verify a password against stored hash and salt."""
+        computed_hash = PasswordHasher.hash_password(password, salt)
+        return computed_hash == stored_hash
 
 
 class UserAccountCreator:
@@ -255,12 +275,12 @@ class UserAccountCreator:
         # Password (only for local authentication)
         if user_data['provider'] == Provider.LOCAL.value:
             while True:
-                password = getpass.getpass("Password: ")
+                password = input("Password: ")
                 if len(password) < 6:
                     print("Password must be at least 6 characters long.")
                     continue
                 
-                confirm_password = getpass.getpass("Confirm password: ")
+                confirm_password = input("Confirm password: ")
                 if password != confirm_password:
                     print("Passwords don't match. Please try again.")
                     continue
