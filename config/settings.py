@@ -118,3 +118,5 @@ if CACHE_ENABLED:
             "LOCATION": os.getenv("CACHE_LOCATION"),
         }
     }
+
+LOGGING_ON = True
