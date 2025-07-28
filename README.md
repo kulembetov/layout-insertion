@@ -90,6 +90,12 @@ python insert_palette.py --json my_output/sql_generator_input.json --mode manual
 # auto mode
 python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
+# 3. Insert into BlockLayoutConfig
+# manual mode
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# auto mode
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
 # 4. Match BlockLayoutConfig with PresentationPalette
 python match_block_layout_presentation_palette.py
 
@@ -113,24 +119,24 @@ python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --ou
 
 # 2. Insert into PresentationPalette
 # manual mode
-python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # auto mode
-python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
 # 3. Insert into BlockLayoutConfig
 # manual mode
-python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
 # auto mode
-python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
 
 # 4. Match BlockLayoutConfig with PresentationPalette
 python3 match_block_layout_presentation_palette.py
 
 # 5. Generate SQL
-python3 slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
+python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Validate SQL
-python3 sql_validator.py --input-dir script/my_sql_output
+python3 sql_validator.py --input-dir my_sql_output
 
 # 7. Apply SQL to DB
 python3 sql_pollution.py
@@ -377,26 +383,36 @@ python3 slide_deletion.py
 
 **Windows:**
 ```bash
-# 1. Вставка в PresentationPalette
-# ручной режим
-python insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
-# авто режим
-python insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+# 1. Извлечение из Figma
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
 
-# 2. Вставка в BlockLayoutConfig
+# 2. Вставка в PresentationPalette
 # ручной режим
-python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
+python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # авто режим
-python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
+python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
-# 3. Сопоставление BlockLayoutConfig с PresentationPalette
+# 3. Вставка в BlockLayoutConfig
+# ручной режим
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# авто режим
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
+# 4. Сопоставление BlockLayoutConfig с PresentationPalette
 python match_block_layout_presentation_palette.py
 
-# 4. Извлечение из Figma
-python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir script/my_output
-
 # 5. Генерация SQL
-python slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
+python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+
+# 6. Валидация SQL
+python sql_validator.py --input-dir my_sql_output
+
+# 7. Загрузка SQL в БД
+python sql_pollution.py
+
+# 8. Удаление из БД (блоков, слайдов, изображений)
+python slide_deletion.py
+```
 
 # 6. Валидация SQL
 python sql_validator.py --input-dir script/my_sql_output
@@ -410,29 +426,29 @@ python slide_deletion.py
 
 **macOS:**
 ```bash
-# 1. Вставка в PresentationPalette
-# ручной режим
-python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
-# авто режим
-python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+# 1. Извлечение из Figma
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
 
-# 2. Вставка в BlockLayoutConfig
+# 2. Вставка в PresentationPalette
 # ручной режим
-python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # авто режим
-python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
-# 3. Сопоставление BlockLayoutConfig с PresentationPalette
+# 3. Вставка в BlockLayoutConfig
+# ручной режим
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# авто режим
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
+# 4. Сопоставление BlockLayoutConfig с PresentationPalette
 python3 match_block_layout_presentation_palette.py
 
-# 4. Извлечение из Figma
-python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir script/my_output
-
 # 5. Генерация SQL
-python3 slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
+python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Валидация SQL
-python3 sql_validator.py --input-dir script/my_sql_output
+python3 sql_validator.py --input-dir my_sql_output
 
 # 7. Загрузка SQL в БД
 python3 sql_pollution.py
@@ -445,9 +461,9 @@ python3 slide_deletion.py
 ---
 
 ## Конфигурационный файл: `config.py`
-- Централизует все настройки для пайплайна
+- **Централизует все настройки** для пайплайна
 - Хранит Figma API, значения по умолчанию, маппинги слайдов/блоков, цвета, вотермарки и логику категоризации
-- Гарантирует согласованность между извлечением и генерацией SQL
+- **Гарантирует согласованность** между извлечением и генерацией SQL
 
 ---
 

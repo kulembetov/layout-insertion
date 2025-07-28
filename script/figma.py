@@ -1,5 +1,5 @@
 """
-Complete Figma to SQL Generator Integration
+Figma to SQL Generator Integration
 Self-contained file with all necessary classes included.
 Fully compatible with config.py specifications.
 """
@@ -34,10 +34,6 @@ def setup_block_logger(output_dir):
     block_log_handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
     block_logger.addHandler(block_log_handler)
 
-
-# ================ Constants and Mappings ================
-
-# All constants moved to config.py
 
 # ================ Data Classes and Enums ================
 
@@ -131,14 +127,12 @@ class BlockTypeUtils:
 
     @staticmethod
     def _normalize_type_name(name: str) -> str:
-        # Lowercase, replace underscores/hyphens/spaces, split camelCase
         name = re.sub(r"([a-z])([A-Z])", r"\1_\2", name)  # camelCase to snake_case
         name = name.replace("-", "_").replace(" ", "_").lower()
         return name
 
     @staticmethod
     def _detect_text_block_type(name: str) -> str:
-        # Canonical types mapping
         CANONICAL_TYPES = {
             "number": "number",
             "percentage": "percentage",
@@ -167,7 +161,6 @@ class BlockTypeUtils:
     @staticmethod
     def _detect_rectangle_block_type(name: str) -> str:
         """Detect block type from rectangle node name."""
-        # Canonical types mapping for rectangles
         CANONICAL_TYPES = {
             "background": "background",
             "image": "image",
@@ -187,7 +180,6 @@ class BlockTypeUtils:
     @staticmethod
     def _detect_frame_block_type(name: str) -> str:
         """Detect block type from frame/group node name."""
-        # Canonical types mapping for frames/groups
         CANONICAL_TYPES = {
             "background": "background",
             "image": "image",
@@ -787,7 +779,6 @@ class FigmaExtractor:
         return config.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, None)
 
     def extract_color_from_fills(self, node: dict) -> tuple[str | None, str | None]:
-        # Replaced by ColorUtils.extract_color_info
         return ColorUtils.extract_color_info(node)
 
     def collect_blocks(
@@ -930,165 +921,123 @@ class FigmaExtractor:
         return blocks
 
     def _extract_slide_config(self, slide_node):
-        """Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer."""
+        """Extract slideConfig from the hidden slideColors table in the slide node."""
         config_dict = {}
         palette_colors = set()
+        
         if not slide_node or not BlockUtils.get_node_property(slide_node, "children"):
             return config_dict, []
+            
         for node_child in BlockUtils.get_node_property(slide_node, "children"):
             if BlockUtils.get_node_property(node_child, "name") == "slideColors":
-                            LogUtils.log_block_event("[slideColors] Found slideColors table in slide")
-            for node_block in BlockUtils.get_node_property(node_child, "children", []):
-                block_type = BlockUtils.get_node_property(node_block, "name")
-                LogUtils.log_block_event(f"[slideColors] Processing block type: {block_type}")
-                block_colors = {}
-                for color_group in BlockUtils.get_node_property(node_block, "children", []):
-                    color_hex = BlockUtils.get_node_property(color_group, "name")
-                    if color_hex:
-                        color_hex = color_hex.lower()
-                        palette_colors.add(color_hex)
-                    LogUtils.log_block_event(f"[slideColors] Processing color group: {color_hex}")
-                    block_objs = []
-                    for text_child in BlockUtils.get_node_property(color_group, "children", []):
-                        if BlockUtils.is_node_type(text_child, "TEXT"):
-                            text_obj = {}
-                            color_val, color_var = ColorUtils.extract_color_info(
-                                text_child
-                            )
-                            text_obj["color"] = color_val
-                            if color_var:
-                                text_obj["color_variable"] = color_var
-                            font_family = None
-                            if (
-                                "style" in text_child
-                                and "fontFamily" in text_child["style"]
-                            ):
-                                font_family = text_child["style"]["fontFamily"]
-                            text_obj["fontFamily"] = FontUtils.normalize_font_family(
-                                font_family
-                            )
-                            if block_type == "figure":
-                                idx = BlockUtils.get_node_property(text_child, "name", "").strip()
-                                text_obj["figureName"] = idx
-                                LogUtils.log_block_event(
-                                    f"[slideColors] Found figure in {color_hex}: name='{idx}', color={color_val}, font={font_family}"
-                                )
-                            block_objs.append(text_obj)
-                    block_colors[color_hex] = block_objs
-                config_dict[block_type] = block_colors
-                LogUtils.log_block_event(
-                    f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups"
-                )
-                for color_hex, obj_list in block_colors.items():
+                LogUtils.log_block_event("[slideColors] Found slideColors table in slide")
+                
+                for node_block in BlockUtils.get_node_property(node_child, "children", []):
+                    block_type = BlockUtils.get_node_property(node_block, "name")
+                    LogUtils.log_block_event(f"[slideColors] Processing block type: {block_type}")
+                    
+                    block_colors = {}
+                    for color_group in BlockUtils.get_node_property(node_block, "children", []):
+                        color_hex = BlockUtils.get_node_property(color_group, "name")
+                        if color_hex:
+                            color_hex = color_hex.lower()
+                            palette_colors.add(color_hex)
+                            
+                        LogUtils.log_block_event(f"[slideColors] Processing color group: {color_hex}")
+                        block_objs = []
+                        
+                        for text_child in BlockUtils.get_node_property(color_group, "children", []):
+                            if BlockUtils.is_node_type(text_child, "TEXT"):
+                                text_obj = {}
+                                color_val, color_var = ColorUtils.extract_color_info(text_child)
+                                text_obj["color"] = color_val
+                                
+                                if color_var:
+                                    text_obj["color_variable"] = color_var
+                                    
+                                font_family = None
+                                if ("style" in text_child and "fontFamily" in text_child["style"]):
+                                    font_family = text_child["style"]["fontFamily"]
+                                text_obj["fontFamily"] = FontUtils.normalize_font_family(font_family)
+                                
+                                if block_type == "figure":
+                                    idx = BlockUtils.get_node_property(text_child, "name", "").strip()
+                                    text_obj["figureName"] = idx
+                                    LogUtils.log_block_event(
+                                        f"[slideColors] Found figure in {color_hex}: name='{idx}', color={color_val}, font={font_family}"
+                                    )
+                                    
+                                block_objs.append(text_obj)
+                                
+                        block_colors[color_hex] = block_objs
+                        
+                    config_dict[block_type] = block_colors
                     LogUtils.log_block_event(
-                        f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects"
+                        f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups"
                     )
+                    
         return config_dict, sorted(palette_colors)
 
     def _update_figure_config_with_names(self, slide_config, blocks):
-        # Collect all figure blocks with their info
+        """Update figure configuration with proper figure names from blocks."""
+        if "figure" not in slide_config:
+            return
+            
+        # Collect figure blocks info
         figure_blocks_info = []
         for block in blocks:
             if block.sql_type == "figure":
                 base_name = FigureUtils.extract_base_figure_name(block.name)
                 figure_blocks_info.append({"base_name": base_name, "block": block})
-                LogUtils.log_block_event(
-                    f"[figureBlocks] Found figure block: '{block.name}' -> base_name: '{base_name}'"
-                )
+                LogUtils.log_block_event(f"[figureBlocks] Found figure block: '{block.name}' -> base_name: '{base_name}'")
+        
         new_figure_config = {}
         for color_hex, obj_list in slide_config["figure"].items():
             figure_objects = []
-
-            # Process ALL figure entries from slideColors, not just the ones that have corresponding blocks
+            
             for obj in obj_list:
                 figure_name = obj.get("figureName", "")
-                if figure_name:
-                    # Try to find a matching block in the main structure
-                    matching_block = None
-                    for fig in figure_blocks_info:
-                        base_name = fig["base_name"]
-                        index_match = re.search(r"_(\d+)$", base_name)
-                        if index_match and index_match.group(1) == figure_name:
-                            matching_block = fig["block"]
-                            break
-
-                    # Create figure object for this entry
-                    font_family = obj.get("fontFamily")
-                    font_family = FontUtils.normalize_font_family(font_family)
-                    fill = obj.get("color")
-
-                    # Always try to extract the proper figure name from the figure blocks
-                    clean_figure_name = figure_name  # Default to slideColors name
-
-                    # Try to find a matching block to get the proper name
-                    found_match = False
-                    for fig in figure_blocks_info:
-                        base_name = fig["base_name"]
-                        index_match = re.search(r"_(\d+)$", base_name)
-                        if index_match and index_match.group(1) == figure_name:
-                            # Found matching block, extract proper name
-                            clean_figure_name = re.sub(r"_(\d+)$", "", base_name)
-                            LogUtils.log_block_event(
-                                f"[figureConfig] Found exact index match for '{figure_name}', using name: '{clean_figure_name}'"
-                            )
-                            found_match = True
-                            break
-
-                    # If no exact match, try to find by z-index or other patterns
-                    if not found_match:
-                        for fig in figure_blocks_info:
-                            base_name = fig["base_name"]
-                            # Try to match by z-index if available
-                            z_index_match = re.search(
-                                r"z-index\s*(\d+)", fig["block"].name
-                            )
-                            if z_index_match and z_index_match.group(1) == figure_name:
-                                clean_figure_name = re.sub(r"_(\d+)$", "", base_name)
-                                LogUtils.log_block_event(
-                                    f"[figureConfig] Found z-index match for '{figure_name}', using name: '{clean_figure_name}'"
-                                )
-                                found_match = True
-                                break
-
-                    # If still no match, try to find by position in the list (assuming order matters)
-                    if not found_match and len(figure_blocks_info) > 0:
-                        # Use the first available block name as fallback
-                        first_block = figure_blocks_info[0]
-                        clean_figure_name = re.sub(
-                            r"_(\d+)$", "", first_block["base_name"]
-                        )
-                        LogUtils.log_block_event(
-                            f"[figureConfig] No match found for '{figure_name}', using fallback name: '{clean_figure_name}'"
-                        )
-
-                    if matching_block:
-                        LogUtils.log_block_event(
-                            f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill}, font: {font_family}"
-                        )
-                    else:
-                        LogUtils.log_block_event(
-                            f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill}, font: {font_family}"
-                        )
-
-                    figure_obj = {
-                        "color": fill,
-                        "fontFamily": font_family,
-                        "figureName": clean_figure_name,
-                    }
-                    figure_objects.append(figure_obj)
-
+                if not figure_name:
+                    continue
+                    
+                # Find matching block by index
+                matching_block = None
+                clean_figure_name = figure_name
+                
+                for fig in figure_blocks_info:
+                    base_name = fig["base_name"]
+                    index_match = re.search(r"_(\d+)$", base_name)
+                    if index_match and index_match.group(1) == figure_name:
+                        matching_block = fig["block"]
+                        clean_figure_name = re.sub(r"_(\d+)$", "", base_name)
+                        LogUtils.log_block_event(f"[figureConfig] Found match for '{figure_name}' -> '{clean_figure_name}'")
+                        break
+                
+                # Create figure object
+                font_family = FontUtils.normalize_font_family(obj.get("fontFamily"))
+                fill = obj.get("color")
+                
+                figure_obj = {
+                    "color": fill,
+                    "fontFamily": font_family,
+                    "figureName": clean_figure_name,
+                }
+                figure_objects.append(figure_obj)
+                
+                if matching_block:
+                    LogUtils.log_block_event(f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill}, font: {font_family}")
+                else:
+                    LogUtils.log_block_event(f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill}, font: {font_family}")
+                    
             new_figure_config[color_hex] = figure_objects
+            
         slide_config["figure"] = new_figure_config
-
+        
         # Summary logging
-        LogUtils.log_block_event(
-            f"[figureConfig] SUMMARY: Processed {len(figure_blocks_info)} figure blocks"
-        )
+        LogUtils.log_block_event(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_info)} figure blocks")
         for fig_info in figure_blocks_info:
             clean_name = re.sub(r"_(\d+)$", "", fig_info["base_name"])
-            LogUtils.log_block_event(
-                f"[figureConfig] Block '{fig_info['base_name']}' -> looking for '{clean_name}' in slideColors"
-            )
+            LogUtils.log_block_event(f"[figureConfig] Block '{fig_info['base_name']}' -> looking for '{clean_name}' in slideColors")
 
     def traverse_and_extract(
         self, node: Dict[str, Any], parent_name: str = ""
@@ -1272,7 +1221,6 @@ class FigmaExtractor:
     def _block_to_dict(
         self, block: ExtractedBlock, slide_config=None
     ) -> Dict[str, Any]:
-        # Now just call build_block_dict for all block dict construction
         return BlockUtils.build_block_dict(block, slide_config)
 
     def save_results(self, data: Dict[str, Any], output_file: str | None) -> str:
