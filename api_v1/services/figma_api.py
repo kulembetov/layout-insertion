@@ -1,7 +1,7 @@
 import requests
 
 from typing import Any, Optional
-from logger import setup_logger
+from log_utils import setup_logger
 
 from .filters.filter_settings import FilterMode, FilterConfig
 from .utils import Checker, Extractor, should_include, round5, get_slide_number, detect_slide_type, \

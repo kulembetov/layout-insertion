@@ -9,7 +9,7 @@ from api_v1.services.figma_api import FigmaAPI
 from api_v1.services.filters.filter_settings import FilterMode
 from config.settings import FIGMA_TOKEN
 
-from logger import setup_logger
+from log_utils import setup_logger
 
 from .services.redis_utils import get_cached_request, set_cached_request
 from .services.filters.filter_service import FilterFigmaApi
