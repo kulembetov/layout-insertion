@@ -66,3 +66,5 @@ Thumbs.db
 /my_output/
 /my_sql_output/
 /logs/
+
+output.json
