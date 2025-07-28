@@ -4,13 +4,15 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
+
 from api_v1.services.figma_api import FigmaAPI
-from api_v1.services.filter_service import FilterMode, FilterConfig
+from api_v1.services.filters.filter_settings import FilterMode
 from config.settings import FIGMA_TOKEN
 
 from logger import setup_logger
 
 from .services.redis_utils import get_cached_request, set_cached_request
+from .services.filters.filter_service import FilterFigmaApi
 
 
 logg = setup_logger(__name__)
@@ -29,36 +31,24 @@ class ReceiveFigmaJsonAPIView(APIView):
         if request.data.get('filter'):
             filter_mode = request.data.get('filter').get('mode')
             filter_params = request.data.get('filter').get('params')
+            figma_filtered = FilterFigmaApi(
+                token=FIGMA_TOKEN,
+                filter_params=filter_params,
+                file_id=file_id
+            )
 
             match filter_mode:
-                case FilterMode.ALL.value:
-                    filter_config = FilterConfig(
-                        mode=FilterMode.ALL
-                    )
-
                 case FilterMode.SPECIFIC_SLIDES.value:
-                    filter_config = FilterConfig(
-                        mode=FilterMode.SPECIFIC_SLIDES,
-                        target_slides=filter_params,
-                        require_z_index=True
-                    )
+                    data = figma_filtered.extract_specific_slides()
 
                 case FilterMode.SPECIFIC_BLOCKS.value:
-                    filter_config = FilterConfig(
-                        mode=FilterMode.SPECIFIC_BLOCKS,
-                        target_block_types=filter_params,
-                    )
+                    data = figma_filtered.extract_specific_blocks()
 
                 case FilterMode.BY_TYPE.value:
-                    filter_config = FilterConfig(
-                        mode=FilterMode.BY_TYPE,
-                        target_containers=filter_params
-                    )
-
+                    data = figma_filtered.extract_by_type()
+                
                 case _:
                     raise Exception(f'Unknown filter mode: {filter_mode}')
-
-            data = self.figma.extract(filter_config=filter_config)
 
         else:
             data = self.figma.extract()
