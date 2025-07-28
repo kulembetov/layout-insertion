@@ -109,7 +109,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 FIGMA_TOKEN = os.getenv("FIGMA_TOKEN", "")
 FIGMA_FILE_ID = os.getenv("FIGMA_FILE_ID", "")
 
-CACHE_ENABLED = True
+CACHE_ENABLED = False
 
 if CACHE_ENABLED:
     CACHES = {

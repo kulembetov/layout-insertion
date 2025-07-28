@@ -3,7 +3,7 @@ import requests
 from typing import Any, Optional
 from logger import setup_logger
 
-from .filter_service import FilterMode, FilterConfig
+from .filters.filter_settings import FilterMode, FilterConfig
 from .utils import Checker, Extractor, should_include, round5, get_slide_number, detect_slide_type, \
     detect_block_type, count_sentences, normalize_font_family, block_to_dict
 from .data_classes import ExtractedBlock, ExtractedSlide
@@ -407,3 +407,4 @@ class FigmaAPI:
             for child in node['children']:
                 blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
         return blocks
+    

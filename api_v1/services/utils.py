@@ -4,7 +4,7 @@ from typing import Optional, Any, Callable
 
 from .data_classes import ExtractedBlock
 from api_v1.constants import BLOCKS, TYPES, CONSTANTS, SLIDES
-from .filter_service import FilterMode, FilterConfig
+from .filters.filter_settings import FilterMode, FilterConfig
 
 
 # ================ Helpful functions ================
