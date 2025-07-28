@@ -1,5 +1,3 @@
-import json
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -9,24 +7,23 @@ from api_v1.services.figma_api import FigmaAPI
 from api_v1.services.filters.filter_settings import FilterMode
 from config.settings import FIGMA_TOKEN
 
-from log_utils import setup_logger
+from log_utils import setup_logger, logs
 
-from .services.redis_utils import get_cached_request, set_cached_request
+from .services.redis_utils import gen_key, set_cached_request
 from .services.filters.filter_service import FilterFigmaApi
+from .services.utils import json_dump
 
 
-logg = setup_logger(__name__)
+logger = setup_logger(__name__)
 
 class ReceiveFigmaJsonAPIView(APIView):
     figma = FigmaAPI(token=FIGMA_TOKEN)
 
+    @logs(logger, on=True)
     def get(self, request):
         file_id = request.data['file_id']
-        if get_cached_request(file_id):
-            return Response(data=get_cached_request(file_id), status=status.HTTP_200_OK)
-
         self.figma.file_id = file_id
-        logg.info(f'file_id: {file_id}')
+        logger.info(f'file_id: {file_id}')
 
         if request.data.get('filter'):
             filter_mode = request.data.get('filter').get('mode')
@@ -50,12 +47,14 @@ class ReceiveFigmaJsonAPIView(APIView):
                 case _:
                     raise Exception(f'Unknown filter mode: {filter_mode}')
 
+            key = gen_key(file_id, filter_mode, filter_params)
+
         else:
             data = self.figma.extract()
+            key = gen_key(file_id)
 
-        with open("output.json", "w", encoding="utf-8") as outfile:
-            json.dump(data, outfile, ensure_ascii=False, indent=4)
 
-        set_cached_request(file_id, data)
+        json_dump(data, 'output.json')
 
+        set_cached_request(key, data)
         return Response(data=data, status=status.HTTP_200_OK)
