@@ -618,3 +618,9 @@ SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE = {
     "center_ring_chart": {"infographicsType": "doughnut"},
     "center_bar_chart": {"infographicsType": "bar"},
 }
+
+# Slide layout names that should have forGeneration = false
+SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE = [
+    'one_rectangle_outline_icon_card_image_right',
+    'one_rectangle_outline_icon_card_image_left'
+]

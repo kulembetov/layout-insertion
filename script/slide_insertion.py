@@ -1367,11 +1367,19 @@ class NumberBasedSlideTypeStrategy(SlideTypeStrategy):
 
         # Determine if this slide should have forGeneration set to false
         for_generation = True
-        # Set forGeneration to False for 5cols, 6cols, 7cols
+        
+        # Check slide number-based logic (5cols, 6cols, 7cols)
         if number in [7, 10, 11]:
             for_generation = False
             logger.info(
                 f"Setting forGeneration to false for slide number {number} (5cols, 6cols, 7cols)"
+            )
+        
+        # Check slide layout name-based logic
+        if slide_layout.name in self.config.config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
+            for_generation = False
+            logger.info(
+                f"Setting forGeneration to false for slide layout name '{slide_layout.name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)"
             )
 
         if slide_layout.is_last or number == -1:
@@ -1504,8 +1512,16 @@ class ContentBasedSlideTypeStrategy(SlideTypeStrategy):
                 slide_layout.for_generation,
             )
 
+        # Check if forGeneration should be set to false based on slide layout name
+        for_generation = slide_layout.for_generation
+        if slide_layout.name in self.config.config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
+            for_generation = False
+            logger.info(
+                f"Setting forGeneration to false for slide layout name '{slide_layout.name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)"
+            )
+
         slide_type = self.config.get_slide_layout_type(type_key)
-        return type_key, slide_type, slide_layout.for_generation
+        return type_key, slide_type, for_generation
 
 
 # ================ Main SQL Generator ================
@@ -1823,6 +1839,13 @@ class SQLGenerator:
 
         # Initialize with a default for_generation value (will be updated by the strategy)
         for_generation = True
+        
+        # Check if forGeneration should be set to false based on slide layout name
+        if slide_layout_name in config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
+            for_generation = False
+            logger.info(
+                f"Setting forGeneration to false for slide layout name '{slide_layout_name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)"
+            )
 
         # Determine initial slide type based on number (camelCase)
         slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide_layout_number, "other")
@@ -2020,6 +2043,13 @@ class SQLGenerator:
         type_key = slide_type
         slide_layout.type_key = type_key  # camelCase
         slide_layout.type = slide_type  # camelCase
+        
+        # Check if forGeneration should be set to false based on slide layout name
+        if slide_layout.name in config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
+            slide_layout.for_generation = False
+            logger.info(
+                f"Setting forGeneration to false for slide layout name '{slide_layout.name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)"
+            )
         skip_number_types = set(
             [config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]]
         )
@@ -2242,6 +2272,15 @@ def _process_figma_slide(
     clean_slide_layout_name = strip_zindex(slide["slide_layout_name"])
     # Always use camelCase for type
     slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide["slide_layout_number"], "other")
+    
+    # Determine forGeneration based on slide layout name
+    for_generation = True
+    if clean_slide_layout_name in config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
+        for_generation = False
+        logger.info(
+            f"Setting forGeneration to false for slide layout name '{clean_slide_layout_name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)"
+        )
+    
     slide_layout = SlideLayout(
         id=slide_layout_id,
         name=clean_slide_layout_name,
@@ -2251,7 +2290,7 @@ def _process_figma_slide(
         type_key=slide_type,  # camelCase
         type=slide_type,  # camelCase
         icon_url="",  # Will be set below
-        for_generation=True,  # Will be set by SQLGenerator
+        for_generation=for_generation,
     )
     logger.info(f"Created SlideLayout: {slide_layout}")
     # Set icon_url using config and slide info (same as manual mode)
