@@ -162,7 +162,7 @@ class PasswordHasher:
     @staticmethod
     def generate_salt() -> str:
         """Generate a random salt between 64-127 bytes (matches Node.js implementation)."""
-        salt_length = random.randint(64, 127)  # Same range as Math.floor(Math.random() * 64 + 64)
+        salt_length = random.randint(64, 128)  # Fixed: should be 128, not 127
         return secrets.token_bytes(salt_length).hex()
     
     @staticmethod
@@ -172,13 +172,13 @@ class PasswordHasher:
         salt_bytes = bytes.fromhex(salt)
         
         # Use scrypt with Node.js default parameters:
-        # N=16384, r=8, p=1, dklen=64 (same as Node.js crypto.scrypt)
+        # Node.js crypto.scrypt defaults: N=16384, r=8, p=1
         derived_key = hashlib.scrypt(
             password.encode('utf-8'), 
             salt=salt_bytes, 
-            n=16384,  # CPU/memory cost parameter
-            r=8,      # Block size parameter  
-            p=1,      # Parallelization parameter
+            n=16384,  # CPU/memory cost parameter (Node.js default)
+            r=8,      # Block size parameter (Node.js default)
+            p=1,      # Parallelization parameter (Node.js default)
             dklen=64  # Derived key length (64 bytes = 128 hex chars)
         )
         return derived_key.hex()
