@@ -3,5 +3,5 @@ from api_v1.views import ReceiveFigmaJsonAPIView
 
 
 urlpatterns = [
-    path('figma/extract/wip/', ReceiveFigmaJsonAPIView.as_view()),
+    path('figma/extract/', ReceiveFigmaJsonAPIView.as_view()),
 ]
