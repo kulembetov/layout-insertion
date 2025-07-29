@@ -3,16 +3,20 @@ import requests
 from typing import Any, Optional
 from log_utils import setup_logger, logs
 
-from .filters.filter_settings import FilterMode, FilterConfig
-from .utils import Checker, Extractor, should_include, round5, get_slide_number, detect_slide_type, \
-    detect_block_type, count_sentences, normalize_font_family, block_to_dict
 from .data_classes import ExtractedBlock, ExtractedSlide
+from .filters.filter_settings import FilterMode, FilterConfig
+
+from api_v1.utils.helpers import round5, get_slide_number
+from api_v1.utils.checkers import Checker
+from api_v1.utils.filters import should_include
+from api_v1.utils.extractors import Extractor
+from api_v1.utils.builders import slide_to_dict
+from api_v1.utils.detectors import detect_slide_type, detect_block_type
 
 from api_v1.constants import BLOCKS, SLIDES, CONSTANTS
 
 
 logger = setup_logger(__name__)
-
 
 @logs(logger, on=True)
 class FigmaAPI:
@@ -128,7 +132,7 @@ class FigmaAPI:
                         'slide_layout_types': SLIDES.SLIDE_LAYOUT_TYPES
                     }
                 },
-                'slides': [self._slide_to_dict(slide) for slide in all_slides]
+                'slides': [slide_to_dict(slide) for slide in all_slides]
             }
 
         except requests.exceptions.RequestException as e:
@@ -234,97 +238,6 @@ class FigmaAPI:
             return False
         
         return True
-
-    @staticmethod
-    @logs(logger, on=True)
-    def _update_figure_config_with_names(slide_config, blocks):
-        # !REFACTOR
-        figure_blocks_by_name = {}
-        
-        for block in blocks:
-            if block.sql_type != 'figure':
-                continue
-
-            base_name = Extractor.extract_base_figure_name(block.name)
-            figure_blocks_by_name[base_name] = block
-            logger.info(f"[figureBlocks] Found figure block: '{block.name}' -> base_name: '{base_name}'")
-
-        new_figure_config = {}
-
-        for color_hex, obj_list in slide_config['figure'].items():
-            figure_objects = []
-            
-            for obj in obj_list:
-                figure_name = obj.get('figureName', '')
-                if not figure_name:
-                    continue
-                    
-                font_family = obj.get('fontFamily')
-                normalized_font_family = normalize_font_family(font_family)
-                fill_color = obj.get('color')
-                matching_block = figure_blocks_by_name.get(Extractor.extract_base_figure_name(figure_name))
-                clean_figure_name = Extractor.extract_base_figure_name(figure_name)
-                
-                if matching_block is not None:
-                    clean_figure_name = Extractor.extract_base_figure_name(matching_block.name)
-                    logger.info(f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
-                else:
-                    logger.info(f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
-
-                figure_obj = {
-                    "color": fill_color,
-                    "fontFamily": normalized_font_family,
-                    "figureName": clean_figure_name
-                }
-                figure_objects.append(figure_obj)
-            new_figure_config[color_hex] = figure_objects
-        slide_config['figure'] = new_figure_config
-        logger.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_by_name)} figure blocks")
-
-
-    def _slide_to_dict(self, slide: ExtractedSlide) -> dict[str, Any]:
-        """
-        Convert slide object to dictionary, using only the text block with the most text for sentence count.
-        Remove debug logs. Add slideColors extraction.
-        """
-        # Find the text block with the longest text_content
-        max_text_block = None
-        max_len = 0
-        for block in slide.blocks:
-            if block.sql_type == 'text':
-                text_content = getattr(block, 'text_content', None)
-                if text_content and len(text_content) > max_len:
-                    max_text_block = block
-                    max_len = len(text_content)
-        sentence_count = 1
-        if max_text_block:
-            text_content = getattr(max_text_block, 'text_content', None)
-            sentence_count = count_sentences(text_content)
-        if sentence_count == 0:
-            sentence_count = 1
-        # Extract slideConfig and palette colors if available
-        slide_config = {}
-        presentation_palette_colors = []
-        figma_node = getattr(slide, '_figma_node', None)
-        if figma_node:
-            slide_config, presentation_palette_colors = Extractor.extract_slide_config(figma_node)
-            # Build mapping from figure numbers to actual figure names and update slideConfig
-            if 'figure' in slide_config:
-                self._update_figure_config_with_names(slide_config, slide.blocks)
-        return {
-            'slide_number': slide.number,
-            'container_name': slide.container_name,
-            'frame_name': slide.frame_name,
-            'slide_type': slide.slide_type,
-            'sentences': sentence_count,
-            'frame_id': slide.frame_id,
-            'dimensions': slide.dimensions,
-            'folder_name': SLIDES.SLIDE_NUMBER_TO_FOLDER.get(slide.number, 'other'),
-            'blocks': [block_to_dict(block, slide_config) for block in slide.blocks],
-            'block_count': len(slide.blocks),
-            'slideConfig': slide_config,
-            'presentationPaletteColors': presentation_palette_colors
-        }
 
 
     # TO-DO: refactor ==========================================================================
