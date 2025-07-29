@@ -8,6 +8,7 @@ class FilterMode(Enum):
     SPECIFIC_SLIDES = "specific_slides"
     SPECIFIC_BLOCKS = "specific_blocks"
     BY_TYPE = "by_type"
+    READY_TO_DEV = "ready_to_dev"
 
 
 @dataclass
