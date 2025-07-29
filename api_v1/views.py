@@ -43,6 +43,9 @@ class ReceiveFigmaJsonAPIView(APIView):
 
                 case FilterMode.BY_TYPE.value:
                     data = figma_filtered.extract_by_type()
+
+                case FilterMode.READY_TO_DEV.value: 
+                    data = figma_filtered.extract_ready_to_dev()
                 
                 case _:
                     raise Exception(f'Unknown filter mode: {filter_mode}')

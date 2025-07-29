@@ -39,3 +39,8 @@ class FilterFigmaApi(FigmaAPI):
             target_containers=self.filter_params
         )
         return self.extract()
+    
+    def extract_ready_to_dev(self) -> Dict[str, Any]:
+        """Extract blocks marked as ready for development."""
+        self.filter_config = FilterConfig(mode=FilterMode.READY_TO_DEV)
+        return self.extract()

@@ -160,7 +160,7 @@ class FigmaAPI:
     def traverse_and_extract(self, node: dict[str, Any], parent_name: str = "") -> list[ExtractedSlide]:
         """Enhanced traversal with filtering"""
         slides = []
-        
+
         if self.is_target_frame(node):
             logger.info(f"Found target frame: \"{node['name']}\"")
             logger.info(f"Parent container: \"{parent_name}\"")
@@ -210,28 +210,26 @@ class FigmaAPI:
         
         return slides
 
+
     def is_target_frame(self, node: dict[str, Any]) -> bool:
-        """Check if node is a target frame, now supports 'ready to dev' marker"""
+        """Check if node is a target frame, now supports 'ready to dev' marker."""
 
         if not node.get('absoluteBoundingBox'):
             return False
         
-        # Checks if the frame name contains a Z-index.
         if self.filter_config.require_z_index and not Checker.check_z_index(node.get('name', '')):
             return False
         
-        # Checks for the 'ready to dev' label.
-        if not Checker.check_marker(
-            getattr(self.filter_config, 'ready_to_dev_marker', ''),
-            node.get('name', '')
-        ):
-            return False
-        
-        # Checks whether the frame size matches the target width and height.
+        if self.filter_config.mode == FilterMode.READY_TO_DEV:
+            if not Checker.check_marker(
+                getattr(self.filter_config, 'ready_to_dev_marker', ''),
+                node.get('name', '')
+            ):
+                return False
+    
         if not Checker.check_dimensions(node['absoluteBoundingBox']):
             return False
         
-        # Checks whether the frame area exceeds the minimum threshold.
         if not Checker.check_min_area(
             node['absoluteBoundingBox'], self.filter_config.min_area
         ):
