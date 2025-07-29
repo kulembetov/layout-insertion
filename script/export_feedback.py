@@ -498,7 +498,7 @@ class FeedbackExporter:
                 [stats.likes, stats.neutral, stats.dislikes],  # A3:C3
                 [f"{stats.likes_percent}%", f"{stats.neutral_percent}%", f"{stats.dislikes_percent}%"],  # A4:C4
                 [f"Всего: {stats.total} | Презентаций: {stats.presentations_count}"],  # A5 (merged)
-                [f"Ср. символов: {stats.avg_symbols} | Текст: {stats.avg_text_regenerations} | Изображения: {stats.avg_image_regenerations} | Инфографика: {stats.avg_infographics} | Слайды: {stats.avg_slide_changes} | Скачиваний: {stats.download_rate} | Ошибок: {stats.error_rate}%"]  # A6 (merged)
+                [f"Ср. символов: {stats.avg_symbols} | Текст: {stats.avg_text_regenerations} | Изображения: {stats.avg_image_regenerations} | Инфографика: {stats.avg_infographics} | Слайды: {stats.avg_slide_changes} | Скачиваний: {stats.download_rate}"]  # A6 (merged)
             ]
             
             # Prepare comments data (D column)
@@ -518,7 +518,7 @@ class FeedbackExporter:
                     settings_info += f" | Тема: {record.theme or 'N/A'}, Язык: {record.lang or 'N/A'}, Источник: {record.presentation_source or 'N/A'}"
                     settings_info += f" | Цвет: {record.color or 'N/A'}, Веб-поиск: {'Да' if record.use_web_search else 'Нет'}"
                     settings_info += f" | Стиль изображений: {record.image_style_type or 'N/A'}, Слайдов: {record.slides_count or 'N/A'}"
-                    settings_info += f" | Аудитория: {record.audience or 'N/A'}, Текст: {record.text_amount or 'N/A'}/{record.text_tone or 'N/A'}"
+                    settings_info += f" | Аудитория: {record.audience or 'N/A'}, Текст: {record.text_change or 'N/A'}/{record.text_amount or 'N/A'}/{record.text_tone or 'N/A'}"
                     
                     rating_text = {"like": "[ЛАЙК]", "dislike": "[ДИЗЛАЙК]", "neutral": "[НЕЙТРАЛЬНО]"}.get(record.rating.value, "[НЕИЗВЕСТНО]")
                     comment_text = f"[{record.presentation_name or 'Неизвестно'} | ID презентации: {record.presentation_id} {rating_text} {record.comment}{created_info}{settings_info}"

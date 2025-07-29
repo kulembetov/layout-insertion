@@ -12,6 +12,7 @@ import hashlib
 import secrets
 import configparser
 import random
+import time
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional, Dict, Any, List
@@ -54,6 +55,13 @@ class SubscriptionType(Enum):
     YEAR = "year"
     MONTH = "month"
     QUARTER = "quarter"
+
+
+class ABTestType(Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+    D = "D"
 
 
 class ExecutionMode(Enum):
@@ -161,15 +169,15 @@ class DatabaseManager:
 class PasswordHasher:
     @staticmethod
     def generate_salt() -> str:
-        """Generate a random salt between 64-127 bytes (matches Node.js implementation)."""
-        salt_length = random.randint(64, 128)  # Fixed: should be 128, not 127
+        """Generate a random salt with length between 64-128 bytes (matches Node.js implementation)."""
+        salt_length = random.randint(64, 128)  # Matches Node.js randomInt(64, 128)
         return secrets.token_bytes(salt_length).hex()
     
     @staticmethod
     def hash_password(password: str, salt: str) -> str:
         """Hash password with salt using scrypt (matches Node.js crypto.scrypt)."""
-        # Convert hex salt back to bytes
-        salt_bytes = bytes.fromhex(salt)
+        # Node.js treats salt as UTF-8 string, not hex-encoded bytes
+        salt_bytes = salt.encode('utf-8')
         
         # Use scrypt with Node.js default parameters:
         # Node.js crypto.scrypt defaults: N=16384, r=8, p=1
@@ -197,8 +205,31 @@ class UserAccountCreator:
         self.sql_statements = []  # Store generated SQL statements for manual mode
     
     def generate_uuid7(self) -> str:
-        """Generate UUID7-like string (using UUID4 for simplicity)."""
-        return str(uuid.uuid4())
+        """Generate a UUID version 7 (time-ordered UUID)."""
+        # Get current UNIX timestamp (milliseconds)
+        unix_ts_ms = int(time.time() * 1000)
+
+        # Convert to bytes (48 bits for timestamp)
+        ts_bytes = unix_ts_ms.to_bytes(6, byteorder="big")
+
+        # Generate 74 random bits (9 bytes with 2 bits used for version and variant)
+        random_bytes = uuid.uuid4().bytes[6:]
+
+        # Create the UUID combining timestamp and random bits
+        # First 6 bytes from timestamp, rest from random
+        uuid_bytes = ts_bytes + random_bytes
+
+        # Set the version (7) in the 6th byte
+        uuid_bytes = (
+            uuid_bytes[0:6] + bytes([((uuid_bytes[6] & 0x0F) | 0x70)]) + uuid_bytes[7:]
+        )
+
+        # Set the variant (RFC 4122) in the 8th byte
+        uuid_bytes = (
+            uuid_bytes[0:8] + bytes([((uuid_bytes[8] & 0x3F) | 0x80)]) + uuid_bytes[9:]
+        )
+
+        return str(uuid.UUID(bytes=uuid_bytes))
     
     def add_sql_statement(self, description: str, query: str, params: tuple = None):
         """Add SQL statement to the list (for manual mode)."""
@@ -303,6 +334,34 @@ class UserAccountCreator:
         user_data['ip'] = ip_address if ip_address else None
         
         return user_data
+    
+    def get_ab_test_input(self) -> Optional[str]:
+        """Get AB test group information from user input."""
+        print("\n=== AB Test Group Setup ===")
+        
+        # Ask if user wants to create an AB test group
+        create_ab_test = input("Create AB test group? (y/N): ").strip().lower()
+        if create_ab_test not in ['y', 'yes']:
+            return None
+        
+        # Display available AB test types
+        print("\nAvailable AB test types:")
+        for i, ab_type in enumerate(ABTestType, 1):
+            print(f"{i}. {ab_type.value}")
+        
+        while True:
+            try:
+                type_choice = input(f"Select AB test type (1-{len(ABTestType)}, default: A): ").strip()
+                if not type_choice:
+                    return ABTestType.A.value
+                else:
+                    type_index = int(type_choice) - 1
+                    if 0 <= type_index < len(ABTestType):
+                        return list(ABTestType)[type_index].value
+                    else:
+                        print("Invalid choice. Please try again.")
+            except ValueError:
+                print("Please enter a valid number.")
     
     def create_user_account(self, user_data: Dict[str, Any]) -> str:
         """Create a complete user account with all necessary records."""
@@ -600,15 +659,16 @@ VALUES (%s, %s, %s, %s, %s, %s)"""
                     ))
                     
                     # 2. Create Subscription record
-                    subscription_query = """INSERT INTO "Subscription" (id, "userId", "planId", "createdAt", "expiredAt", "activeUntil")
-VALUES (%s, %s, %s, %s, %s, %s)"""
+                    subscription_query = """INSERT INTO "Subscription" (id, "userId", "planId", "createdAt", "expiredAt", "isActive", "nextPaymentAt")
+VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                     cursor.execute(subscription_query, (
                         subscription_id,
                         user_id,
                         plan['id'],
                         now,
                         expired_at,
-                        expired_at
+                        payment_status == PaymentStatus.SUCCEEDED.value,  # Only active if payment succeeded
+                        expired_at  # Set nextPaymentAt to same as expiredAt for now
                     ))
                     
                     # 3. Create SymbolsPurchase record
@@ -656,15 +716,16 @@ VALUES (%s, %s, %s, %s, %s, %s)"""
                 ))
                 
                 # 2. Subscription record
-                subscription_query = """INSERT INTO "Subscription" (id, "userId", "planId", "createdAt", "expiredAt", "activeUntil")
-VALUES (%s, %s, %s, %s, %s, %s)"""
+                subscription_query = """INSERT INTO "Subscription" (id, "userId", "planId", "createdAt", "expiredAt", "isActive", "nextPaymentAt")
+VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                 self.add_sql_statement("Create Subscription record", subscription_query, (
                     subscription_id,
                     user_id,
                     plan['id'],
                     now,
                     expired_at,
-                    expired_at
+                    payment_status == PaymentStatus.SUCCEEDED.value,  # Only active if payment succeeded
+                    expired_at  # Set nextPaymentAt to same as expiredAt for now
                 ))
                 
                 # 3. SymbolsPurchase record
@@ -712,6 +773,46 @@ WHERE "userId" = %s"""
             if self.db.mode == ExecutionMode.AUTO:
                 self.db.connection.rollback()
             print(f"Failed to create subscription: {e}")
+            raise
+    
+    def create_ab_user_group(self, user_id: str, ab_test_type: str) -> bool:
+        """Create an ABUserGroup record for the user."""
+        if self.db.mode == ExecutionMode.MANUAL:
+            print("Generating ABUserGroup SQL...")
+        else:
+            print("Creating ABUserGroup record...")
+        
+        try:
+            if self.db.mode == ExecutionMode.AUTO:
+                # Auto mode: Execute SQL statement
+                with self.db.connection.cursor() as cursor:
+                    ab_user_group_query = """INSERT INTO "ABUserGroup" ("userId", type)
+VALUES (%s, %s)"""
+                    cursor.execute(ab_user_group_query, (user_id, ab_test_type))
+                
+                # Commit transaction
+                self.db.connection.commit()
+                
+            else:
+                # Manual mode: Generate SQL statement
+                ab_user_group_query = """INSERT INTO "ABUserGroup" ("userId", type)
+VALUES (%s, %s)"""
+                self.add_sql_statement("Create ABUserGroup record", ab_user_group_query, (user_id, ab_test_type))
+            
+            if self.db.mode == ExecutionMode.AUTO:
+                print("ABUserGroup record created successfully!")
+            else:
+                print("ABUserGroup SQL generated!")
+                
+            print(f"User ID: {user_id} | AB Test Type: {ab_test_type}")
+            
+            return True
+            
+        except psycopg2.Error as e:
+            # Rollback transaction on error (only in auto mode)
+            if self.db.mode == ExecutionMode.AUTO:
+                self.db.connection.rollback()
+            print(f"Failed to create ABUserGroup record: {e}")
             raise
 
 
@@ -794,6 +895,18 @@ def main():
                                 print(f"Subscription creation failed: {sub_error}")
                         else:
                             print("No subscription created.")
+                        
+                        # Get AB test group input and create record
+                        ab_test_type = creator.get_ab_test_input()
+                        if ab_test_type:
+                            try:
+                                creator.create_ab_user_group(user_id, ab_test_type)
+                                if mode == ExecutionMode.AUTO:
+                                    print("ABUserGroup verification: PASSED")
+                            except Exception as ab_error:
+                                print(f"ABUserGroup creation failed: {ab_error}")
+                        else:
+                            print("No AB test group created.")
                     else:
                         print("Account verification: FAILED")
                     
