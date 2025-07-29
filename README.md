@@ -7,6 +7,7 @@ This repository is organized to support a full workflow from Figma design extrac
 - `sql_validator.py`: Validates generated SQL files for syntax and referential integrity before database insertion.
 - `sql_pollution.py`: Executes validated SQL files against the target PostgreSQL database.
 - `slide_deletion.py`: Handles deletion of slides, blocks, and images from the database, supporting selective and batch operations.
+- `account_creation.py`: Creates user accounts with authentication, subscriptions, payments, and AB testing groups in the database.
 - `insert_palette.py`, `insert_block_layout_config.py`, `match_block_layout_presentation_palette.py`: Scripts for managing palette and block layout configuration, including mapping and matching between Figma and database structures.
 - `config.py`: Central configuration file for all scripts, storing Figma API credentials, mappings, and default values.
 - `database.ini`: Stores database connection parameters for PostgreSQL.
@@ -110,6 +111,9 @@ python sql_pollution.py
 
 # 8. Delete from the DB (blocks, slides, images)
 python slide_deletion.py
+
+# 9. Create user accounts (optional)
+python account_creation.py
 ```
 
 **macOS:**
@@ -143,6 +147,9 @@ python3 sql_pollution.py
 
 # 8. Delete from the DB (blocks, slides, images)
 python3 slide_deletion.py
+
+# 9. Create user accounts (optional)
+python3 account_creation.py
 ```
 
 ---
@@ -286,6 +293,24 @@ python3 slide_deletion.py
 - **Dependencies:** `psycopg2`, `json`, `argparse`, `config`
 - **Usage:** `python match_block_layout_presentation_palette.py`
 
+### `account_creation.py`
+- **Purpose:** Creates complete user accounts with authentication, subscriptions, payments, and AB testing groups
+- **Functionality:** 
+  - Creates user accounts with role-based access control (ADMIN, USER, MIIN, etc.)
+  - Supports multiple authentication providers (local, Google, Yandex, VKontakte, Telegram)
+  - Generates secure password hashes using scrypt algorithm (compatible with Node.js)
+  - Creates subscriptions with payment tracking and symbol purchases
+  - Manages user balances and subscription symbols
+  - Creates AB testing group assignments for user segmentation
+  - Supports both automatic (direct DB) and manual (SQL generation) modes
+  - Generates UUID7 time-ordered identifiers for better database performance
+- **Configuration:** 
+  - Requires `database.ini` with PostgreSQL connection parameters
+  - Uses Prisma schema for table structure validation
+  - Supports custom subscription plans and payment statuses
+- **Dependencies:** `psycopg2`, `uuid`, `hashlib`, `secrets`, `datetime`, `enum`
+- **Usage:** `python account_creation.py` (interactive mode) or `python account_creation.py --mode auto`
+
 ### `migrate_images.py`
 - **Purpose:** Migrates images from Google Drive to Yandex Cloud Object Storage
 - **Functionality:** 
@@ -311,6 +336,7 @@ python3 slide_deletion.py
 - `sql_validator.py`: Валидирует сгенерированные SQL-файлы на синтаксис и целостность связей перед загрузкой в базу.
 - `sql_pollution.py`: Выполняет валидированные SQL-файлы в целевой базе PostgreSQL.
 - `slide_deletion.py`: Удаляет слайды, блоки и изображения из базы, поддерживает выборочное и пакетное удаление.
+- `account_creation.py`: Создает пользовательские аккаунты с аутентификацией, подписками, платежами и группами AB-тестирования в базе данных.
 - `insert_palette.py`, `insert_block_layout_config.py`, `match_block_layout_presentation_palette.py`: Скрипты для управления палитрами и конфигурацией блоков, включая сопоставление между Figma и структурой базы.
 - `config.py`: Центральный конфиг для всех скриптов, хранит параметры Figma API, маппинги и значения по умолчанию.
 - `database.ini`: Параметры подключения к PostgreSQL.
@@ -422,6 +448,9 @@ python sql_pollution.py
 
 # 8. Удаление из БД (блоков, слайдов, изображений)
 python slide_deletion.py
+
+# 9. Создание пользовательских аккаунтов (опционально)
+python account_creation.py
 ```
 
 **macOS:**
@@ -455,6 +484,9 @@ python3 sql_pollution.py
 
 # 8. Удаление из БД (блоков, слайдов, изображений)
 python3 slide_deletion.py
+
+# 9. Создание пользовательских аккаунтов (опционально)
+python3 account_creation.py
 ```
 
 
@@ -598,6 +630,24 @@ python3 slide_deletion.py
   - Поддерживает пользовательские алгоритмы сопоставления и правила
 - **Зависимости:** `psycopg2`, `json`, `argparse`, `config`
 - **Использование:** `python match_block_layout_presentation_palette.py`
+
+### `account_creation.py`
+- **Назначение:** Создает полные пользовательские аккаунты с аутентификацией, подписками, платежами и группами AB-тестирования
+- **Функциональность:** 
+  - Создает пользовательские аккаунты с ролевым доступом (ADMIN, USER, MIIN и т.д.)
+  - Поддерживает несколько провайдеров аутентификации (local, Google, Yandex, VKontakte, Telegram)
+  - Генерирует безопасные хеши паролей с использованием алгоритма scrypt (совместим с Node.js)
+  - Создает подписки с отслеживанием платежей и покупками символов
+  - Управляет балансами пользователей и символами подписок
+  - Создает назначения групп AB-тестирования для сегментации пользователей
+  - Поддерживает как автоматический (прямая БД), так и ручной (генерация SQL) режимы
+  - Генерирует UUID7 временно-упорядоченные идентификаторы для лучшей производительности БД
+- **Конфигурация:** 
+  - Требует `database.ini` с параметрами подключения PostgreSQL
+  - Использует схему Prisma для валидации структуры таблиц
+  - Поддерживает пользовательские планы подписок и статусы платежей
+- **Зависимости:** `psycopg2`, `uuid`, `hashlib`, `secrets`, `datetime`, `enum`
+- **Использование:** `python account_creation.py` (интерактивный режим) или `python account_creation.py --mode auto`
 
 ### `migrate_images.py`
 - **Назначение:** Переносит изображения из Google Drive в объектное хранилище Yandex Cloud

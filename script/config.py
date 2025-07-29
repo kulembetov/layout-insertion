@@ -103,7 +103,7 @@ PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
     "default_colors": [
         "#bae4e4",  # мятно-бирюзовый
         "#c6d6f2",  # холодно-синий
-        "#dfe8f5",  # небесно-голубой
+        "#d2def0",  # небесно-голубой
         "#e3dcf8",  # сиреневый
         "#f0f0f0",  # светло-серый
         "#f5e7e7",  # розово-бежевый

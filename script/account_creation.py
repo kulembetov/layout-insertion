@@ -170,24 +170,21 @@ class PasswordHasher:
     @staticmethod
     def generate_salt() -> str:
         """Generate a random salt with length between 64-128 bytes (matches Node.js implementation)."""
-        salt_length = random.randint(64, 128)  # Matches Node.js randomInt(64, 128)
+        salt_length = random.randint(64, 128)
         return secrets.token_bytes(salt_length).hex()
     
     @staticmethod
     def hash_password(password: str, salt: str) -> str:
         """Hash password with salt using scrypt (matches Node.js crypto.scrypt)."""
-        # Node.js treats salt as UTF-8 string, not hex-encoded bytes
         salt_bytes = salt.encode('utf-8')
         
-        # Use scrypt with Node.js default parameters:
-        # Node.js crypto.scrypt defaults: N=16384, r=8, p=1
         derived_key = hashlib.scrypt(
             password.encode('utf-8'), 
             salt=salt_bytes, 
-            n=16384,  # CPU/memory cost parameter (Node.js default)
-            r=8,      # Block size parameter (Node.js default)
-            p=1,      # Parallelization parameter (Node.js default)
-            dklen=64  # Derived key length (64 bytes = 128 hex chars)
+            n=16384,
+            r=8,
+            p=1,
+            dklen=64
         )
         return derived_key.hex()
     
@@ -206,25 +203,17 @@ class UserAccountCreator:
     
     def generate_uuid7(self) -> str:
         """Generate a UUID version 7 (time-ordered UUID)."""
-        # Get current UNIX timestamp (milliseconds)
         unix_ts_ms = int(time.time() * 1000)
-
-        # Convert to bytes (48 bits for timestamp)
         ts_bytes = unix_ts_ms.to_bytes(6, byteorder="big")
-
-        # Generate 74 random bits (9 bytes with 2 bits used for version and variant)
         random_bytes = uuid.uuid4().bytes[6:]
-
-        # Create the UUID combining timestamp and random bits
-        # First 6 bytes from timestamp, rest from random
         uuid_bytes = ts_bytes + random_bytes
 
-        # Set the version (7) in the 6th byte
+        # Set version (7) in the 6th byte
         uuid_bytes = (
             uuid_bytes[0:6] + bytes([((uuid_bytes[6] & 0x0F) | 0x70)]) + uuid_bytes[7:]
         )
 
-        # Set the variant (RFC 4122) in the 8th byte
+        # Set variant (RFC 4122) in the 8th byte
         uuid_bytes = (
             uuid_bytes[0:8] + bytes([((uuid_bytes[8] & 0x3F) | 0x80)]) + uuid_bytes[9:]
         )
@@ -375,9 +364,8 @@ class UserAccountCreator:
         
         try:
             if self.db.mode == ExecutionMode.AUTO:
-                # Auto mode: Execute SQL statements
                 with self.db.connection.cursor() as cursor:
-                    # 1. Create User record
+                    # Create User record
                     user_query = """INSERT INTO "User" (id, role, username, image, ip, "createdAt", "presentationsCount")
 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                     cursor.execute(user_query, (
@@ -390,7 +378,7 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                         0
                     ))
                     
-                    # 2. Create Auth record
+                    # Create Auth record
                     auth_query = """INSERT INTO "Auth" (id, provider, key, "userId")
 VALUES (%s, %s, %s, %s)"""
                     auth_key = user_data.get('auth_key', user_data.get('username', user_id))
@@ -401,7 +389,7 @@ VALUES (%s, %s, %s, %s)"""
                         user_id
                     ))
                     
-                    # 3. Create Password record (only for local auth)
+                    # Create Password record (only for local auth)
                     if user_data['provider'] == Provider.LOCAL.value and 'password' in user_data:
                         salt = self.hasher.generate_salt()
                         hashed_password = self.hasher.hash_password(user_data['password'], salt)
@@ -410,17 +398,15 @@ VALUES (%s, %s, %s, %s)"""
 VALUES (%s, %s, %s)"""
                         cursor.execute(password_query, (user_id, hashed_password, salt))
                     
-                    # 4. Create Balance record
+                    # Create Balance record
                     balance_query = """INSERT INTO "Balance" ("userId", symbols, "subscriptionSymbols")
 VALUES (%s, %s, %s)"""
                     cursor.execute(balance_query, (user_id, 0, 0))
                     
-                # Commit transaction
                 self.db.connection.commit()
                 
             else:
-                # Manual mode: Generate SQL statements
-                # 1. User record
+                # Generate SQL statements
                 user_query = """INSERT INTO "User" (id, role, username, image, ip, "createdAt", "presentationsCount")
 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                 self.add_sql_statement("Create User record", user_query, (
@@ -433,7 +419,6 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                     0
                 ))
                 
-                # 2. Auth record
                 auth_query = """INSERT INTO "Auth" (id, provider, key, "userId")
 VALUES (%s, %s, %s, %s)"""
                 auth_key = user_data.get('auth_key', user_data.get('username', user_id))
@@ -444,7 +429,6 @@ VALUES (%s, %s, %s, %s)"""
                     user_id
                 ))
                 
-                # 3. Password record (only for local auth)
                 if user_data['provider'] == Provider.LOCAL.value and 'password' in user_data:
                     salt = self.hasher.generate_salt()
                     hashed_password = self.hasher.hash_password(user_data['password'], salt)
@@ -453,7 +437,6 @@ VALUES (%s, %s, %s, %s)"""
 VALUES (%s, %s, %s)"""
                     self.add_sql_statement("Create Password record", password_query, (user_id, hashed_password, salt))
                 
-                # 4. Balance record
                 balance_query = """INSERT INTO "Balance" ("userId", symbols, "subscriptionSymbols")
 VALUES (%s, %s, %s)"""
                 self.add_sql_statement("Create Balance record", balance_query, (user_id, 0, 0))
@@ -468,7 +451,6 @@ VALUES (%s, %s, %s)"""
             return user_id
             
         except psycopg2.Error as e:
-            # Rollback transaction on error (only in auto mode)
             if self.db.mode == ExecutionMode.AUTO:
                 self.db.connection.rollback()
             print(f"Failed to create user account: {e}")
@@ -643,9 +625,8 @@ VALUES (%s, %s, %s)"""
         
         try:
             if self.db.mode == ExecutionMode.AUTO:
-                # Auto mode: Execute SQL statements
                 with self.db.connection.cursor() as cursor:
-                    # 1. Create Payment record
+                    # Create Payment record
                     payment_query = """INSERT INTO "Payment" (id, "userId", status, price, description, "createdAt")
 VALUES (%s, %s, %s, %s, %s, %s)"""
                     payment_description = f"Subscription to {plan['name'] or 'Plan'}"
@@ -658,7 +639,7 @@ VALUES (%s, %s, %s, %s, %s, %s)"""
                         now
                     ))
                     
-                    # 2. Create Subscription record
+                    # Create Subscription record
                     subscription_query = """INSERT INTO "Subscription" (id, "userId", "planId", "createdAt", "expiredAt", "isActive", "nextPaymentAt")
 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                     cursor.execute(subscription_query, (
@@ -667,11 +648,11 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                         plan['id'],
                         now,
                         expired_at,
-                        payment_status == PaymentStatus.SUCCEEDED.value,  # Only active if payment succeeded
-                        expired_at  # Set nextPaymentAt to same as expiredAt for now
+                        payment_status == PaymentStatus.SUCCEEDED.value,
+                        expired_at
                     ))
                     
-                    # 3. Create SymbolsPurchase record
+                    # Create SymbolsPurchase record
                     symbols_purchase_query = """INSERT INTO "SymbolsPurchase" (id, "userId", symbols, price, "planId", "isActive", "createdAt", "paymentId")
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
                     cursor.execute(symbols_purchase_query, (
@@ -680,29 +661,27 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
                         plan['symbols'],
                         plan['price'],
                         plan['id'],
-                        payment_status == PaymentStatus.SUCCEEDED.value,  # Only active if payment succeeded
+                        payment_status == PaymentStatus.SUCCEEDED.value,
                         now,
                         payment_id
                     ))
                     
-                    # 4. Create SubscriptionPayment junction record
+                    # Create SubscriptionPayment junction record
                     subscription_payment_query = """INSERT INTO "SubscriptionPayment" ("subscriptionId", "paymentId")
 VALUES (%s, %s)"""
                     cursor.execute(subscription_payment_query, (subscription_id, payment_id))
                     
-                    # 5. Update user's balance if payment succeeded
+                    # Update user's balance if payment succeeded
                     if payment_status == PaymentStatus.SUCCEEDED.value:
                         balance_update_query = """UPDATE "Balance"
 SET "subscriptionSymbols" = "subscriptionSymbols" + %s
 WHERE "userId" = %s"""
                         cursor.execute(balance_update_query, (plan['symbols'], user_id))
                 
-                # Commit transaction
                 self.db.connection.commit()
                 
             else:
-                # Manual mode: Generate SQL statements
-                # 1. Payment record
+                # Generate SQL statements
                 payment_query = """INSERT INTO "Payment" (id, "userId", status, price, description, "createdAt")
 VALUES (%s, %s, %s, %s, %s, %s)"""
                 payment_description = f"Subscription to {plan['name'] or 'Plan'}"
@@ -715,7 +694,6 @@ VALUES (%s, %s, %s, %s, %s, %s)"""
                     now
                 ))
                 
-                # 2. Subscription record
                 subscription_query = """INSERT INTO "Subscription" (id, "userId", "planId", "createdAt", "expiredAt", "isActive", "nextPaymentAt")
 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                 self.add_sql_statement("Create Subscription record", subscription_query, (
@@ -724,11 +702,10 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                     plan['id'],
                     now,
                     expired_at,
-                    payment_status == PaymentStatus.SUCCEEDED.value,  # Only active if payment succeeded
-                    expired_at  # Set nextPaymentAt to same as expiredAt for now
+                    payment_status == PaymentStatus.SUCCEEDED.value,
+                    expired_at
                 ))
                 
-                # 3. SymbolsPurchase record
                 symbols_purchase_query = """INSERT INTO "SymbolsPurchase" (id, "userId", symbols, price, "planId", "isActive", "createdAt", "paymentId")
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
                 self.add_sql_statement("Create SymbolsPurchase record", symbols_purchase_query, (
@@ -742,12 +719,10 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
                     payment_id
                 ))
                 
-                # 4. SubscriptionPayment junction record
                 subscription_payment_query = """INSERT INTO "SubscriptionPayment" ("subscriptionId", "paymentId")
 VALUES (%s, %s)"""
                 self.add_sql_statement("Create SubscriptionPayment junction record", subscription_payment_query, (subscription_id, payment_id))
                 
-                # 5. Update balance if payment succeeded
                 if payment_status == PaymentStatus.SUCCEEDED.value:
                     balance_update_query = """UPDATE "Balance"
 SET "subscriptionSymbols" = "subscriptionSymbols" + %s
@@ -769,7 +744,6 @@ WHERE "userId" = %s"""
             }
             
         except psycopg2.Error as e:
-            # Rollback transaction on error (only in auto mode)
             if self.db.mode == ExecutionMode.AUTO:
                 self.db.connection.rollback()
             print(f"Failed to create subscription: {e}")
@@ -784,17 +758,14 @@ WHERE "userId" = %s"""
         
         try:
             if self.db.mode == ExecutionMode.AUTO:
-                # Auto mode: Execute SQL statement
                 with self.db.connection.cursor() as cursor:
                     ab_user_group_query = """INSERT INTO "ABUserGroup" ("userId", type)
 VALUES (%s, %s)"""
                     cursor.execute(ab_user_group_query, (user_id, ab_test_type))
                 
-                # Commit transaction
                 self.db.connection.commit()
                 
             else:
-                # Manual mode: Generate SQL statement
                 ab_user_group_query = """INSERT INTO "ABUserGroup" ("userId", type)
 VALUES (%s, %s)"""
                 self.add_sql_statement("Create ABUserGroup record", ab_user_group_query, (user_id, ab_test_type))
@@ -809,7 +780,6 @@ VALUES (%s, %s)"""
             return True
             
         except psycopg2.Error as e:
-            # Rollback transaction on error (only in auto mode)
             if self.db.mode == ExecutionMode.AUTO:
                 self.db.connection.rollback()
             print(f"Failed to create ABUserGroup record: {e}")
