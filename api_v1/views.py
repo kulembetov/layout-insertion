@@ -9,7 +9,7 @@ from config.settings import FIGMA_TOKEN
 
 from log_utils import setup_logger, logs
 
-from .services.redis_utils import gen_key, set_cached_request
+from api_v1.redis.utils import gen_key, set_cached_request
 from .services.filters.filter_service import FilterFigmaApi
 from .services.utils import json_dump
 
