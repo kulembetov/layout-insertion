@@ -11,7 +11,7 @@ from log_utils import setup_logger, logs
 
 from api_v1.redis.utils import gen_key, set_cached_request
 from .services.filters.filter_service import FilterFigmaApi
-from .services.utils import json_dump
+from api_v1.utils.helpers import json_dump
 
 
 logger = setup_logger(__name__)
