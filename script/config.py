@@ -103,11 +103,11 @@ PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
     "default_colors": [
         "#bae4e4",  # мятно-бирюзовый
         "#c6d6f2",  # холодно-синий
-        "#e0e8f5",  # небесно-голубой
+        "#dfe8f5",  # небесно-голубой
         "#e3dcf8",  # сиреневый
         "#f0f0f0",  # светло-серый
         "#f5e7e7",  # розово-бежевый
-        "#fce0d2",  # персиково-оранжевый
+        "#fad2be",  # персиково-оранжевый
     ],
     "prefix": ["Green", "Blue", "Sky", "Purple", "Gray", "Pink", "Orange"],
 }
@@ -618,9 +618,3 @@ SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE = {
     "center_ring_chart": {"infographicsType": "doughnut"},
     "center_bar_chart": {"infographicsType": "bar"},
 }
-
-# Slide layout names that should have forGeneration = false
-SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE = [
-    'one_rectangle_outline_icon_card_image_right',
-    'one_rectangle_outline_icon_card_image_left'
-]
