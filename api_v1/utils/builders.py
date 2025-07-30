@@ -4,7 +4,7 @@ from api_v1.constants import BLOCKS, SLIDES
 from api_v1.services.data_classes import ExtractedBlock, ExtractedSlide
 from api_v1.utils.extractors import Extractor
 from api_v1.utils.font import normalize_font_family
-from api_v1.utils.helpers import safe_in
+from api_v1.utils.helpers import safe_in, json_dump
 from api_v1.utils.text import count_words, count_sentences
 
 
@@ -15,10 +15,13 @@ class BlockBuilder:
     This is the single source of truth for block dict construction.
     Adds figure_info and precompiled_image_info if relevant.
     Always includes both has_corner_radius (bool) and corner_radius (list of 4 ints).
+
+    Comments: dict -> look 'fetch_comments' in FigmaAPI.
     """
-    def __init__(self, block: dict | ExtractedBlock, slide_config: Optional[dict] = None):
+    def __init__(self, block: dict | ExtractedBlock, comments: dict, slide_config: Optional[dict] = None):
         self.block = block
         self.slide_config = slide_config
+        self.comments = comments
         self.block_dict: dict = {}
 
     def get(self, key: str) -> Optional[Any]:
@@ -34,6 +37,7 @@ class BlockBuilder:
             'sql_type': self.get('sql_type'),
             'dimensions': self.get('dimensions'),
             'styles': self.get('styles'),
+            'comments': self.__fill_comments(),
             'is_target': self.get('is_target'),
             'needs_null_styles': self.get('sql_type') in BLOCKS.BLOCK_TYPES['null_style_types'],
             'needs_z_index': self.get('sql_type') in BLOCKS.BLOCK_TYPES['z_index_types'],
@@ -41,6 +45,12 @@ class BlockBuilder:
             'has_corner_radius': self.get('has_corner_radius') if self.get('has_corner_radius') is not None else False,
             'corner_radius': self.get('corner_radius') if self.get('corner_radius') is not None else [0, 0, 0, 0],
         }
+
+    def __fill_comments(self) -> list:
+        node_id = self.get('id')
+        if node_id and self.comments.get(node_id):
+            return self.comments.get(node_id)
+        return []
 
     def _fill_words(self) -> None:
         text_content = self.get('text_content')
@@ -186,9 +196,12 @@ class BlockBuilder:
         return self.block_dict
 
 
-def block_to_dict(block: ExtractedBlock, slide_config: Optional[dict] = None):
-    # Convert block to dict construction
-    return BlockBuilder(block, slide_config).build()
+def block_to_dict(block: ExtractedBlock, comments: dict, slide_config: Optional[dict] = None):
+    """
+    Convert block to dict construction
+    Comments: dict -> look 'fetch_comments' in FigmaAPI.
+    """
+    return BlockBuilder(block, comments, slide_config).build()
 
 
 # codeblock for 'slide_to_dict', don't use/import this
@@ -239,10 +252,12 @@ def _update_figure_config_with_names(slide_config, blocks):
     # logger.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_by_name)} figure blocks")
 
 
-def slide_to_dict(slide: ExtractedSlide) -> dict[str, Any]:
+def slide_to_dict(slide: ExtractedSlide, comments: dict) -> dict[str, Any]:
     """
     Convert slide object to dictionary, using only the text block with the most text for sentence count.
     Remove debug logs. Add slideColors extraction.
+
+    Comments: dict -> look 'fetch_comments' in FigmaAPI.
     """
     # Find the text block with the longest text_content
     max_text_block = None
@@ -277,7 +292,7 @@ def slide_to_dict(slide: ExtractedSlide) -> dict[str, Any]:
         'frame_id': slide.frame_id,
         'dimensions': slide.dimensions,
         'folder_name': SLIDES.SLIDE_NUMBER_TO_FOLDER.get(slide.number, 'other'),
-        'blocks': [block_to_dict(block, slide_config) for block in slide.blocks],
+        'blocks': [block_to_dict(block, comments, slide_config) for block in slide.blocks],
         'block_count': len(slide.blocks),
         'slideConfig': slide_config,
         'presentationPaletteColors': presentation_palette_colors

@@ -12,6 +12,7 @@ class ExtractedBlock:
     styles: dict[str, Any]
     slide_number: int
     parent_container: str
+    comments: list = field(default_factory=list)
     is_target: bool = False
     has_corner_radius: bool = False
     corner_radius: list[int] = field(default_factory=lambda: [0, 0, 0, 0])

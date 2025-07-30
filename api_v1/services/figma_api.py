@@ -74,6 +74,49 @@ class FigmaAPI:
         response.raise_for_status()
         return response.json()['document']['children']
 
+    @logs(logger, on=True)
+    def fetch_comments(self) -> dict:
+        """Fetch comments from the Figma API and map them by node_id with full metadata."""
+        try:
+            response = requests.get(
+                f"https://api.figma.com/v1/files/{self.file_id}/comments",
+                headers=self.headers
+            )
+            response.raise_for_status()
+            comments_data = response.json().get("comments", [])
+            node_comments = {}
+
+            for comment in comments_data:
+                client_meta = comment.get("client_meta")
+                comment_info = {
+                    "message": comment.get("message", ""),
+                    "user": comment.get("user", {}),
+                    "created_at": comment.get("created_at"),
+                    "resolved_at": comment.get("resolved_at"),
+                    "comment_id": comment.get("id"),
+                    "parent_id": comment.get("parent_id"),
+                }
+
+                if isinstance(client_meta, list):
+                    for meta in client_meta:
+                        node_id = meta.get("node_id")
+                        if node_id:
+                            node_comments.setdefault(node_id, []).append(comment_info)
+                elif isinstance(client_meta, dict):
+                    node_id = client_meta.get("node_id")
+                    if node_id:
+                        node_comments.setdefault(node_id, []).append(comment_info)
+
+            logger.info(f"Fetched {len(comments_data)} comments for {len(node_comments)} nodes")
+            if node_comments:
+                logger.info(
+                    f"Comment distribution: {list(node_comments.keys())[:5]}...")  # Show first 5 node IDs
+            return node_comments
+
+        except Exception as e:
+            logger.debug(f"Failed to fetch comments: {e}")
+            return {}
+
 
     # =========== Extract codeblocks ==============
     @logs(logger, on=True)
@@ -114,6 +157,7 @@ class FigmaAPI:
         try:
             all_slides = self._get_slides()
             summary = self._get_summary(all_slides)
+            comments = self.fetch_comments()
 
             return {
                 'metadata': {
@@ -132,7 +176,7 @@ class FigmaAPI:
                         'slide_layout_types': SLIDES.SLIDE_LAYOUT_TYPES
                     }
                 },
-                'slides': [slide_to_dict(slide) for slide in all_slides]
+                'slides': [slide_to_dict(slide, comments) for slide in all_slides]
             }
 
         except requests.exceptions.RequestException as e:
