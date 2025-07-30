@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "d1c40461-e9a5-4faf-83dc-f628ddcc767b",
+		"_postman_id": "4f0ac79c-7d72-472c-a3d9-821b24f1bbe2",
 		"name": "Present Simple Figma Script Django",
 		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
 		"_exporter_id": "36808934"
@@ -23,7 +23,7 @@
 						}
 					}
 				},
-				"url": "http://127.0.0.1:8000/api_v1/figma/extract/wip/"
+				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
 			},
 			"response": []
 		},
@@ -44,7 +44,7 @@
 						}
 					}
 				},
-				"url": "http://127.0.0.1:8000/api_v1/figma/extract/wip/"
+				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
 			},
 			"response": []
 		},
@@ -65,7 +65,7 @@
 						}
 					}
 				},
-				"url": "http://127.0.0.1:8000/api_v1/figma/extract/wip/"
+				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
 			},
 			"response": []
 		},
@@ -86,7 +86,7 @@
 						}
 					}
 				},
-				"url": "http://127.0.0.1:8000/api_v1/figma/extract/wip/"
+				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
 			},
 			"response": []
 		},
@@ -107,7 +107,7 @@
 						}
 					}
 				},
-				"url": "http://127.0.0.1:8000/api_v1/figma/extract/wip/"
+				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
 			},
 			"response": []
 		}
