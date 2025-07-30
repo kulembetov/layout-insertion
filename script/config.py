@@ -107,7 +107,7 @@ PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
         "#e3dcf8",  # сиреневый
         "#f0f0f0",  # светло-серый
         "#f5e7e7",  # розово-бежевый
-        "#fad2be",  # персиково-оранжевый
+        "#fce0d2",  # персиково-оранжевый
     ],
     "prefix": ["Green", "Blue", "Sky", "Purple", "Gray", "Pink", "Orange"],
 }
