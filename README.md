@@ -7,6 +7,7 @@ This repository is organized to support a full workflow from Figma design extrac
 - `sql_validator.py`: Validates generated SQL files for syntax and referential integrity before database insertion.
 - `sql_pollution.py`: Executes validated SQL files against the target PostgreSQL database.
 - `slide_deletion.py`: Handles deletion of slides, blocks, and images from the database, supporting selective and batch operations.
+- `account_creation.py`: Creates user accounts with authentication, subscriptions, payments, and AB testing groups in the database.
 - `insert_palette.py`, `insert_block_layout_config.py`, `match_block_layout_presentation_palette.py`: Scripts for managing palette and block layout configuration, including mapping and matching between Figma and database structures.
 - `config.py`: Central configuration file for all scripts, storing Figma API credentials, mappings, and default values.
 - `database.ini`: Stores database connection parameters for PostgreSQL.
@@ -90,6 +91,12 @@ python insert_palette.py --json my_output/sql_generator_input.json --mode manual
 # auto mode
 python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
+# 3. Insert into BlockLayoutConfig
+# manual mode
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# auto mode
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
 # 4. Match BlockLayoutConfig with PresentationPalette
 python match_block_layout_presentation_palette.py
 
@@ -104,6 +111,9 @@ python sql_pollution.py
 
 # 8. Delete from the DB (blocks, slides, images)
 python slide_deletion.py
+
+# 9. Create user accounts (optional)
+python account_creation.py
 ```
 
 **macOS:**
@@ -113,30 +123,33 @@ python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --ou
 
 # 2. Insert into PresentationPalette
 # manual mode
-python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # auto mode
-python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
 # 3. Insert into BlockLayoutConfig
 # manual mode
-python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
 # auto mode
-python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
 
 # 4. Match BlockLayoutConfig with PresentationPalette
 python3 match_block_layout_presentation_palette.py
 
 # 5. Generate SQL
-python3 slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
+python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Validate SQL
-python3 sql_validator.py --input-dir script/my_sql_output
+python3 sql_validator.py --input-dir my_sql_output
 
 # 7. Apply SQL to DB
 python3 sql_pollution.py
 
 # 8. Delete from the DB (blocks, slides, images)
 python3 slide_deletion.py
+
+# 9. Create user accounts (optional)
+python3 account_creation.py
 ```
 
 ---
@@ -280,6 +293,24 @@ python3 slide_deletion.py
 - **Dependencies:** `psycopg2`, `json`, `argparse`, `config`
 - **Usage:** `python match_block_layout_presentation_palette.py`
 
+### `account_creation.py`
+- **Purpose:** Creates complete user accounts with authentication, subscriptions, payments, and AB testing groups
+- **Functionality:** 
+  - Creates user accounts with role-based access control (ADMIN, USER, MIIN, etc.)
+  - Supports multiple authentication providers (local, Google, Yandex, VKontakte, Telegram)
+  - Generates secure password hashes using scrypt algorithm (compatible with Node.js)
+  - Creates subscriptions with payment tracking and symbol purchases
+  - Manages user balances and subscription symbols
+  - Creates AB testing group assignments for user segmentation
+  - Supports both automatic (direct DB) and manual (SQL generation) modes
+  - Generates UUID7 time-ordered identifiers for better database performance
+- **Configuration:** 
+  - Requires `database.ini` with PostgreSQL connection parameters
+  - Uses Prisma schema for table structure validation
+  - Supports custom subscription plans and payment statuses
+- **Dependencies:** `psycopg2`, `uuid`, `hashlib`, `secrets`, `datetime`, `enum`
+- **Usage:** `python account_creation.py` (interactive mode) or `python account_creation.py --mode auto`
+
 ### `migrate_images.py`
 - **Purpose:** Migrates images from Google Drive to Yandex Cloud Object Storage
 - **Functionality:** 
@@ -305,6 +336,7 @@ python3 slide_deletion.py
 - `sql_validator.py`: Валидирует сгенерированные SQL-файлы на синтаксис и целостность связей перед загрузкой в базу.
 - `sql_pollution.py`: Выполняет валидированные SQL-файлы в целевой базе PostgreSQL.
 - `slide_deletion.py`: Удаляет слайды, блоки и изображения из базы, поддерживает выборочное и пакетное удаление.
+- `account_creation.py`: Создает пользовательские аккаунты с аутентификацией, подписками, платежами и группами AB-тестирования в базе данных.
 - `insert_palette.py`, `insert_block_layout_config.py`, `match_block_layout_presentation_palette.py`: Скрипты для управления палитрами и конфигурацией блоков, включая сопоставление между Figma и структурой базы.
 - `config.py`: Центральный конфиг для всех скриптов, хранит параметры Figma API, маппинги и значения по умолчанию.
 - `database.ini`: Параметры подключения к PostgreSQL.
@@ -377,26 +409,36 @@ python3 slide_deletion.py
 
 **Windows:**
 ```bash
-# 1. Вставка в PresentationPalette
-# ручной режим
-python insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
-# авто режим
-python insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+# 1. Извлечение из Figma
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
 
-# 2. Вставка в BlockLayoutConfig
+# 2. Вставка в PresentationPalette
 # ручной режим
-python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
+python insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # авто режим
-python insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
+python insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
-# 3. Сопоставление BlockLayoutConfig с PresentationPalette
+# 3. Вставка в BlockLayoutConfig
+# ручной режим
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# авто режим
+python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
+# 4. Сопоставление BlockLayoutConfig с PresentationPalette
 python match_block_layout_presentation_palette.py
 
-# 4. Извлечение из Figma
-python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir script/my_output
-
 # 5. Генерация SQL
-python slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
+python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+
+# 6. Валидация SQL
+python sql_validator.py --input-dir my_sql_output
+
+# 7. Загрузка SQL в БД
+python sql_pollution.py
+
+# 8. Удаление из БД (блоков, слайдов, изображений)
+python slide_deletion.py
+```
 
 # 6. Валидация SQL
 python sql_validator.py --input-dir script/my_sql_output
@@ -406,48 +448,54 @@ python sql_pollution.py
 
 # 8. Удаление из БД (блоков, слайдов, изображений)
 python slide_deletion.py
+
+# 9. Создание пользовательских аккаунтов (опционально)
+python account_creation.py
 ```
 
 **macOS:**
 ```bash
-# 1. Вставка в PresentationPalette
-# ручной режим
-python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
-# авто режим
-python3 insert_palette.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
+# 1. Извлечение из Figma
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
 
-# 2. Вставка в BlockLayoutConfig
+# 2. Вставка в PresentationPalette
 # ручной режим
-python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode manual
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode manual --csv presentation_palette_mapping.csv
 # авто режим
-python3 insert_block_layout_config.py --json script/my_output/sql_generator_input.json --mode auto --db database.ini
+python3 insert_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 
-# 3. Сопоставление BlockLayoutConfig с PresentationPalette
+# 3. Вставка в BlockLayoutConfig
+# ручной режим
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode manual
+# авто режим
+python3 insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
+
+# 4. Сопоставление BlockLayoutConfig с PresentationPalette
 python3 match_block_layout_presentation_palette.py
 
-# 4. Извлечение из Figma
-python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir script/my_output
-
 # 5. Генерация SQL
-python3 slide_insertion.py --auto-from-figma script/my_output/sql_generator_input.json --output-dir script/my_sql_output
+python3 slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Валидация SQL
-python3 sql_validator.py --input-dir script/my_sql_output
+python3 sql_validator.py --input-dir my_sql_output
 
 # 7. Загрузка SQL в БД
 python3 sql_pollution.py
 
 # 8. Удаление из БД (блоков, слайдов, изображений)
 python3 slide_deletion.py
+
+# 9. Создание пользовательских аккаунтов (опционально)
+python3 account_creation.py
 ```
 
 
 ---
 
 ## Конфигурационный файл: `config.py`
-- Централизует все настройки для пайплайна
+- **Централизует все настройки** для пайплайна
 - Хранит Figma API, значения по умолчанию, маппинги слайдов/блоков, цвета, вотермарки и логику категоризации
-- Гарантирует согласованность между извлечением и генерацией SQL
+- **Гарантирует согласованность** между извлечением и генерацией SQL
 
 ---
 
@@ -582,6 +630,24 @@ python3 slide_deletion.py
   - Поддерживает пользовательские алгоритмы сопоставления и правила
 - **Зависимости:** `psycopg2`, `json`, `argparse`, `config`
 - **Использование:** `python match_block_layout_presentation_palette.py`
+
+### `account_creation.py`
+- **Назначение:** Создает полные пользовательские аккаунты с аутентификацией, подписками, платежами и группами AB-тестирования
+- **Функциональность:** 
+  - Создает пользовательские аккаунты с ролевым доступом (ADMIN, USER, MIIN и т.д.)
+  - Поддерживает несколько провайдеров аутентификации (local, Google, Yandex, VKontakte, Telegram)
+  - Генерирует безопасные хеши паролей с использованием алгоритма scrypt (совместим с Node.js)
+  - Создает подписки с отслеживанием платежей и покупками символов
+  - Управляет балансами пользователей и символами подписок
+  - Создает назначения групп AB-тестирования для сегментации пользователей
+  - Поддерживает как автоматический (прямая БД), так и ручной (генерация SQL) режимы
+  - Генерирует UUID7 временно-упорядоченные идентификаторы для лучшей производительности БД
+- **Конфигурация:** 
+  - Требует `database.ini` с параметрами подключения PostgreSQL
+  - Использует схему Prisma для валидации структуры таблиц
+  - Поддерживает пользовательские планы подписок и статусы платежей
+- **Зависимости:** `psycopg2`, `uuid`, `hashlib`, `secrets`, `datetime`, `enum`
+- **Использование:** `python account_creation.py` (интерактивный режим) или `python account_creation.py --mode auto`
 
 ### `migrate_images.py`
 - **Назначение:** Переносит изображения из Google Drive в объектное хранилище Yandex Cloud
