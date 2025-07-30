@@ -83,7 +83,7 @@ All these tables are created and maintained in your company's presentation datab
 **Windows:**
 ```bash
 # 1. Extract from Figma
-python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
 
 # 2. Insert into PresentationPalette
 # manual mode
@@ -438,7 +438,6 @@ python sql_pollution.py
 
 # 8. Удаление из БД (блоков, слайдов, изображений)
 python slide_deletion.py
-```
 
 # 6. Валидация SQL
 python sql_validator.py --input-dir script/my_sql_output
