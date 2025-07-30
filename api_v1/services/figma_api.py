@@ -265,10 +265,8 @@ class FigmaAPI:
             return False
         
         if self.filter_config.mode == FilterMode.READY_TO_DEV:
-            if not Checker.check_marker(
-                getattr(self.filter_config, 'ready_to_dev_marker', ''),
-                node.get('name', '')
-            ):
+            dev_status = node.get('devStatus', {}).get('type')
+            if dev_status != "READY_FOR_DEV":
                 return False
     
         if not Checker.check_dimensions(node['absoluteBoundingBox']):
@@ -289,6 +287,11 @@ class FigmaAPI:
         blocks = []
         if not node.get('absoluteBoundingBox'):
             return blocks
+        
+        if self.filter_config.mode == FilterMode.READY_TO_DEV:
+            dev_status = node.get('devStatus', {}).get('type')
+            if dev_status != "READY_FOR_DEV":
+                return blocks
         
         # Centralized filtering for node
         if not should_include(node, self.filter_config):
