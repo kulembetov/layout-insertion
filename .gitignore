@@ -1,10 +1,5 @@
 # Environment variables
 .env
-
-/my_output/
-/my_sql_output/
-
-*.csv
 .env.local
 .env.*.local
 
@@ -16,6 +11,7 @@ token.json
 exports/
 *.xlsx
 *.log
+*.csv
 
 # Python
 __pycache__/
@@ -38,7 +34,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-*.csv
 MANIFEST
 
 # Virtual environments
@@ -60,11 +55,8 @@ venv.bak/
 Thumbs.db
 .venv
 
-
-
-
+# Other
 /my_output/
 /my_sql_output/
 /logs/
-
 output.json
