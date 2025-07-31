@@ -171,8 +171,8 @@ class ExtractedBlock:
     slide_number: int
     parent_container: str
     is_target: bool = False
-    has_corner_radius: bool = False
-    corner_radius: List[int] = field(default_factory=lambda: [0, 0, 0, 0])
+    has_border_radius: bool = False
+    border_radius: List[int] = field(default_factory=lambda: [0, 0, 0, 0])
     text_content: str = None
     figure_info: Dict[str, Any] = field(default_factory=dict)
     precompiled_image_info: Dict[str, Any] = field(default_factory=dict)
@@ -317,7 +317,7 @@ class BlockUtils:
         Build a block dictionary from an ExtractedBlock or dict and optional slide_config.
         This is the single source of truth for block dict construction.
         Adds figure_info and precompiled_image_info if relevant.
-        Always includes both has_corner_radius (bool) and corner_radius (list of 4 ints).
+        Always includes both has_border_radius (bool) and border_radius (list of 4 ints).
         """
         get = (
             (lambda k: block.get(k, None))
@@ -335,19 +335,16 @@ class BlockUtils:
             "needs_null_styles": get("sql_type")
             in config.BLOCK_TYPES["null_style_types"],
             "needs_z_index": get("sql_type") in config.BLOCK_TYPES["z_index_types"],
-            # Always include both fields for clarity and downstream use
-            "has_corner_radius": (
-                get("has_corner_radius")
-                if get("has_corner_radius") is not None
+            "has_border_radius": (
+                get("has_border_radius")
+                if get("has_border_radius") is not None
                 else False
-            ),
-            "corner_radius": (
-                get("corner_radius")
-                if get("corner_radius") is not None
-                else [0, 0, 0, 0]
             ),
             "comment": get("comment"),
         }
+        
+        if get("border_radius") is not None:
+            block_dict["border_radius"] = get("border_radius")
         text_content = get("text_content")
         # Use existing 'words' if present in dict, else recalculate
         if isinstance(block, dict) and "words" in block and block["words"] is not None:
@@ -388,21 +385,21 @@ class BlockUtils:
         return info
 
     @staticmethod
-    def extract_corner_radius_from_node(node: dict) -> tuple[bool, list[int]]:
-        """Extract corner radius from a Figma node, returns (has_corner_radius, [tl, tr, br, bl])"""
-        corner_radius = [0, 0, 0, 0]
-        has_corner_radius = False
+    def extract_border_radius_from_node(node: dict) -> tuple[bool, list[int]]:
+        """Extract corner radius from a Figma node, map to border radius and returns (has_border_radius, [tl, tr, br, bl])"""
+        border_radius = [0, 0, 0, 0]
+        has_border_radius = False
         if "cornerRadius" in node:
             radius = node["cornerRadius"]
             if isinstance(radius, (int, float)) and radius > 0:
-                corner_radius = [int(radius)] * 4
-                has_corner_radius = True
+                border_radius = [int(radius)] * 4
+                has_border_radius = True
         if "rectangleCornerRadii" in node:
             radii = node["rectangleCornerRadii"]
             if isinstance(radii, list) and len(radii) == 4:
-                corner_radius = [int(r) for r in radii]
-                has_corner_radius = any(r > 0 for r in corner_radius)
-        return has_corner_radius, corner_radius
+                border_radius = [int(r) for r in radii]
+                has_border_radius = any(r > 0 for r in border_radius)
+        return has_border_radius, border_radius
 
     @staticmethod
     def get_node_property(node: dict, key: str, default=None):
@@ -620,26 +617,26 @@ class FigmaExtractor:
                 styles["weight"] = self.normalize_font_weight(style["fontWeight"])
         return styles
 
-    def extract_corner_radius(self, node: Dict[str, Any]) -> Tuple[bool, List[int]]:
-        """Extract corner radius information"""
-        corner_radius = [0, 0, 0, 0]  # Default: all corners 0
-        has_corner_radius = False
+    def extract_border_radius(self, node: Dict[str, Any]) -> Tuple[bool, List[int]]:
+        """Extract border radius information"""
+        border_radius = [0, 0, 0, 0]  # Default: all corners 0
+        has_border_radius = False
 
         # Check for cornerRadius property
         if "cornerRadius" in node:
             radius = node["cornerRadius"]
             if isinstance(radius, (int, float)) and radius > 0:
-                corner_radius = [int(radius)] * 4
-                has_corner_radius = True
+                border_radius = [int(radius)] * 4
+                has_border_radius = True
 
         # Check for individual corner radii
         if "rectangleCornerRadii" in node:
             radii = node["rectangleCornerRadii"]
             if isinstance(radii, list) and len(radii) == 4:
-                corner_radius = [int(r) for r in radii]
-                has_corner_radius = any(r > 0 for r in corner_radius)
+                border_radius = [int(r) for r in radii]
+                has_border_radius = any(r > 0 for r in border_radius)
 
-        return has_corner_radius, corner_radius
+        return has_border_radius, border_radius
 
     def is_target_frame(self, node: Dict[str, Any]) -> bool:
         """Check if node is a target frame, now supports 'ready to dev' marker"""
@@ -779,7 +776,7 @@ class FigmaExtractor:
                         sql_type, config.Z_INDEX_DEFAULTS["default"]
                     )
                 styles["zIndex"] = z_index
-                has_corner_radius, corner_radius = BlockUtils.extract_corner_radius_from_node(node)
+                has_border_radius, border_radius = BlockUtils.extract_border_radius_from_node(node)
                 text_content = None
                 if sql_type in [
                     "text", "blockTitle", "slideTitle", "subTitle", "number", "email", "date", "name", "percentage"
@@ -799,8 +796,8 @@ class FigmaExtractor:
                     slide_number=slide_number,
                     parent_container=parent_container,
                     is_target=True,
-                    has_corner_radius=has_corner_radius,
-                    corner_radius=corner_radius,
+                    has_border_radius=has_border_radius,
+                    border_radius=border_radius,
                     text_content=text_content,
                     comment=comment,
                 )
@@ -1300,7 +1297,7 @@ class FigmaToSQLIntegrator:
                     "styles": dict(block_dict.get("styles", {})),
                     "needs_null_styles": block_dict.get("needs_null_styles", False),
                     "needs_z_index": block_dict.get("needs_z_index", False),
-                    "corner_radius": block_dict.get("corner_radius"),
+                    "border_radius": block_dict.get("border_radius"),
                     "sql_ready": True,
                     "words": block_dict.get("words", 0),
                     "figure_info": block_dict.get("figure_info"),
@@ -1465,8 +1462,8 @@ class FigmaToSQLIntegrator:
             lines.append(f"--   Dimensions: {block['dimensions']}")
             lines.append(f"--   Z-Index: {block['styles'].get('zIndex', 'N/A')}")
             lines.append(f"--   Styles: {block['styles']}")
-            if block.get("corner_radius"):
-                lines.append(f"--   Corner Radius: {block['corner_radius']}")
+            if block.get("border_radius"):
+                lines.append(f"--   Border Radius: {block['border_radius']}")
             lines.append("")
 
         lines.append(
@@ -1546,9 +1543,9 @@ class FigmaToSQLIntegrator:
                         f"     - Alignment: {styles.get('textVertical', '-') } / {styles.get('textHorizontal', '-')}"
                     )
 
-                if block.get("corner_radius"):
+                if block.get("border_radius"):
                     instructions.append(
-                        f"     - Corner Radius: {block['corner_radius']}"
+                        f"     - Border Radius: {block['border_radius']}"
                     )
                 instructions.append("")
 

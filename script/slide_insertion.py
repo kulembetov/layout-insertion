@@ -734,9 +734,7 @@ class BlockFactory:
         # Dimensions
         dimensions = dict(data.get("dimensions", {}))
         # Border radius
-        border_radius = (
-            data.get("border_radius") or data.get("corner_radius") or [0, 0, 0, 0]
-        )
+        border_radius = data.get("border_radius") or [0, 0, 0, 0]
         # Opacity
         opacity = data.get("opacity", 1)
         # Words
@@ -963,9 +961,12 @@ class BlockStylesCommand(SQLCommand):
         color_settings_id = self.config.get_default_color_settings_id()
 
         for block in self.blocks:
+            # Use block's border_radius field
+            border_radius = block.border_radius
+            
             # Only set border radius for image blocks, use null for all others
-            if block.type == self.BLOCK_TYPE_IMAGE and block.border_radius:
-                border_radius_str = f"ARRAY[{', '.join(map(str, block.border_radius))}]"
+            if block.type == self.BLOCK_TYPE_IMAGE and border_radius:
+                border_radius_str = f"ARRAY[{', '.join(map(str, border_radius))}]"
             else:
                 border_radius_str = "null"
 
