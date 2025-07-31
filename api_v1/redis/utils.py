@@ -4,12 +4,12 @@ from django.core.cache import cache
 from config.settings import CACHE_ENABLED
 
 
-def gen_key(file_id: str, filter_mode: Optional[str] = None, params: Optional[list] = None) -> str:
+def gen_key(file_id: str, filter_type: Optional[str] = None, filter_names: Optional[list] = None) -> str:
     key = f"figma={file_id}"
-    if filter_mode and params:
-        key += f":filter-mode={filter_mode}"
-        param_str = ':'.join(map(str, sorted(params)))
-        key += f":params={param_str}"
+    if filter_type and filter_names:
+        key += f":filter-type={filter_type}"
+        names_str = ':'.join(map(str, sorted(filter_names)))
+        key += f":filter-names={names_str}"
     return key
 
 
@@ -18,6 +18,7 @@ def get_cached_request(key: str) -> Optional[dict]:
         cached_data = cache.get(key)
         if cached_data:
             return cached_data
+    return None
 
 
 def set_cached_request(key: str, data: dict) -> None:
