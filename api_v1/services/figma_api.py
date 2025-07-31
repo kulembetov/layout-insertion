@@ -92,24 +92,17 @@ class FigmaAPI:
 
             for comment in comments_data:
                 client_meta = comment.get("client_meta")
-                comment_info = {
-                    "message": comment.get("message", ""),
-                    "user": comment.get("user", {}),
-                    "created_at": comment.get("created_at"),
-                    "resolved_at": comment.get("resolved_at"),
-                    "comment_id": comment.get("id"),
-                    "parent_id": comment.get("parent_id"),
-                }
+                comment_message = comment.get("message", "")
 
                 if isinstance(client_meta, list):
                     for meta in client_meta:
                         node_id = meta.get("node_id")
                         if node_id:
-                            node_comments.setdefault(node_id, []).append(comment_info)
+                            node_comments.setdefault(node_id, []).append(comment_message)
                 elif isinstance(client_meta, dict):
                     node_id = client_meta.get("node_id")
                     if node_id:
-                        node_comments.setdefault(node_id, []).append(comment_info)
+                        node_comments.setdefault(node_id, []).append(comment_message)
 
             logger.info(f"Fetched {len(comments_data)} comments for {len(node_comments)} nodes")
             if node_comments:
