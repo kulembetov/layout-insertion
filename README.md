@@ -335,7 +335,7 @@ python3 account_creation.py
 - **Purpose:** Generates cleanup statements for existing blocks and combines them with new insertion statements
 - **Functionality:** 
   - Processes old SQL files to find existing SlideLayout IDs in the database
-  - Generates DELETE and UPDATE statements to safely remove old block data
+  - Generates DELETE and UPDATE, INSERT statements to safely remove old block data
   - Processes new SQL files and replaces new UUIDs with existing SlideLayout IDs
   - Maintains folder structure organization (title, 1cols, 2cols, etc.)
   - Creates cleanup files with `cleanup_` prefix and updated insertion files
@@ -695,7 +695,7 @@ python3 account_creation.py
 - **Назначение:** Генерирует очистку для существующих блоков и объединяет их с новыми операторами вставки
 - **Функциональность:** 
   - Обрабатывает старые SQL файлы, чтобы найти существующие ID макетов слайдов в базе данных
-  - Генерирует операторы DELETE и UPDATE, чтобы безопасно удалить старые данные блока
+  - Генерирует операторы DELETE и UPDATE, INSERT, чтобы безопасно удалить старые данные блока
   - Обрабатывает новые SQL файлы и заменяет новые UUID на существующие ID макетов слайдов
   - Сохраняет организацию структуры папок (название, 1cols, 2cols и т.д.)
   - Создает файлы очистки с префиксом `cleanup_` и обновленные файлы вставки

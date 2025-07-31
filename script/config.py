@@ -57,6 +57,8 @@ VALID_FONT_WEIGHTS = [300, 400, 700]
  Enums for Types
 ========================
 """
+
+
 class SlideLayoutType(str, Enum):
     CLASSIC = "classic"
     MANY_TEXT = "manyText"
@@ -68,6 +70,7 @@ class SlideLayoutType(str, Enum):
     TITLE = "title"
     LAST = "last"
     OTHER = "other"
+
 
 class BlockType(str, Enum):
     TEXT = "text"
@@ -88,15 +91,19 @@ class BlockType(str, Enum):
     NUMBER = "number"
     CHART = "chart"
 
+
 """
 ========================
  TypedDicts for Structured Configs
 ========================
 """
+
+
 class PrecompiledImagesConfig(TypedDict):
     base_url: str
     default_colors: List[str]
     prefix: List[str]
+
 
 PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
     "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen",
@@ -147,7 +154,7 @@ INSERT INTO "SlideLayout" (
     {slide_layout_number},
     true,
     '{presentation_layout_id}',
-    0,
+    {imagesCount},
     300,
     15,
     10,
@@ -421,7 +428,7 @@ INSERT INTO "SlideLayout" (
     {slide_layout_number},
     true,
     '{presentation_layout_id}',
-    0,
+    {imagesCount},
     300,
     15,
     10,
@@ -621,6 +628,6 @@ SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE = {
 
 # Slide layout names that should have forGeneration = false
 SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE = [
-    'one_rectangle_outline_icon_card_image_right',
-    'one_rectangle_outline_icon_card_image_left'
+    "one_rectangle_outline_icon_card_image_right",
+    "one_rectangle_outline_icon_card_image_left",
 ]

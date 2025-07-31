@@ -220,7 +220,7 @@ class BlockUtils:
             ),
             "comment": get("comment"),
         }
-        
+
         if get("border_radius") is not None:
             block_dict["border_radius"] = get("border_radius")
         text_content = get("text_content")
@@ -571,21 +571,27 @@ class FigmaExtractor:
             LogUtils.log_block_event("Fetching comments from Figma API...")
             response = requests.get(
                 f"https://api.figma.com/v1/files/{self.file_id}/comments",
-                headers=self.headers
+                headers=self.headers,
             )
             response.raise_for_status()
             comments_data = response.json()
-            
-            LogUtils.log_block_event(f"Comments API response keys: {list(comments_data.keys())}")
-            
+
+            LogUtils.log_block_event(
+                f"Comments API response keys: {list(comments_data.keys())}"
+            )
+
             # Log the raw response for debugging
             if "comments" in comments_data:
-                LogUtils.log_block_event(f"Total comments in response: {len(comments_data['comments'])}")
+                LogUtils.log_block_event(
+                    f"Total comments in response: {len(comments_data['comments'])}"
+                )
                 for i, comment in enumerate(comments_data["comments"][:3]):
                     LogUtils.log_block_event(f"Comment {i+1}: {comment}")
             else:
-                LogUtils.log_block_event(f"No 'comments' key found in response. Available keys: {list(comments_data.keys())}")
-            
+                LogUtils.log_block_event(
+                    f"No 'comments' key found in response. Available keys: {list(comments_data.keys())}"
+                )
+
             # Create a mapping of node_id to first comment message
             for comment in comments_data.get("comments", []):
                 client_meta = comment.get("client_meta", {})
@@ -593,11 +599,15 @@ class FigmaExtractor:
                 message = comment.get("message", "")
                 if node_id and message and node_id not in comments_map:
                     comments_map[node_id] = message
-                    LogUtils.log_block_event(f"Mapped comment for node {node_id}: {message[:50]}...")
-            
-            LogUtils.log_block_event(f"Successfully mapped {len(comments_map)} comments")
+                    LogUtils.log_block_event(
+                        f"Mapped comment for node {node_id}: {message[:50]}..."
+                    )
+
+            LogUtils.log_block_event(
+                f"Successfully mapped {len(comments_map)} comments"
+            )
             return comments_map
-            
+
         except requests.exceptions.RequestException as e:
             LogUtils.log_block_event(f"Failed to fetch comments: {e}", level="debug")
             return {}
@@ -611,7 +621,7 @@ class FigmaExtractor:
         frame_origin: Dict[str, int],
         slide_number: int,
         parent_container: str,
-        comments_map: Dict[str, str] = None
+        comments_map: Dict[str, str] = None,
     ) -> List[ExtractedBlock]:
         """Recursively collect blocks from a Figma node, filtering and normalizing as needed."""
         blocks = []
@@ -655,16 +665,28 @@ class FigmaExtractor:
                         sql_type, config.Z_INDEX_DEFAULTS["default"]
                     )
                 styles["zIndex"] = z_index
-                has_border_radius, border_radius = BlockUtils.extract_border_radius_from_node(node)
+                has_border_radius, border_radius = (
+                    BlockUtils.extract_border_radius_from_node(node)
+                )
                 text_content = None
                 if sql_type in [
-                    "text", "blockTitle", "slideTitle", "subTitle", "number", "email", "date", "name", "percentage"
+                    "text",
+                    "blockTitle",
+                    "slideTitle",
+                    "subTitle",
+                    "number",
+                    "email",
+                    "date",
+                    "name",
+                    "percentage",
                 ] and BlockUtils.is_node_type(node, "TEXT"):
-                    text_content = BlockUtils.get_node_property(node, "characters", None)
-                
+                    text_content = BlockUtils.get_node_property(
+                        node, "characters", None
+                    )
+
                 # Get comment from the pre-fetched comments map
                 comment = comments_map.get(node["id"], "") if comments_map else ""
-                
+
                 block = ExtractedBlock(
                     id=node["id"],
                     figma_type=figma_type,
@@ -696,7 +718,11 @@ class FigmaExtractor:
             for node_child in BlockUtils.get_node_property(node, "children"):
                 blocks.extend(
                     self.collect_blocks(
-                        node_child, frame_origin, slide_number, parent_container, comments_map
+                        node_child,
+                        frame_origin,
+                        slide_number,
+                        parent_container,
+                        comments_map,
                     )
                 )
         return blocks
@@ -711,14 +737,18 @@ class FigmaExtractor:
             if BlockUtils.get_node_property(node_child, "name") == "slideColors":
                 if block_logger:
                     block_logger.info(f"[slideColors] Found slideColors table in slide")
-                for node_block in BlockUtils.get_node_property(node_child, "children", []):
+                for node_block in BlockUtils.get_node_property(
+                    node_child, "children", []
+                ):
                     block_type = BlockUtils.get_node_property(node_block, "name")
                     if block_logger:
                         block_logger.info(
                             f"[slideColors] Processing block type: {block_type}"
                         )
                     block_colors = {}
-                    for color_group in BlockUtils.get_node_property(node_block, "children", []):
+                    for color_group in BlockUtils.get_node_property(
+                        node_block, "children", []
+                    ):
                         color_hex = BlockUtils.get_node_property(color_group, "name")
                         if color_hex:
                             color_hex = color_hex.lower()
@@ -728,7 +758,9 @@ class FigmaExtractor:
                                 f"[slideColors] Processing color group: {color_hex}"
                             )
                         block_objs = []
-                        for text_child in BlockUtils.get_node_property(color_group, "children", []):
+                        for text_child in BlockUtils.get_node_property(
+                            color_group, "children", []
+                        ):
                             if BlockUtils.is_node_type(text_child, "TEXT"):
                                 text_obj = {}
                                 color_val, color_var = ColorUtils.extract_color_info(
@@ -743,11 +775,13 @@ class FigmaExtractor:
                                     and "fontFamily" in text_child["style"]
                                 ):
                                     font_family = text_child["style"]["fontFamily"]
-                                text_obj["fontFamily"] = FontUtils.normalize_font_family(
-                                    font_family
+                                text_obj["fontFamily"] = (
+                                    FontUtils.normalize_font_family(font_family)
                                 )
                                 if block_type == "figure":
-                                    idx = BlockUtils.get_node_property(text_child, "name", "").strip()
+                                    idx = BlockUtils.get_node_property(
+                                        text_child, "name", ""
+                                    ).strip()
                                     text_obj["figureName"] = idx
                                     if block_logger:
                                         block_logger.info(
@@ -878,7 +912,10 @@ class FigmaExtractor:
                 )
 
     def traverse_and_extract(
-        self, node: Dict[str, Any], parent_name: str = "", comments_map: Dict[str, str] = None
+        self,
+        node: Dict[str, Any],
+        parent_name: str = "",
+        comments_map: Dict[str, str] = None,
     ) -> List[ExtractedSlide]:
         """Traversal with filtering"""
         slides = []
@@ -903,7 +940,9 @@ class FigmaExtractor:
 
             slide_type = self.detect_slide_type(parent_name, slide_number)
 
-            blocks = self.collect_blocks(node, frame_origin, slide_number, parent_name, comments_map)
+            blocks = self.collect_blocks(
+                node, frame_origin, slide_number, parent_name, comments_map
+            )
 
             if blocks or self.filter_config.mode == FilterMode.ALL:
                 slide = ExtractedSlide(
@@ -913,10 +952,10 @@ class FigmaExtractor:
                     slide_type=slide_type,
                     blocks=blocks,
                     frame_id=node["id"],
-                                    dimensions={
-                    "w": config.FIGMA_CONFIG["TARGET_WIDTH"],
-                    "h": config.FIGMA_CONFIG["TARGET_HEIGHT"],
-                },
+                    dimensions={
+                        "w": config.FIGMA_CONFIG["TARGET_WIDTH"],
+                        "h": config.FIGMA_CONFIG["TARGET_HEIGHT"],
+                    },
                 )
                 # Attach the original node for color extraction
                 slide._figma_node = node
@@ -930,7 +969,9 @@ class FigmaExtractor:
         # Continue traversing children
         if node.get("children"):
             for child in node["children"]:
-                child_slides = self.traverse_and_extract(child, node["name"], comments_map)
+                child_slides = self.traverse_and_extract(
+                    child, node["name"], comments_map
+                )
                 slides.extend(child_slides)
 
         return slides
@@ -947,7 +988,9 @@ class FigmaExtractor:
             # Fetch all comments in a single API call for efficiency
             comments_map = self.fetch_all_comments()
 
-            pages = BlockUtils.get_node_property(data["document"], config.FIGMA_KEY_CHILDREN, [])
+            pages = BlockUtils.get_node_property(
+                data["document"], config.FIGMA_KEY_CHILDREN, []
+            )
             all_slides = []
 
             for page in pages:
@@ -1010,7 +1053,10 @@ class FigmaExtractor:
         except Exception as e:
             LogUtils.log_block_event(f"Unexpected error: {e}", level="debug")
             return {
-                "metadata": {"file_id": self.file_id, "error": f"Unexpected error: {e}"},
+                "metadata": {
+                    "file_id": self.file_id,
+                    "error": f"Unexpected error: {e}",
+                },
                 "slides": [],
             }
 
@@ -1031,6 +1077,10 @@ class FigmaExtractor:
             sentence_count = TextUtils.count_sentences(text_content)
         if sentence_count == 0:
             sentence_count = 1
+
+        # Count images in the slide
+        images_count = sum(1 for block in slide.blocks if block.sql_type == "image")
+
         # Extract slideConfig and palette colors if available
         slide_config = {}
         presentation_palette_colors = []
@@ -1048,6 +1098,7 @@ class FigmaExtractor:
             "frame_name": slide.frame_name,
             "slide_type": slide.slide_type,
             "sentences": sentence_count,
+            "imagesCount": images_count,
             "frame_id": slide.frame_id,
             "dimensions": slide.dimensions,
             "folder_name": config.SLIDE_NUMBER_TO_FOLDER.get(slide.number, "other"),
@@ -1152,6 +1203,7 @@ class FigmaToSQLIntegrator:
                 "presentation_layout_id": presentation_layout_id,
                 "is_last": is_last,
                 "folder_name": slide.get("folder_name", "other"),
+                "imagesCount": slide.get("imagesCount", 0),
                 "blocks": [],
                 "auto_blocks": self._get_auto_blocks_for_slide(slide, is_last),
                 "sql_config": {
@@ -1249,7 +1301,9 @@ class FigmaToSQLIntegrator:
         }
 
     def generate_sql_for_slides(
-        self, slide_numbers: List[int], output_dir: str = config.DEFAULT_OUTPUT_DIRECTORIES["sql_output"]
+        self,
+        slide_numbers: List[int],
+        output_dir: str = config.OUTPUT_CONFIG["output_dir"],
     ):
         """Complete pipeline: extract from Figma and generate SQL with config compatibility"""
         LogUtils.log_block_event(f"Extracting slides {slide_numbers} from Figma...")
@@ -1402,15 +1456,15 @@ class FigmaToSQLIntegrator:
             if slide.get("auto_blocks"):
                 instructions.append(f"**Auto Blocks:**")
                 for block_name, block_info in slide["auto_blocks"].items():
-                    instructions.append(
-                        f"- {block_name.title()}: {block_info['type']}"
-                    )
+                    instructions.append(f"- {block_name.title()}: {block_info['type']}")
 
             instructions.append(f"**User Blocks:**")
             for j, block in enumerate(slide["blocks"]):
                 instructions.append(f"  {j+1}. **{block['type']}** - {block['name']}")
                 instructions.append(f"     - Dimensions: {block['dimensions']}")
-                instructions.append(f"     - Z-Index: {block['styles'].get('zIndex', 'N/A')}")
+                instructions.append(
+                    f"     - Z-Index: {block['styles'].get('zIndex', 'N/A')}"
+                )
                 instructions.append(f"     - Null Styles: {block['needs_null_styles']}")
 
                 if not block["needs_null_styles"]:
@@ -1567,7 +1621,7 @@ class BatchFigmaProcessor:
         self.figma_token = figma_token
 
     def process_presentation_by_types(
-        self, file_id: str, output_base: str = config.DEFAULT_OUTPUT_DIRECTORIES["batch_output"]
+        self, file_id: str, output_base: str = "batch_output"
     ):
         """Process a presentation by extracting different slide types separately"""
         integrator = FigmaToSQLIntegrator(file_id, self.figma_token)
@@ -1658,7 +1712,11 @@ if __name__ == "__main__":
     parser.add_argument("--slides", type=int, nargs="*", help="Specific slide numbers")
     parser.add_argument("--block-types", nargs="*", help="Specific block types")
     parser.add_argument("--containers", nargs="*", help="Specific containers")
-    parser.add_argument("--output-dir", default=config.DEFAULT_OUTPUT_DIRECTORIES["sql_output"], help="Output directory")
+    parser.add_argument(
+        "--output-dir",
+        default=config.OUTPUT_CONFIG["output_dir"],
+        help="Output directory",
+    )
     parser.add_argument(
         "--batch", action="store_true", help="Enable batch processing mode"
     )
@@ -1787,4 +1845,3 @@ Usage Examples with Config Compatibility:
 6. Extract with custom output directory:
    python integration.py --file-id YOUR_ID --token YOUR_TOKEN --mode slides --slides 1 5 --output-dir my_slides
 """
-
