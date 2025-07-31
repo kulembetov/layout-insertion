@@ -176,6 +176,7 @@ class ExtractedBlock:
     text_content: str = None
     figure_info: Dict[str, Any] = field(default_factory=dict)
     precompiled_image_info: Dict[str, Any] = field(default_factory=dict)
+    comment: str = None
 
 
 @dataclass
@@ -345,6 +346,7 @@ class BlockUtils:
                 if get("corner_radius") is not None
                 else [0, 0, 0, 0]
             ),
+            "comment": get("comment"),
         }
         text_content = get("text_content")
         # Use existing 'words' if present in dict, else recalculate
@@ -687,12 +689,53 @@ class FigmaExtractor:
         # Replaced by ColorUtils.extract_color_info
         return ColorUtils.extract_color_info(node)
 
+    def fetch_all_comments(self) -> Dict[str, str]:
+        """Fetch all comments from Figma API in a single call and return a mapping of node_id to comment."""
+        comments_map = {}
+        try:
+            LogUtils.log_block_event("Fetching comments from Figma API...")
+            response = requests.get(
+                f"https://api.figma.com/v1/files/{self.file_id}/comments",
+                headers=self.headers
+            )
+            response.raise_for_status()
+            comments_data = response.json()
+            
+            LogUtils.log_block_event(f"Comments API response keys: {list(comments_data.keys())}")
+            
+            # Log the raw response for debugging
+            if "comments" in comments_data:
+                LogUtils.log_block_event(f"Total comments in response: {len(comments_data['comments'])}")
+                for i, comment in enumerate(comments_data["comments"][:3]):
+                    LogUtils.log_block_event(f"Comment {i+1}: {comment}")
+            else:
+                LogUtils.log_block_event(f"No 'comments' key found in response. Available keys: {list(comments_data.keys())}")
+            
+            # Create a mapping of node_id to first comment message
+            for comment in comments_data.get("comments", []):
+                node_id = comment.get("node_id")
+                message = comment.get("message", "")
+                if node_id and message and node_id not in comments_map:
+                    comments_map[node_id] = message
+                    LogUtils.log_block_event(f"Mapped comment for node {node_id}: {message[:50]}...")
+            
+            LogUtils.log_block_event(f"Successfully mapped {len(comments_map)} comments")
+            return comments_map
+            
+        except requests.exceptions.RequestException as e:
+            LogUtils.log_block_event(f"Failed to fetch comments: {e}", level="debug")
+            return {}
+        except Exception as e:
+            LogUtils.log_block_event(f"Error fetching comments: {e}", level="debug")
+            return {}
+
     def collect_blocks(
         self,
         node: Dict[str, Any],
         frame_origin: Dict[str, int],
         slide_number: int,
         parent_container: str,
+        comments_map: Dict[str, str] = None
     ) -> List[ExtractedBlock]:
         """Recursively collect blocks from a Figma node, filtering and normalizing as needed."""
         blocks = []
@@ -742,6 +785,10 @@ class FigmaExtractor:
                     "text", "blockTitle", "slideTitle", "subTitle", "number", "email", "date", "name", "percentage"
                 ] and BlockUtils.is_node_type(node, "TEXT"):
                     text_content = BlockUtils.get_node_property(node, "characters", None)
+                
+                # Get comment from the pre-fetched comments map
+                comment = comments_map.get(node["id"], "") if comments_map else ""
+                
                 block = ExtractedBlock(
                     id=node["id"],
                     figma_type=figma_type,
@@ -755,6 +802,7 @@ class FigmaExtractor:
                     has_corner_radius=has_corner_radius,
                     corner_radius=corner_radius,
                     text_content=text_content,
+                    comment=comment,
                 )
                 if BlockFilterUtils.should_include_node_or_block(
                     block, self.filter_config
@@ -772,7 +820,7 @@ class FigmaExtractor:
             for node_child in BlockUtils.get_node_property(node, "children"):
                 blocks.extend(
                     self.collect_blocks(
-                        node_child, frame_origin, slide_number, parent_container
+                        node_child, frame_origin, slide_number, parent_container, comments_map
                     )
                 )
         return blocks
@@ -954,7 +1002,7 @@ class FigmaExtractor:
                 )
 
     def traverse_and_extract(
-        self, node: Dict[str, Any], parent_name: str = ""
+        self, node: Dict[str, Any], parent_name: str = "", comments_map: Dict[str, str] = None
     ) -> List[ExtractedSlide]:
         """Traversal with filtering"""
         slides = []
@@ -979,7 +1027,7 @@ class FigmaExtractor:
 
             slide_type = self.detect_slide_type(parent_name, slide_number)
 
-            blocks = self.collect_blocks(node, frame_origin, slide_number, parent_name)
+            blocks = self.collect_blocks(node, frame_origin, slide_number, parent_name, comments_map)
 
             if blocks or self.filter_config.mode == FilterMode.ALL:
                 slide = ExtractedSlide(
@@ -1006,7 +1054,7 @@ class FigmaExtractor:
         # Continue traversing children
         if node.get("children"):
             for child in node["children"]:
-                child_slides = self.traverse_and_extract(child, node["name"])
+                child_slides = self.traverse_and_extract(child, node["name"], comments_map)
                 slides.extend(child_slides)
 
         return slides
@@ -1020,6 +1068,9 @@ class FigmaExtractor:
             response.raise_for_status()
             data = response.json()
 
+            # Fetch all comments in a single API call for efficiency
+            comments_map = self.fetch_all_comments()
+
             pages = BlockUtils.get_node_property(data["document"], config.FIGMA_KEY_CHILDREN, [])
             all_slides = []
 
@@ -1027,7 +1078,7 @@ class FigmaExtractor:
                 LogUtils.log_block_event(
                     f"\nProcessing page: {BlockUtils.get_node_property(page, config.FIGMA_KEY_NAME, 'Unnamed')}"
                 )
-                page_slides = self.traverse_and_extract(page)
+                page_slides = self.traverse_and_extract(page, comments_map)
                 all_slides.extend(page_slides)
 
             # Generate summary
