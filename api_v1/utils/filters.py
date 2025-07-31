@@ -15,9 +15,9 @@ def _check_mode(mode: FilterMode, filter_config: FilterConfig, get: Callable) ->
         if slide_number is not None:
             return slide_number in getattr(filter_config, 'target_slides', [])
     if mode == FilterMode.SLIDE_NAME:
-        parent_container = get('parent_container')
-        if parent_container is not None:
-            return parent_container in getattr(filter_config, 'target_names', [])
+        slide_name = get('name')
+        if slide_name is not None:
+            return slide_name in getattr(filter_config, 'target_names', [])
     return True
 
 
