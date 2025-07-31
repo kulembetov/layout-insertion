@@ -146,6 +146,12 @@ class IssueReportExporter:
             ).execute()
             
             values = result.get('values', [])
+            
+            # If no data exists, create headers
+            if not values:
+                self._create_headers()
+                return set()
+            
             existing_ids = {row[0] for row in values[1:] if row}
             logger.info(f"Found {len(existing_ids)} existing records")
             return existing_ids
@@ -218,6 +224,61 @@ class IssueReportExporter:
         except HttpError as error:
             logger.error(f"Failed to add data to Google Sheets: {error}")
             raise
+    
+    def _create_headers(self) -> None:
+        """Create headers in the Google Sheets if they don't exist."""
+        headers = ['ID', 'User ID', 'Created At', 'Name', 'Contact', 'Description']
+        
+        body = {'values': [headers]}
+        self.sheets_service.spreadsheets().values().update(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f'{SHEET_NAME}!A1:F1',
+            valueInputOption='RAW',
+            body=body
+        ).execute()
+        
+        # Apply header formatting
+        self._apply_header_formatting()
+        logger.info("Created headers in Google Sheets")
+    
+    def _apply_header_formatting(self) -> None:
+        """Apply formatting to the header row."""
+        try:
+            sheet_id = self._get_sheet_id()
+            
+            requests = [
+                {
+                    'repeatCell': {
+                        'range': {
+                            'sheetId': sheet_id,
+                            'startRowIndex': 0,
+                            'endRowIndex': 1,
+                            'startColumnIndex': 0,
+                            'endColumnIndex': 6
+                        },
+                        'cell': {
+                            'userEnteredFormat': {
+                                'textFormat': {
+                                    'fontSize': 12,
+                                    'fontFamily': 'Open Sans',
+                                    'bold': True
+                                }
+                            }
+                        },
+                        'fields': 'userEnteredFormat.textFormat'
+                    }
+                }
+            ]
+            
+            self.sheets_service.spreadsheets().batchUpdate(
+                spreadsheetId=SPREADSHEET_ID,
+                body={'requests': requests}
+            ).execute()
+            
+            logger.info("Applied header formatting")
+            
+        except HttpError as error:
+            logger.error(f"Failed to apply header formatting: {error}")
     
     def _get_sheet_id(self) -> int:
         """Get the sheet ID for the Reports sheet."""
