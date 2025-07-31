@@ -112,7 +112,10 @@ python sql_pollution.py
 # 8. Delete from the DB (blocks, slides, images)
 python slide_deletion.py
 
-# 9. Create user accounts (optional)
+# 9. Update blocks (cleanup old and insert new)
+python update_blocks.py my_sql_output_old my_sql_output --output-dir final
+
+# 10. Create user accounts (optional)
 python account_creation.py
 ```
 
@@ -148,7 +151,10 @@ python3 sql_pollution.py
 # 8. Delete from the DB (blocks, slides, images)
 python3 slide_deletion.py
 
-# 9. Create user accounts (optional)
+# 9. Update blocks (cleanup old and insert new)
+python3 update_blocks.py my_sql_output_old my_sql_output --output-dir final
+
+# 10. Create user accounts (optional)
 python3 account_creation.py
 ```
 
@@ -325,6 +331,23 @@ python3 account_creation.py
 - **Dependencies:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`
 - **Usage:** Run the script to migrate all images from Google Drive to Yandex Cloud storage 
 
+### `update_blocks.py`
+- **Purpose:** Generates cleanup statements for existing blocks and combines them with new insertion statements
+- **Functionality:** 
+  - Processes old SQL files to find existing SlideLayout IDs in the database
+  - Generates DELETE and UPDATE statements to safely remove old block data
+  - Processes new SQL files and replaces new UUIDs with existing SlideLayout IDs
+  - Maintains folder structure organization (title, 1cols, 2cols, etc.)
+  - Creates cleanup files with `cleanup_` prefix and updated insertion files
+  - Ensures foreign key constraint safety by updating UserBlockLayout.parentLayoutId first
+  - Supports folder filtering for selective processing
+- **Configuration:** 
+  - Requires `database.ini` with PostgreSQL connection parameters
+  - Uses existing SlideLayout IDs from database to avoid creating duplicates
+  - Maintains referential integrity by cleaning up in correct dependency order
+- **Dependencies:** `psycopg2`, `os`, `re`, `argparse`, `shutil`, `datetime`, `pathlib`
+- **Usage:** `python update_blocks.py my_sql_output_old my_sql_output --output-dir final`
+
 ---
 
 # Структура проекта
@@ -448,7 +471,10 @@ python sql_pollution.py
 # 8. Удаление из БД (блоков, слайдов, изображений)
 python slide_deletion.py
 
-# 9. Создание пользовательских аккаунтов (опционально)
+# 9. Обновление блоков (очистка старых и вставка новых)
+python update_blocks.py my_sql_output_old my_sql_output --output-dir final
+
+# 10. Создание пользовательских аккаунтов (опционально)
 python account_creation.py
 ```
 
@@ -484,7 +510,10 @@ python3 sql_pollution.py
 # 8. Удаление из БД (блоков, слайдов, изображений)
 python3 slide_deletion.py
 
-# 9. Создание пользовательских аккаунтов (опционально)
+# 9. Обновление блоков (очистка старых и вставка новых)
+python3 update_blocks.py my_sql_output_old my_sql_output --output-dir final
+
+# 10. Создание пользовательских аккаунтов (опционально)
 python3 account_creation.py
 ```
 
@@ -661,3 +690,20 @@ python3 account_creation.py
   - Требует файл `credentials.json` из Google Cloud Console для доступа к API Google Drive
 - **Зависимости:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`
 - **Использование:** Запустите скрипт для переноса всех изображений из Google Drive в хранилище Yandex Cloud
+
+### `update_blocks.py`
+- **Назначение:** Генерирует очистку для существующих блоков и объединяет их с новыми операторами вставки
+- **Функциональность:** 
+  - Обрабатывает старые SQL файлы, чтобы найти существующие ID макетов слайдов в базе данных
+  - Генерирует операторы DELETE и UPDATE, чтобы безопасно удалить старые данные блока
+  - Обрабатывает новые SQL файлы и заменяет новые UUID на существующие ID макетов слайдов
+  - Сохраняет организацию структуры папок (название, 1cols, 2cols и т.д.)
+  - Создает файлы очистки с префиксом `cleanup_` и обновленные файлы вставки
+  - Обеспечивает безопасность ссылочных ограничений, обновляя UserBlockLayout.parentLayoutId сначала
+  - Поддерживает фильтрацию папок для выборочной обработки
+- **Конфигурация:** 
+  - Требует `database.ini` с параметрами подключения PostgreSQL
+  - Использует существующие ID макетов слайдов из базы данных, чтобы избежать создания дубликатов
+  - Сохраняет целостность ссылочных ограничений, очищая в правильном порядке зависимостей
+- **Зависимости:** `psycopg2`, `os`, `re`, `argparse`, `shutil`, `datetime`, `pathlib`
+- **Использование:** `python update_blocks.py my_sql_output_old my_sql_output --output-dir final`
