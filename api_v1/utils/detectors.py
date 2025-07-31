@@ -1,6 +1,6 @@
 import re
 
-from api_v1.constants import SLIDES, CONSTANTS, BLOCKS
+from api_v1.constants import SLIDES, CONSTANTS, BLOCKS, TYPES
 
 
 def detect_slide_type(container_name: str, slide_number: int) -> str:
@@ -15,8 +15,8 @@ def detect_slide_type(container_name: str, slide_number: int) -> str:
 def detect_block_type(node: dict) -> tuple[str, str]:
     """Detect block type from a Figma node, returning (figma_type, sql_type). Always returns a valid sql_type."""
 
-    name = node.get('name', '').lower()
-    node_type = node.get('type', '')
+    name = node.get(TYPES.FK_NAME, '').lower()
+    node_type = node.get(TYPES.FK_TYPE, '')
     clean_name = re.sub(r'\s*z-index.*$', '', name)
 
     # Check for explicit mappings first, prioritize longer patterns
@@ -27,7 +27,7 @@ def detect_block_type(node: dict) -> tuple[str, str]:
                 return pattern, sql_type
 
     type_mappings = {
-        'TEXT': [
+        TYPES.FT_TEXT: [
             (['title', 'heading', 'header', 'h1', 'h2'], {'sql_type': 'blockTitle'}),
             (['slide', 'main'], {'sql_type': 'slideTitle'} if any(
                 kw in clean_name for kw in ['title', 'heading', 'header', 'h1', 'h2']) else None),
@@ -39,20 +39,20 @@ def detect_block_type(node: dict) -> tuple[str, str]:
             (['percent', '%', 'percentage'], {'sql_type': 'percentage'}),
             ([], {'sql_type': 'text'})
         ],
-        'RECTANGLE': [
+        TYPES.FT_RECTANGLE: [
             (['background', 'bg', 'backdrop'], {'sql_type': 'background'}),
             (['icon', 'symbol'], {'sql_type': 'icon'}),
             (['image', 'img', 'photo', 'picture'], {'sql_type': 'image'}),
             ([], {'sql_type': 'figure'})
         ],
-        'FRAME': [
+        TYPES.FT_FRAME: [
             (['table', 'grid', 'data'], {'sql_type': 'table'}),
             (['chart', 'graph'], {'sql_type': 'table'}),
             (['infographic', 'infographik', 'visual'], {'sql_type': 'infographik'}),
             (['watermark', 'mark'], {'sql_type': 'watermark'}),
             ([], {'sql_type': 'figure'})
         ],
-        'GROUP': [
+        TYPES.FT_GROUP: [
             (['table', 'grid', 'data'], {'sql_type': 'table'}),
             (['chart', 'graph'], {'sql_type': 'table'}),
             (['infographic', 'infographik', 'visual'], {'sql_type': 'infographik'}),

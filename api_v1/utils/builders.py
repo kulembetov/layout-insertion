@@ -1,6 +1,6 @@
 from typing import Optional, Any
 
-from api_v1.constants import BLOCKS, SLIDES
+from api_v1.constants import BLOCKS, SLIDES, TYPES
 from api_v1.services.data_classes import ExtractedBlock, ExtractedSlide
 from api_v1.utils.extractors import Extractor
 from api_v1.utils.font import normalize_font_family
@@ -42,8 +42,8 @@ class BlockBuilder:
             'needs_null_styles': self.get('sql_type') in BLOCKS.BLOCK_TYPES['null_style_types'],
             'needs_z_index': self.get('sql_type') in BLOCKS.BLOCK_TYPES['z_index_types'],
             # Always include both fields for clarity and downstream use
-            'has_corner_radius': self.get('has_corner_radius') if self.get('has_corner_radius') is not None else False,
-            'corner_radius': self.get('corner_radius') if self.get('corner_radius') is not None else [0, 0, 0, 0],
+            'has_border_radius': self.get('has_border_radius') if self.get('has_border_radius') is not None else False,
+            'border_radius': self.get('border_radius') if self.get('border_radius') is not None else [0, 0, 0, 0],
         }
 
     def __fill_comments(self) -> list:
@@ -61,11 +61,11 @@ class BlockBuilder:
             self.block_dict['words'] = count_words(text_content)
 
     def _fill_by_sql_type(self, sql_type: str) -> None:
-        if sql_type == 'background':
+        if sql_type == TYPES.BT_BACKGROUND:
             self._fill_by_background()
-        elif sql_type == 'figure':
+        elif sql_type == TYPES.BT_FIGURE:
             self._fill_by_figure()
-        elif sql_type == 'image' and self.get('node_color'):
+        elif sql_type == TYPES.BT_IMAGE and self.get('node_color'):
             self._fill_by_image()
         text_block_types = ['slideTitle', 'blockTitle', 'text', 'subTitle', 'number', 'email', 'date', 'name',
                             'percentage']
@@ -83,18 +83,18 @@ class BlockBuilder:
         all_fonts = []
         for color_hex, objects in self.slide_config[self.get('sql_type')].items():
             all_colors.extend([o.get('color') for o in objects if o.get('color')])
-            all_fonts.extend([o.get('fontFamily') for o in objects if o.get('fontFamily')])
+            all_fonts.extend([o.get(TYPES.FK_FONT_FAMILY) for o in objects if o.get(TYPES.FK_FONT_FAMILY)])
 
         return all_colors, all_fonts
 
     def _fill_by_background(self) -> None:
         color_found = False
-        if safe_in('background', self.slide_config):
-            for color_hex, background_objects in self.slide_config['background'].items():
+        if safe_in(TYPES.BT_BACKGROUND, self.slide_config):
+            for color_hex, background_objects in self.slide_config[TYPES.BT_BACKGROUND].items():
                 if background_objects:
                     background_obj = background_objects[0]
                     self.block_dict['color'] = background_obj.get('color')
-                    self.block_dict['fontFamily'] = background_obj.get('fontFamily')
+                    self.block_dict[TYPES.FK_FONT_FAMILY] = background_obj.get(TYPES.FK_FONT_FAMILY)
                     color_found = True
                     break
         if not color_found and self.get('node_color'):
@@ -119,15 +119,15 @@ class BlockBuilder:
                     for figure_obj in figure_objects:
                         if figure_obj.get('figureName') == figure_index:
                             self.block_dict['color'] = figure_obj.get('color')
-                            self.block_dict['fontFamily'] = figure_obj.get('fontFamily')
+                            self.block_dict[TYPES.FK_FONT_FAMILY] = figure_obj.get(TYPES.FK_FONT_FAMILY)
                             break
                     if 'color' in self.block_dict:
                         break
 
             if all_colors and 'color' not in self.block_dict:
-                self.block_dict['color'] = all_colors[0]
-            if all_fonts and 'fontFamily' not in self.block_dict:
-                self.block_dict['fontFamily'] = all_fonts[0]
+                self.block_dict[TYPES.FK_FONT_FAMILY] = all_colors[0]
+            if all_fonts and TYPES.FK_FONT_FAMILY not in self.block_dict:
+                self.block_dict[TYPES.FK_FONT_FAMILY] = all_fonts[0]
         self.__fill_color_var()
 
     def _fill_by_image(self) -> None:
@@ -143,8 +143,8 @@ class BlockBuilder:
             self.block_dict['all_fonts'] = list(set(all_fonts))
         if all_colors and 'color' not in self.block_dict:
             self.block_dict['color'] = all_colors[0]
-        if all_fonts and 'fontFamily' not in self.block_dict:
-            self.block_dict['fontFamily'] = all_fonts[0]
+        if all_fonts and TYPES.FK_FONT_FAMILY not in self.block_dict:
+            self.block_dict[TYPES.FK_FONT_FAMILY] = all_fonts[0]
         self.__fill_color_var()
 
     def _fill_info(self) -> None:
@@ -154,7 +154,7 @@ class BlockBuilder:
 
     def _extract_figure_info(self) -> Optional[dict]:
         """Extract and return figure_info dict for a figure block, or None if not a figure."""
-        if self.get('sql_type') != 'figure':
+        if self.get('sql_type') != TYPES.BT_FIGURE:
             return None
         info = {
             'id': self.get('id'),
@@ -163,21 +163,21 @@ class BlockBuilder:
             'fontFamily': self.get('fontFamily'),
         }
         # Optionally enrich with slide_config if available
-        if safe_in('figure', self.slide_config):
+        if safe_in(TYPES.BT_FIGURE, self.slide_config):
             # Try to find matching color/font info
-            for color_hex, figure_objects in self.slide_config['figure'].items():
+            for color_hex, figure_objects in self.slide_config[TYPES.BT_FIGURE].items():
                 for figure_obj in figure_objects:
                     if figure_obj.get('figureName') == info['name']:
                         info['color'] = figure_obj.get('color')
-                        info['fontFamily'] = figure_obj.get('fontFamily')
+                        info[TYPES.FK_FONT_FAMILY] = figure_obj.get(TYPES.FK_FONT_FAMILY)
                         break
         return info
 
     def _extract_precompiled_image_info(self) -> Optional[dict]:
         """Extract and return precompiled_image_info dict for a precompiled image block, or None if not applicable."""
-        if self.get('sql_type') != 'image':
+        if self.get('sql_type') != TYPES.BT_IMAGE:
             return None
-        name = getattr(self.block, 'name', '')
+        name = getattr(self.block, TYPES.FK_NAME, '')
         if not name.lower().startswith('image precompiled'):
             return None
         info = {
@@ -210,7 +210,7 @@ def _update_figure_config_with_names(slide_config, blocks):
     figure_blocks_by_name = {}
 
     for block in blocks:
-        if block.sql_type != 'figure':
+        if block.sql_type != TYPES.BT_FIGURE:
             continue
 
         base_name = Extractor.extract_base_figure_name(block.name)
@@ -219,7 +219,7 @@ def _update_figure_config_with_names(slide_config, blocks):
 
     new_figure_config = {}
 
-    for color_hex, obj_list in slide_config['figure'].items():
+    for color_hex, obj_list in slide_config[TYPES.BT_FIGURE].items():
         figure_objects = []
 
         for obj in obj_list:
@@ -227,7 +227,7 @@ def _update_figure_config_with_names(slide_config, blocks):
             if not figure_name:
                 continue
 
-            font_family = obj.get('fontFamily')
+            font_family = obj.get(TYPES.FK_FONT_FAMILY)
             normalized_font_family = normalize_font_family(font_family)
             fill_color = obj.get('color')
             matching_block = figure_blocks_by_name.get(Extractor.extract_base_figure_name(figure_name))
@@ -248,7 +248,7 @@ def _update_figure_config_with_names(slide_config, blocks):
             }
             figure_objects.append(figure_obj)
         new_figure_config[color_hex] = figure_objects
-    slide_config['figure'] = new_figure_config
+    slide_config[TYPES.BT_FIGURE] = new_figure_config
     # logger.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_by_name)} figure blocks")
 
 
@@ -281,7 +281,7 @@ def slide_to_dict(slide: ExtractedSlide, comments: dict) -> dict[str, Any]:
     if figma_node:
         slide_config, presentation_palette_colors = Extractor.extract_slide_config(figma_node)
         # Build mapping from figure numbers to actual figure names and update slideConfig
-        if 'figure' in slide_config:
+        if TYPES.BT_FIGURE in slide_config:
             _update_figure_config_with_names(slide_config, slide.blocks)
     return {
         'slide_number': slide.number,

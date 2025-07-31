@@ -2,23 +2,23 @@ from typing import Callable, Optional, Any
 
 from api_v1.constants import TYPES
 from api_v1.services.data_classes import ExtractedBlock
-from api_v1.services.filters.filter_settings import FilterMode, FilterConfig
+from api_v1.services.filters.filter_settings import LegacyFilterMode, LegacyFilterConfig
 from api_v1.utils.checkers import Checker
 
 
 # codeblock for 'should_include', don't use/import this
-def _check_mode(mode: FilterMode, filter_config: FilterConfig, get: Callable) -> bool:
-    if mode == FilterMode.ALL:
+def _check_mode(mode: LegacyFilterMode, filter_config: LegacyFilterConfig, get: Callable) -> bool:
+    if mode == LegacyFilterMode.ALL:
         return True
-    if mode == FilterMode.SPECIFIC_SLIDES:
+    if mode == LegacyFilterMode.SPECIFIC_SLIDES:
         slide_number = get('slide_number') or get('slideNumber')
         if slide_number is not None:
             return slide_number in getattr(filter_config, 'target_slides', [])
-    if mode == FilterMode.SPECIFIC_BLOCKS:
+    if mode == LegacyFilterMode.SPECIFIC_BLOCKS:
         sql_type = get('sql_type')
         if sql_type is not None:
             return sql_type in getattr(filter_config, 'target_block_types', [])
-    if mode == FilterMode.BY_TYPE:
+    if mode == LegacyFilterMode.BY_TYPE:
         parent_container = get('parent_container')
         if parent_container is not None:
             return parent_container in getattr(filter_config, 'target_containers', [])
@@ -36,10 +36,10 @@ def should_include(node_or_block: dict | ExtractedBlock, filter_config) -> bool:
             return node_or_block.get(key, None)
         return getattr(node_or_block, key, None)
 
-    name = get(TYPES.FIGMA_KEY_NAME) or ''
+    name = get(TYPES.FK_NAME) or ''
     marker = getattr(filter_config, 'ready_to_dev_marker', None)
 
-    exclude_hidden = getattr(filter_config, 'exclude_hidden', True) and get(TYPES.FIGMA_KEY_VISIBLE) is False
+    exclude_hidden = getattr(filter_config, 'exclude_hidden', True) and get(TYPES.FK_VISIBLE) is False
     marker_check = not Checker.check_marker(marker, name)
     z_index_requirement = getattr(filter_config, 'require_z_index', True) and not Checker.check_z_index(name)
     if exclude_hidden or marker_check or z_index_requirement:

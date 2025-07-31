@@ -4,7 +4,7 @@ from typing import Any, Optional
 from log_utils import setup_logger, logs
 
 from .data_classes import ExtractedBlock, ExtractedSlide
-from .filters.filter_settings import FilterMode, FilterConfig
+from .filters.filter_settings import LegacyFilterMode, LegacyFilterConfig
 
 from api_v1.utils.helpers import round5, get_slide_number
 from api_v1.utils.checkers import Checker
@@ -13,17 +13,16 @@ from api_v1.utils.extractors import Extractor
 from api_v1.utils.builders import slide_to_dict
 from api_v1.utils.detectors import detect_slide_type, detect_block_type
 
-from api_v1.constants import BLOCKS, SLIDES, CONSTANTS
-
+from api_v1.constants import BLOCKS, SLIDES, CONSTANTS, TYPES
 
 logger = setup_logger(__name__)
 
 @logs(logger, on=True)
 class FigmaAPI:
-    def __init__(self, *, file_id: Optional[str] = None, token: Optional[str] = None, filter_config: Optional[FilterConfig] = None) -> None:
+    def __init__(self, *, file_id: Optional[str] = None, token: Optional[str] = None, filter_config: Optional[LegacyFilterConfig] = None) -> None:
         self._file_id = file_id
         self._token = token
-        self._filter_config = filter_config or FilterConfig()
+        self._filter_config = filter_config or LegacyFilterConfig()
 
     @property
     def file_id(self) -> Optional[str]:
@@ -48,12 +47,12 @@ class FigmaAPI:
             raise TypeError("'token' must be str.")
     
     @property
-    def filter_config(self) -> FilterConfig:
+    def filter_config(self) -> LegacyFilterConfig:
         return self._filter_config
 
     @filter_config.setter
-    def filter_config(self, config: FilterConfig) -> None:
-        if isinstance(config, FilterConfig):
+    def filter_config(self, config: LegacyFilterConfig) -> None:
+        if isinstance(config, LegacyFilterConfig):
             self._filter_config = config
         else:
             raise TypeError("'config' must be FilterConfig.")
@@ -72,7 +71,7 @@ class FigmaAPI:
             headers=self.headers
         )
         response.raise_for_status()
-        return response.json()['document']['children']
+        return response.json()['document'][TYPES.FK_CHILDREN]
 
     @logs(logger, on=True)
     def fetch_comments(self) -> dict:
@@ -124,7 +123,7 @@ class FigmaAPI:
         pages = self.fetch()
         all_slides = []
         for page in pages:
-            logger.info(f"\nProcessing page: {page.get('name', 'Unnamed')}")
+            logger.info(f"\nProcessing page: {page.get(TYPES.FK_NAME, 'Unnamed')}")
             page_slides = self.traverse_and_extract(page)
             all_slides.extend(page_slides)
 
@@ -167,8 +166,8 @@ class FigmaAPI:
                     'filter_config': {
                         'mode': self.filter_config.mode.value,
                         'target_slides': self.filter_config.target_slides,
-                        'target_block_types': self.filter_config.target_block_types,
-                        'target_containers': self.filter_config.target_containers
+                        'target_names': self.filter_config.target_block_types,
+                        'target_statuses': self.filter_config.target_containers
                     },
                     'sql_generator_compatibility': {
                         'valid_block_types': BLOCKS.BLOCK_TYPES['block_layout_type_options'],
@@ -206,19 +205,19 @@ class FigmaAPI:
         slides = []
 
         if self.is_target_frame(node):
-            logger.info(f"Found target frame: \"{node['name']}\"")
+            logger.info(f"Found target frame: \"{node[TYPES.FK_NAME]}\"")
             logger.info(f"Parent container: \"{parent_name}\"")
 
             frame_origin = {
-                'x': node['absoluteBoundingBox']['x'],
-                'y': node['absoluteBoundingBox']['y']
+                'x': node[TYPES.FK_ABS_BOX]['x'],
+                'y': node[TYPES.FK_ABS_BOX]['y']
             }
 
             slide_number = get_slide_number(parent_name)
             slide_type = detect_slide_type(parent_name, slide_number)
 
             # Skip if not in target slides (when filtering by specific slides)
-            if (self.filter_config.mode == FilterMode.SPECIFIC_SLIDES and 
+            if (self.filter_config.mode == LegacyFilterMode.SPECIFIC_SLIDES and
                 slide_number not in self.filter_config.target_slides):
                 return slides
             
@@ -226,11 +225,11 @@ class FigmaAPI:
                 node, frame_origin, slide_number, parent_name
             )
 
-            if blocks or self.filter_config.mode == FilterMode.ALL:
+            if blocks or self.filter_config.mode == LegacyFilterMode.ALL:
                 slide = ExtractedSlide(
                     number=slide_number,
                     container_name=parent_name,
-                    frame_name=node['name'],
+                    frame_name=node[TYPES.FK_NAME],
                     slide_type=slide_type,
                     blocks=blocks,
                     frame_id=node['id'],
@@ -247,9 +246,9 @@ class FigmaAPI:
             return slides
 
         # Continue traversing children
-        if node.get('children'):
-            for child in node['children']:
-                child_slides = self.traverse_and_extract(child, node['name'])
+        if node.get(TYPES.FK_CHILDREN):
+            for child in node[TYPES.FK_CHILDREN]:
+                child_slides = self.traverse_and_extract(child, node[TYPES.FK_NAME])
                 slides.extend(child_slides)
         
         return slides
@@ -258,22 +257,22 @@ class FigmaAPI:
     def is_target_frame(self, node: dict[str, Any]) -> bool:
         """Check if node is a target frame, now supports 'ready to dev' marker."""
 
-        if not node.get('absoluteBoundingBox'):
+        if not node.get(TYPES.FK_ABS_BOX):
             return False
         
-        if self.filter_config.require_z_index and not Checker.check_z_index(node.get('name', '')):
+        if self.filter_config.require_z_index and not Checker.check_z_index(node.get(TYPES.FK_NAME, '')):
             return False
         
-        if self.filter_config.mode == FilterMode.READY_TO_DEV:
+        if self.filter_config.mode == LegacyFilterMode.READY_TO_DEV:
             dev_status = node.get('devStatus', {}).get('type')
             if dev_status != "READY_FOR_DEV":
                 return False
     
-        if not Checker.check_dimensions(node['absoluteBoundingBox']):
+        if not Checker.check_dimensions(node[TYPES.FK_ABS_BOX]):
             return False
         
         if not Checker.check_min_area(
-            node['absoluteBoundingBox'], self.filter_config.min_area
+            node[TYPES.FK_ABS_BOX], self.filter_config.min_area
         ):
             return False
         
@@ -285,10 +284,10 @@ class FigmaAPI:
     def collect_enhanced_blocks(self, node: dict[str, Any], frame_origin: dict[str, int], 
                               slide_number: int, parent_container: str) -> list[ExtractedBlock]:
         blocks = []
-        if not node.get('absoluteBoundingBox'):
+        if not node.get(TYPES.FK_ABS_BOX):
             return blocks
         
-        if self.filter_config.mode == FilterMode.READY_TO_DEV:
+        if self.filter_config.mode == LegacyFilterMode.READY_TO_DEV:
             dev_status = node.get('devStatus', {}).get('type')
             if dev_status != "READY_FOR_DEV":
                 return blocks
@@ -296,13 +295,13 @@ class FigmaAPI:
         # Centralized filtering for node
         if not should_include(node, self.filter_config):
             return blocks
-        name = node.get('name', '')
+        name = node.get(TYPES.FK_NAME, '')
         has_z = Checker.check_z_index(name)
 
         # Only process nodes with z-index in the name
         if has_z:
             figma_type, sql_type = detect_block_type(node)
-            abs_box = node['absoluteBoundingBox']
+            abs_box = node[TYPES.FK_ABS_BOX]
             left = abs_box['x'] - frame_origin['x']
             top = abs_box['y'] - frame_origin['y']
             dimensions = {
@@ -330,11 +329,11 @@ class FigmaAPI:
                 if z_index == 0:
                     z_index = CONSTANTS.Z_INDEX_DEFAULTS.get(sql_type, CONSTANTS.Z_INDEX_DEFAULTS['default'])
                 styles['zIndex'] = z_index
-                has_corner_radius, corner_radius = Extractor.extract_corner_radius(node)
+                has_corner_radius, corner_radius = Extractor.extract_border_radius(node)
                 text_content: Optional[str] = None
                 text_like_types = ['text', 'blockTitle', 'slideTitle', 'subTitle', 'number', 'email', 'date', 'name', 'percentage']
                 if sql_type in text_like_types and node.get('type') == 'TEXT':
-                    text_content = node.get('characters', None)
+                    text_content = node.get(TYPES.FK_CHARACTERS, None)
                 
                 # Extract color information for background and other relevant blocks
                 node_color = None
@@ -351,8 +350,8 @@ class FigmaAPI:
                     slide_number=slide_number,
                     parent_container=parent_container,
                     is_target=True,
-                    has_corner_radius=has_corner_radius,
-                    corner_radius=corner_radius,
+                    has_border_radius=has_corner_radius,
+                    border_radius=corner_radius,
                     text_content=text_content  # Pass text content
                 )
                 # Store the extracted color for later use
@@ -365,7 +364,7 @@ class FigmaAPI:
                         f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{color_info}",
                     )
         # Recursively process children (skip children of hidden nodes)
-        if node.get('children') and not (getattr(self.filter_config, 'exclude_hidden', True) and node.get('visible') is False):
-            for child in node['children']:
+        if node.get(TYPES.FK_CHILDREN) and not (getattr(self.filter_config, 'exclude_hidden', True) and node.get(TYPES.FK_VISIBLE) is False):
+            for child in node[TYPES.FK_CHILDREN]:
                 blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
         return blocks

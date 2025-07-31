@@ -3,6 +3,7 @@ from typing import Optional, Any
 
 from api_v1.constants import CONSTANTS
 from api_v1.utils.font import normalize_font_weight, normalize_font_family
+from api_v1.constants import TYPES
 
 
 # codeblock for 'extract_color_info', don't use/import this
@@ -60,7 +61,7 @@ class Extractor:
             'weight': defaults['weight'],
             'textTransform': defaults['text_transform']
         }
-        style = node.get('style', {})
+        style = node.get(TYPES.FK_STYLE, {})
         if style:
             # Prefer Figma's actual values if present
             text_align_vertical = style.get('textAlignVertical', '').lower()
@@ -79,26 +80,26 @@ class Extractor:
         return styles
 
     @staticmethod
-    def extract_corner_radius(node: dict[str, Any]) -> tuple[bool, list[int]]:
+    def extract_border_radius(node: dict[str, Any]) -> tuple[bool, list[int]]:
         """Extract corner radius information"""
-        corner_radius = [0, 0, 0, 0]  # Default: all corners 0
-        has_corner_radius = False
+        border_radius = [0, 0, 0, 0]  # Default: all corners 0
+        has_border_radius = False
 
         # Check for cornerRadius property
-        if 'cornerRadius' in node:
-            radius = node['cornerRadius']
+        if TYPES.FK_BORDER_RADIUS in node:
+            radius = node[TYPES.FK_BORDER_RADIUS]
             if isinstance(radius, (int, float)) and radius > 0:
-                corner_radius = [int(radius)] * 4
-                has_corner_radius = True
+                border_radius = [int(radius)] * 4
+                has_border_radius = True
 
         # Check for individual corner radii
-        if 'rectangleCornerRadii' in node:
-            radii = node['rectangleCornerRadii']
+        if TYPES.FK_RECT_CORNER_RADII in node:
+            radii = node[TYPES.FK_RECT_CORNER_RADII]
             if isinstance(radii, list) and len(radii) == 4:
-                corner_radius = [int(r) for r in radii]
-                has_corner_radius = any(r > 0 for r in corner_radius)
+                border_radius = [int(r) for r in radii]
+                has_border_radius = any(r > 0 for r in border_radius)
 
-        return has_corner_radius, corner_radius
+        return has_border_radius, border_radius
 
     @staticmethod
     def extract_z_index(name: str) -> int:
@@ -121,7 +122,7 @@ class Extractor:
         fills: Optional[list] = node.get('fills')
         if fills and isinstance(fills, list):
             for fill in fills:
-                if fill.get('visible', True) and fill.get('type') == 'SOLID' and 'color' in fill:
+                if fill.get(TYPES.FK_VISIBLE, True) and fill.get(TYPES.FK_TYPE) == 'SOLID' and 'color' in fill:
                     return _hex_and_color_var(fill)
 
         # Fallback: check for direct color field
@@ -142,40 +143,40 @@ class Extractor:
         config_dict = {}
         palette_colors = set()
 
-        if not slide_node or not slide_node.get("children"):
+        if not slide_node or not slide_node.get(TYPES.FK_CHILDREN):
             return config_dict, []
 
-        for child in slide_node["children"]:
-            if child.get("name") != "slideColors":
+        for child in slide_node[TYPES.FK_CHILDREN]:
+            if child.get(TYPES.FK_NAME) != TYPES.FK_SLIDE_COLORS:
                 continue
 
             # logg.info("[slideColors] Found slideColors table in slide")
 
-            for block in child.get("children", []):
-                block_type = block.get("name")
+            for block in child.get(TYPES.FK_CHILDREN, []):
+                block_type = block.get(TYPES.FK_NAME)
                 # logg.info(f"[slideColors] Processing block type: {block_type}")
 
                 block_colors = {}
-                for color_group in block.get("children", []):
-                    color_hex = color_group.get("name").lower() if color_group.get("name") else ""
+                for color_group in block.get(TYPES.FK_CHILDREN, []):
+                    color_hex = color_group.get(TYPES.FK_NAME).lower() if color_group.get(TYPES.FK_NAME) else ""
                     palette_colors.add(color_hex)
 
                     # logg.info(f"[slideColors] Processing color group: {color_hex}")
 
                     block_objs = []
-                    for text_child in color_group.get("children", []):
-                        if text_child.get("type") != "TEXT":
+                    for text_child in color_group.get(TYPES.FK_CHILDREN, []):
+                        if text_child.get(TYPES.FK_TYPE) != TYPES.FT_TEXT:
                             continue
 
                         obj = {
                             "color": Extractor.extract_color_info(text_child)[0],  # Use 'color' instead of 'fill'
                             "fontFamily": normalize_font_family(
-                                text_child["style"].get("fontFamily")
+                                text_child[TYPES.FK_STYLE].get(TYPES.FK_FONT_FAMILY),
                             ),
                         }
 
-                        if block_type == "figure":
-                            obj["figureName"] = text_child.get("name", "").strip()
+                        if block_type == TYPES.BT_FIGURE:
+                            obj["figureName"] = text_child.get(TYPES.FK_NAME, "").strip()
 
                         color_var = Extractor.extract_color_info(text_child)[1]
                         if color_var:

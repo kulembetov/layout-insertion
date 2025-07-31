@@ -4,7 +4,7 @@ from rest_framework import status
 
 
 from api_v1.services.figma_api import FigmaAPI
-from api_v1.services.filters.filter_settings import FilterMode
+from api_v1.services.filters.filter_settings import LegacyFilterMode
 from config.settings import FIGMA_TOKEN
 
 from log_utils import setup_logger, logs
@@ -35,16 +35,16 @@ class ReceiveFigmaJsonAPIView(APIView):
             )
 
             match filter_mode:
-                case FilterMode.SPECIFIC_SLIDES.value:
+                case LegacyFilterMode.SPECIFIC_SLIDES.value:
                     data = figma_filtered.extract_specific_slides()
 
-                case FilterMode.SPECIFIC_BLOCKS.value:
+                case LegacyFilterMode.SPECIFIC_BLOCKS.value:
                     data = figma_filtered.extract_specific_blocks()
 
-                case FilterMode.BY_TYPE.value:
+                case LegacyFilterMode.BY_TYPE.value:
                     data = figma_filtered.extract_by_type()
 
-                case FilterMode.READY_TO_DEV.value: 
+                case LegacyFilterMode.READY_TO_DEV.value:
                     data = figma_filtered.extract_ready_to_dev()
                 
                 case _:

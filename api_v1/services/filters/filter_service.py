@@ -1,6 +1,6 @@
 from typing import Any, Optional, Dict
 
-from .filter_settings import FilterMode, FilterConfig
+from .filter_settings import LegacyFilterMode, LegacyFilterConfig
 from api_v1.services.figma_api import FigmaAPI
 
 
@@ -14,8 +14,8 @@ class FilterFigmaApi(FigmaAPI):
     def extract_specific_slides(self) -> Dict[str, Any]:
         """Extract specific slides from Figma."""
 
-        self.filter_config = FilterConfig(
-            mode=FilterMode.SPECIFIC_SLIDES,
+        self.filter_config = LegacyFilterConfig(
+            mode=LegacyFilterMode.SPECIFIC_SLIDES,
             target_slides=self.filter_params,
             require_z_index=True
         )
@@ -25,8 +25,8 @@ class FilterFigmaApi(FigmaAPI):
     def extract_specific_blocks(self) -> Dict[str, Any]:
         """Extract slides containing specific block types."""
 
-        self.filter_config = FilterConfig(
-            mode=FilterMode.SPECIFIC_BLOCKS,
+        self.filter_config = LegacyFilterConfig(
+            mode=LegacyFilterMode.SPECIFIC_BLOCKS,
             target_block_types=self.filter_params,
         )
         return self.extract()
@@ -34,13 +34,13 @@ class FilterFigmaApi(FigmaAPI):
     def extract_by_type(self) -> Dict[str, Any]:
         """Extract slides from specific containers"""
 
-        self.filter_config = FilterConfig(
-            mode=FilterMode.BY_TYPE,
+        self.filter_config = LegacyFilterConfig(
+            mode=LegacyFilterMode.BY_TYPE,
             target_containers=self.filter_params
         )
         return self.extract()
     
     def extract_ready_to_dev(self) -> Dict[str, Any]:
         """Extract blocks marked as ready for development."""
-        self.filter_config = FilterConfig(mode=FilterMode.READY_TO_DEV)
+        self.filter_config = LegacyFilterConfig(mode=LegacyFilterMode.READY_TO_DEV)
         return self.extract()

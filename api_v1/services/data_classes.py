@@ -14,8 +14,8 @@ class ExtractedBlock:
     parent_container: str
     comments: list = field(default_factory=list)
     is_target: bool = False
-    has_corner_radius: bool = False
-    corner_radius: list[int] = field(default_factory=lambda: [0, 0, 0, 0])
+    has_border_radius: bool = False
+    border_radius: list[int] = field(default_factory=lambda: [0, 0, 0, 0])
     text_content: str = None
     figure_info: dict[str, Any] = field(default_factory=dict)
     precompiled_image_info: dict[str, Any] = field(default_factory=dict)
