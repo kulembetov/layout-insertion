@@ -4,7 +4,7 @@ from api_v1.constants import BLOCKS, SLIDES, TYPES
 from api_v1.services.data_classes import ExtractedBlock, ExtractedSlide
 from api_v1.utils.extractors import Extractor
 from api_v1.utils.font import normalize_font_family
-from api_v1.utils.helpers import safe_in, json_dump
+from api_v1.utils.helpers import safe_in
 from api_v1.utils.text import count_words, count_sentences
 
 

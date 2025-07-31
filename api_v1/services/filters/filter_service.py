@@ -1,46 +1,36 @@
 from typing import Any, Optional, Dict
 
-from .filter_settings import LegacyFilterMode, LegacyFilterConfig
+from .filter_settings import FilterMode, FilterConfig
 from api_v1.services.figma_api import FigmaAPI
 
 
 class FilterFigmaApi(FigmaAPI):
     """Use different types of filtration."""
 
-    def __init__(self, file_id: str, token: Optional[str] = None, filter_params: Optional[list] = None) -> None:
+    def __init__(self, file_id: Optional[str] = None, token: Optional[str] = None, filter_names: Optional[list] = None) -> None:
         super().__init__(file_id=file_id, token=token)
-        self.filter_params = filter_params
+        self.filter_names = filter_names
 
-    def extract_specific_slides(self) -> Dict[str, Any]:
+    def extract_slide_group(self) -> Dict[str, Any]:
         """Extract specific slides from Figma."""
 
-        self.filter_config = LegacyFilterConfig(
-            mode=LegacyFilterMode.SPECIFIC_SLIDES,
-            target_slides=self.filter_params,
+        self.filter_config = FilterConfig(
+            mode=FilterMode.SLIDE_GROUP,
+            target_slides=self.filter_names,
             require_z_index=True
         )
         return self.extract()
     
-
-    def extract_specific_blocks(self) -> Dict[str, Any]:
-        """Extract slides containing specific block types."""
-
-        self.filter_config = LegacyFilterConfig(
-            mode=LegacyFilterMode.SPECIFIC_BLOCKS,
-            target_block_types=self.filter_params,
-        )
-        return self.extract()
-    
-    def extract_by_type(self) -> Dict[str, Any]:
+    def extract_slide_name(self) -> Dict[str, Any]:
         """Extract slides from specific containers"""
 
-        self.filter_config = LegacyFilterConfig(
-            mode=LegacyFilterMode.BY_TYPE,
-            target_containers=self.filter_params
+        self.filter_config = FilterConfig(
+            mode=FilterMode.SLIDE_NAME,
+            target_names=self.filter_names
         )
         return self.extract()
     
-    def extract_ready_to_dev(self) -> Dict[str, Any]:
+    def extract_status(self) -> Dict[str, Any]:
         """Extract blocks marked as ready for development."""
-        self.filter_config = LegacyFilterConfig(mode=LegacyFilterMode.READY_TO_DEV)
+        self.filter_config = FilterConfig(mode=FilterMode.STATUS)
         return self.extract()

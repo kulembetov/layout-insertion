@@ -2,60 +2,51 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-
-from api_v1.services.figma_api import FigmaAPI
-from api_v1.services.filters.filter_settings import LegacyFilterMode
-from config.settings import FIGMA_TOKEN
+from api_v1.services.filters.filter_settings import FilterMode
+from api_v1.implemented import figma_instance
 
 from log_utils import setup_logger, logs
 
 from api_v1.redis.utils import gen_key, set_cached_request
-from .services.filters.filter_service import FilterFigmaApi
 from api_v1.utils.helpers import json_dump
 
 
 logger = setup_logger(__name__)
 
 class ReceiveFigmaJsonAPIView(APIView):
-    figma = FigmaAPI(token=FIGMA_TOKEN)
-
     @logs(logger, on=True)
     def get(self, request):
         file_id = request.data['file_id']
-        self.figma.file_id = file_id
+        figma_instance.file_id = file_id
         logger.info(f'file_id: {file_id}')
 
         if request.data.get('filter'):
-            filter_mode = request.data.get('filter').get('mode')
-            filter_params = request.data.get('filter').get('params')
-            figma_filtered = FilterFigmaApi(
-                token=FIGMA_TOKEN,
-                filter_params=filter_params,
-                file_id=file_id
-            )
+            from api_v1.implemented import filter_figma_instance
 
-            match filter_mode:
-                case LegacyFilterMode.SPECIFIC_SLIDES.value:
-                    data = figma_filtered.extract_specific_slides()
+            filter_type: str = request.data.get('filter').get('type')
+            filter_names: list[str] = request.data.get('filter').get('name')
 
-                case LegacyFilterMode.SPECIFIC_BLOCKS.value:
-                    data = figma_filtered.extract_specific_blocks()
+            filter_figma_instance.file_id = file_id
+            filter_figma_instance.filter_names = filter_names
 
-                case LegacyFilterMode.BY_TYPE.value:
-                    data = figma_filtered.extract_by_type()
+            match filter_type:
+                case FilterMode.SLIDE_GROUP.value:
+                    data = filter_figma_instance.extract_slide_group()
 
-                case LegacyFilterMode.READY_TO_DEV.value:
-                    data = figma_filtered.extract_ready_to_dev()
-                
+                case FilterMode.SLIDE_NAME.value:
+                    data = filter_figma_instance.extract_slide_name()
+
+                case FilterMode.STATUS.value:
+                    data = filter_figma_instance.extract_status()
+
                 case _:
-                    raise Exception(f'Unknown filter mode: {filter_mode}')
+                    raise ValueError(f'Unknown filter type: {filter_type}')
 
-            key = gen_key(file_id, filter_mode, filter_params)
+            key = gen_key(file_id, filter_type, filter_names)
 
         else:
-            data = self.figma.extract()
+            data = figma_instance.extract()
             key = gen_key(file_id)
-
 
         json_dump(data, 'output.json')
 

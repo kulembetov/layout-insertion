@@ -4,7 +4,7 @@ from typing import Any, Optional
 from log_utils import setup_logger, logs
 
 from .data_classes import ExtractedBlock, ExtractedSlide
-from .filters.filter_settings import LegacyFilterMode, LegacyFilterConfig
+from .filters.filter_settings import FilterMode, FilterConfig
 
 from api_v1.utils.helpers import round5, get_slide_number
 from api_v1.utils.checkers import Checker
@@ -19,10 +19,10 @@ logger = setup_logger(__name__)
 
 @logs(logger, on=True)
 class FigmaAPI:
-    def __init__(self, *, file_id: Optional[str] = None, token: Optional[str] = None, filter_config: Optional[LegacyFilterConfig] = None) -> None:
+    def __init__(self, *, file_id: Optional[str] = None, token: Optional[str] = None, filter_config: Optional[FilterConfig] = None) -> None:
         self._file_id = file_id
         self._token = token
-        self._filter_config = filter_config or LegacyFilterConfig()
+        self._filter_config = filter_config or FilterConfig()
 
     @property
     def file_id(self) -> Optional[str]:
@@ -47,12 +47,12 @@ class FigmaAPI:
             raise TypeError("'token' must be str.")
     
     @property
-    def filter_config(self) -> LegacyFilterConfig:
+    def filter_config(self) -> FilterConfig:
         return self._filter_config
 
     @filter_config.setter
-    def filter_config(self, config: LegacyFilterConfig) -> None:
-        if isinstance(config, LegacyFilterConfig):
+    def filter_config(self, config: FilterConfig) -> None:
+        if isinstance(config, FilterConfig):
             self._filter_config = config
         else:
             raise TypeError("'config' must be FilterConfig.")
@@ -166,8 +166,8 @@ class FigmaAPI:
                     'filter_config': {
                         'mode': self.filter_config.mode.value,
                         'target_slides': self.filter_config.target_slides,
-                        'target_names': self.filter_config.target_block_types,
-                        'target_statuses': self.filter_config.target_containers
+                        'target_names': self.filter_config.target_names,
+                        'target_statuses': self.filter_config.target_statuses
                     },
                     'sql_generator_compatibility': {
                         'valid_block_types': BLOCKS.BLOCK_TYPES['block_layout_type_options'],
@@ -217,7 +217,7 @@ class FigmaAPI:
             slide_type = detect_slide_type(parent_name, slide_number)
 
             # Skip if not in target slides (when filtering by specific slides)
-            if (self.filter_config.mode == LegacyFilterMode.SPECIFIC_SLIDES and
+            if (self.filter_config.mode == FilterMode.SLIDE_GROUP and
                 slide_number not in self.filter_config.target_slides):
                 return slides
             
@@ -225,7 +225,7 @@ class FigmaAPI:
                 node, frame_origin, slide_number, parent_name
             )
 
-            if blocks or self.filter_config.mode == LegacyFilterMode.ALL:
+            if blocks or self.filter_config.mode == FilterMode.ALL:
                 slide = ExtractedSlide(
                     number=slide_number,
                     container_name=parent_name,
@@ -263,7 +263,7 @@ class FigmaAPI:
         if self.filter_config.require_z_index and not Checker.check_z_index(node.get(TYPES.FK_NAME, '')):
             return False
         
-        if self.filter_config.mode == LegacyFilterMode.READY_TO_DEV:
+        if self.filter_config.mode == FilterMode.STATUS:
             dev_status = node.get('devStatus', {}).get('type')
             if dev_status != "READY_FOR_DEV":
                 return False
@@ -287,7 +287,7 @@ class FigmaAPI:
         if not node.get(TYPES.FK_ABS_BOX):
             return blocks
         
-        if self.filter_config.mode == LegacyFilterMode.READY_TO_DEV:
+        if self.filter_config.mode == FilterMode.STATUS:
             dev_status = node.get('devStatus', {}).get('type')
             if dev_status != "READY_FOR_DEV":
                 return blocks
