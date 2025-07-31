@@ -317,8 +317,8 @@ class FigmaAPI:
                 sql_type == 'image' and  # Only skip images, not backgrounds
                 dimensions['x'] == 0 and
                 dimensions['y'] == 0 and
-                dimensions['w'] == 1200 and
-                dimensions['h'] == 675 and
+                dimensions['w'] == CONSTANTS.FIGMA_CONFIG['TARGET_WIDTH'] and
+                dimensions['h'] == CONSTANTS.FIGMA_CONFIG['TARGET_HEIGHT'] and
                 not is_precompiled
             )
             if should_skip:

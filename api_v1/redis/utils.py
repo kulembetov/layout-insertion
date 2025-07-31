@@ -14,10 +14,10 @@ def gen_key(file_id: str, filter_mode: Optional[str] = None, params: Optional[li
 
 
 def get_cached_request(key: str) -> Optional[dict]:
-    # to-do: refactor
-    if CACHE_ENABLED and cache.get(key):
-        return cache.get(key)
-    return None
+    if CACHE_ENABLED:
+        cached_data = cache.get(key)
+        if cached_data:
+            return cached_data
 
 
 def set_cached_request(key: str, data: dict) -> None:
