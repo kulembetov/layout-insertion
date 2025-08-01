@@ -16,7 +16,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"file_id\": \"{{file_id}}\"\r\n}",
+					"raw": "{ \r\n    \"file_id\": \"DLwzM8Inx4UsvSGU6NMvUC\" \r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -37,14 +37,14 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"file_id\": \"{{file_id}}\",\r\n    \"filter\": {\r\n        \"type\": \"slide_group\",\r\n        \"name\": [3] // 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, -1\r\n    }\r\n}",
+					"raw": "{\r\n    \"file_id\": \"DLwzM8Inx4UsvSGU6NMvUC\",\r\n    \"filter\": {\r\n        \"type\": \"slide_group\",\r\n        \"name\": [3] // 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, -1\r\n    }\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
 						}
 					}
 				},
-				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
+				"url": "http://127.0.0.1:8000/api/v1/figma/filter/"
 			},
 			"response": []
 		},
@@ -58,14 +58,14 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"file_id\": \"{{file_id}}\",\r\n    \"filter\": {\r\n        \"type\": \"slide_name\",\r\n        \"name\": [\"image_right background_1 z-index 0\"] // divider_image_none_right_logo background_3 z-index 2, image_right background_1 z-index 0\r\n    }\r\n}",
+					"raw": "{\r\n\"file_id\": \"DLwzM8Inx4UsvSGU6NMvUC\",\r\n    \"filter\": {\r\n        \"type\": \"slide_name\",\r\n        \"name\": [\"image_right background_1 z-index 0\"] // divider_image_none_right_logo background_3 z-index 2, image_right background_1 z-index 0\r\n    }\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
 						}
 					}
 				},
-				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
+				"url": "http://127.0.0.1:8000/api/v1/figma/filter/"
 			},
 			"response": []
 		},
@@ -79,14 +79,14 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"file_id\": \"{{file_id}}\",\r\n    \"filter\": {\r\n        \"type\": \"status\",\r\n        \"name\": [\"ready_to_dev\"] // ready_to_dev\r\n    }\r\n}\r\n",
+					"raw": "{\r\n    \"file_id\": \"DLwzM8Inx4UsvSGU6NMvUC\",\r\n    \"filter\": {\r\n        \"type\": \"status\",\r\n        \"name\": [\"ready_to_dev\"] // ready_to_dev\r\n    }\r\n}\r\n",
 					"options": {
 						"raw": {
 							"language": "json"
 						}
 					}
 				},
-				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
+				"url": "http://127.0.0.1:8000/api/v1/figma/filter/"
 			},
 			"response": []
 		}
