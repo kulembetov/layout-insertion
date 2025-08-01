@@ -507,6 +507,23 @@ class FigmaExtractor:
         # Default opacity
         return 1
 
+    def extract_rotation(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> int:
+        """Extract rotation from a Figma node"""
+        # Check for rotation property
+        if "rotation" in node:
+            rotation = node["rotation"]
+            if isinstance(rotation, (int, float)):
+                return int(rotation)
+        
+        # Check for rotation in absoluteTransform
+        if "absoluteTransform" in node:
+            transform = node["absoluteTransform"]
+            if isinstance(transform, list) and len(transform) >= 2:
+                return 0
+        
+        # Default rotation
+        return 0
+
     def extract_border_radius(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> Tuple[bool, List[int]]:
         """Extract border radius information"""
         border_radius = [0, 0, 0, 0]  # Default: all corners 0
@@ -648,11 +665,15 @@ class FigmaExtractor:
             abs_box = BlockUtils.get_node_property(node, "absoluteBoundingBox")
             left = abs_box["x"] - frame_origin["x"]
             top = abs_box["y"] - frame_origin["y"]
+            # Extract rotation
+            rotation = self.extract_rotation(node)
+            
             dimensions = {
                 "x": round(left),
                 "y": round(top),
                 "w": round(abs_box["width"]),
                 "h": round(abs_box["height"]),
+                "rotation": rotation,
             }
             name_lower = name.lower()
             is_precompiled = "precompiled" in name_lower
