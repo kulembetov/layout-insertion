@@ -183,7 +183,7 @@ class FigmaAPI:
             }
 
         except requests.exceptions.RequestException as e:
-            print(f"Request error: {e}")
+            logger.error(f"Request error: {e}")
             return {
                 'metadata': {
                     'file_id': self.file_id,
@@ -193,7 +193,7 @@ class FigmaAPI:
             }
 
         except Exception as e:
-            print(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
             return {
                 'metadata': {
                     'file_id': self.file_id,
