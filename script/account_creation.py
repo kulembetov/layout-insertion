@@ -7,7 +7,7 @@ Includes support for creating subscriptions with payments and symbol purchases.
 
 import os
 import sys
-import uuid
+import uuid_utils as uuid
 import hashlib
 import secrets
 import configparser
@@ -15,7 +15,7 @@ import random
 import time
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Union, List
 
 try:
     import psycopg2
@@ -199,26 +199,10 @@ class UserAccountCreator:
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
         self.hasher = PasswordHasher()
-        self.sql_statements = []  # Store generated SQL statements for manual mode
-    
-    def generate_uuid7(self) -> str:
-        """Generate a UUID version 7 (time-ordered UUID)."""
-        unix_ts_ms = int(time.time() * 1000)
-        ts_bytes = unix_ts_ms.to_bytes(6, byteorder="big")
-        random_bytes = uuid.uuid4().bytes[6:]
-        uuid_bytes = ts_bytes + random_bytes
+        self.sql_statements = []
 
-        # Set version (7) in the 6th byte
-        uuid_bytes = (
-            uuid_bytes[0:6] + bytes([((uuid_bytes[6] & 0x0F) | 0x70)]) + uuid_bytes[7:]
-        )
-
-        # Set variant (RFC 4122) in the 8th byte
-        uuid_bytes = (
-            uuid_bytes[0:8] + bytes([((uuid_bytes[8] & 0x3F) | 0x80)]) + uuid_bytes[9:]
-        )
-
-        return str(uuid.UUID(bytes=uuid_bytes))
+    def generate_uuid(self) -> str:
+        return str(uuid.uuid7())    
     
     def add_sql_statement(self, description: str, query: str, params: tuple = None):
         """Add SQL statement to the list (for manual mode)."""
@@ -240,7 +224,7 @@ class UserAccountCreator:
         """Clear the SQL statements list."""
         self.sql_statements = []
     
-    def get_user_input(self) -> Dict[str, Any]:
+    def get_user_input(self) -> Dict[str, Union[str, int, bool, None]]:
         """Collect user information through interactive input."""
         print("\n=== User Account Creation ===")
         
@@ -352,7 +336,7 @@ class UserAccountCreator:
             except ValueError:
                 print("Please enter a valid number.")
     
-    def create_user_account(self, user_data: Dict[str, Any]) -> str:
+    def create_user_account(self, user_data: Dict[str, Union[str, int, bool, None]]) -> str:
         """Create a complete user account with all necessary records."""
         user_id = self.generate_uuid7()
         auth_id = self.generate_uuid7()

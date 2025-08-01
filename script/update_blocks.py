@@ -381,9 +381,9 @@ def remove_slide_layout_insert(content: str, existing_slide_layout_id: str) -> s
         # Pattern 3: Just the INSERT statement without comment
         r'INSERT INTO "SlideLayout".*?RETURNING \*;',
     ]
-
+    
     replacement_comment = f"-- Using existing SlideLayout ID: {existing_slide_layout_id}\n-- SlideLayout INSERT statement removed (reusing existing layout)"
-
+    
     modified_content = content
     for pattern in slide_insert_patterns:
         if re.search(pattern, modified_content, re.DOTALL | re.IGNORECASE):
@@ -394,7 +394,7 @@ def remove_slide_layout_insert(content: str, existing_slide_layout_id: str) -> s
                 flags=re.DOTALL | re.IGNORECASE,
             )
             break  # Only apply the first matching pattern
-
+    
     return modified_content
 
 
@@ -1009,20 +1009,20 @@ def generate_cleanup_sql_file(
 
 
 def find_corresponding_new_file(
-    old_sql_file_info: Dict[str, str],
+    old_sql_file_info: Dict[str, str], 
     new_sql_folder: str,
     logger: Optional[logging.Logger] = None,
 ) -> Optional[str]:
     """Find the corresponding new SQL file for an old SQL file based on layout name and structure."""
     new_sql_path = Path(new_sql_folder)
-
+    
     if not new_sql_path.exists():
         return None
-
+    
     # Extract the base filename without path and extension
     old_filename = Path(old_sql_file_info["filename"]).stem
     old_folder = old_sql_file_info["folder"]
-
+    
     # Look for files with similar names in the same folder structure
     search_patterns = [
         # Exact match
@@ -1032,18 +1032,18 @@ def find_corresponding_new_file(
         # Just the base name
         f"{old_filename}.sql",
     ]
-
+    
     for pattern in search_patterns:
         if old_folder:
             search_path = new_sql_path / old_folder / pattern
         else:
             search_path = new_sql_path / pattern
-
+            
         if search_path.exists():
             if logger:
                 logger.info(f"    Found corresponding new file: {search_path}")
             return str(search_path)
-
+    
     # If no exact match found, try to find files with same base name but different timestamps
     base_name_without_timestamp = re.sub(r"_[A-Z][a-z]{2}\d{2}_\d{2}-\d{2}", "", old_filename)
     
@@ -1066,26 +1066,26 @@ def find_corresponding_new_file(
     try:
         old_content = Path(old_sql_file_info["filepath"]).read_text(encoding="utf-8")
         old_slide_info = extract_slide_layout_info(old_content)
-
+        
         if old_slide_info:
             # Search all new files for matching slide layout name
             for new_file in new_sql_path.rglob("*.sql"):
                 if new_file.name.startswith("00_master"):
                     continue
-
+                    
                 try:
                     new_content = new_file.read_text(encoding="utf-8")
                     new_slide_info = extract_slide_layout_info(new_content)
-
+                    
                     if (
                         new_slide_info
                         and new_slide_info["name"] == old_slide_info["name"]
                         and new_slide_info["number"] == old_slide_info["number"]
                     ):
-
+                        
                         relative_path = new_file.relative_to(new_sql_path)
                         folder_parts = relative_path.parts[:-1]
-
+                        
                         # Check if folder structure matches
                         if old_folder == "/".join(folder_parts):
                             if logger:
@@ -1093,13 +1093,13 @@ def find_corresponding_new_file(
                                     f"    Found corresponding new file by content: {new_file}"
                                 )
                             return str(new_file)
-
+                            
                 except Exception:
                     continue
-
+                    
     except Exception:
         pass
-
+    
     if logger:
         logger.warning(
             f"    No corresponding new file found for {old_sql_file_info['filename']}"
@@ -1202,7 +1202,7 @@ def copy_new_sql_files(
         modified_content = replace_slide_layout_id_in_sql(
             content, slide_info["original_id"], existing_slide_layout_id
         )
-
+        
         # Remove SlideLayout INSERT statement since we're reusing existing one
         modified_content = remove_slide_layout_insert(
             modified_content, existing_slide_layout_id

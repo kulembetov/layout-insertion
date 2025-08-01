@@ -6,9 +6,11 @@ import csv
 import psycopg2
 import uuid_utils as uuid
 
+
 def generate_uuid() -> str:
     """Generate a UUID7 string for database use."""
     return str(uuid.uuid7())
+
 
 # --- DB config parser ---
 def parse_db_config(ini_path):

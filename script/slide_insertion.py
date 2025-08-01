@@ -533,7 +533,7 @@ class BlockFactory:
         dimensions = self._get_dimensions(block_type, index, user_input, is_first_block)
 
         # Opacity: always set to 1 if not provided
-        opacity = 1.0
+        opacity = 1
 
         return Block(
             id=block_id,
@@ -711,9 +711,9 @@ class BlockFactory:
         # Dimensions
         dimensions = dict(data.get("dimensions", {}))
         # Border radius
-        border_radius = data.get("border_radius") or [0, 0, 0, 0]
+        border_radius = styles.get("borderRadius") or data.get("border_radius") or [0, 0, 0, 0]
         # Opacity
-        opacity = data.get("opacity", 1)
+        opacity = styles.get("opacity") or data.get("opacity", 1)
         # Words
         words = data.get("words", 1)
         # Font family
@@ -939,14 +939,9 @@ class BlockStylesCommand(SQLCommand):
         color_settings_id = self.config.get_default_color_settings_id()
 
         for block in self.blocks:
-            # Use block's border_radius field
-            border_radius = block.border_radius
-
-            # Only set border radius for image blocks, use null for all others
-            if block.type == self.BLOCK_TYPE_IMAGE and border_radius:
-                border_radius_str = f"ARRAY[{', '.join(map(str, border_radius))}]"
-            else:
-                border_radius_str = "null"
+            # Use block's border_radius field - always include border radius
+            border_radius = block.border_radius or [0, 0, 0, 0]
+            border_radius_str = f"ARRAY[{', '.join(map(str, border_radius))}]"
 
             # Format the SQL based on block type
             color_value = block.styles.get("color")
@@ -2384,7 +2379,7 @@ def _process_figma_blocks(
             styles["color"] = normalized_color
         else:
             styles["color"] = None
-        opacity = block.get("opacity", 1)
+        opacity = styles.get("opacity") or block.get("opacity", 1)
         original_block_name = block["name"]
         block_index = BlockNameUtils.extract_index(original_block_name, block["type"])
         clean_block_name = BlockNameUtils.normalize_name(original_block_name)

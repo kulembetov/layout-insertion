@@ -7,7 +7,7 @@ Supports both individual images and folders containing images
 import os
 import io
 import logging
-from typing import List, TypedDict, Optional, Dict, Any
+from typing import List, TypedDict, Optional, Dict, Union
 from pathlib import Path
 import mimetypes
 
@@ -190,9 +190,9 @@ class GoogleDriveDownloader:
             logger.error(f"Error downloading {filename}: {error}")
             return None
     
-    def get_images_from_subfolder(self, folder_id: str, subfolder_name: str) -> List[Dict[str, Any]]:
+    def get_images_from_subfolder(self, folder_id: str, subfolder_name: str) -> List[Dict[str, Union[str, int, float, bool]]]:
         """Get all images from a specific subfolder"""
-        images: List[Dict[str, Any]] = []
+        images: List[Dict[str, Union[str, int, float, bool]]] = []
         
         try:
             # Get all items in the subfolder

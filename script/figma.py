@@ -9,7 +9,7 @@ import os
 import requests
 import re
 import argparse
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass, field
 from enum import Enum
 import config
@@ -66,15 +66,13 @@ class ExtractedBlock:
     sql_type: str
     name: str
     dimensions: Dict[str, int]
-    styles: Dict[str, Any]
+    styles: Dict[str, Union[str, int, float, bool, list]]
     slide_number: int
     parent_container: str
     is_target: bool = False
-    has_border_radius: bool = False
-    border_radius: List[int] = field(default_factory=lambda: [0, 0, 0, 0])
     text_content: str = None
-    figure_info: Dict[str, Any] = field(default_factory=dict)
-    precompiled_image_info: Dict[str, Any] = field(default_factory=dict)
+    figure_info: Dict[str, Union[str, int, float, bool]] = field(default_factory=dict)
+    precompiled_image_info: Dict[str, Union[str, int, float, bool]] = field(default_factory=dict)
     comment: str = None
 
 
@@ -195,34 +193,28 @@ class BlockUtils:
         Build a block dictionary from an ExtractedBlock or dict and optional slide_config.
         This is the single source of truth for block dict construction.
         Adds figure_info and precompiled_image_info if relevant.
-        Always includes both has_border_radius (bool) and border_radius (list of 4 ints).
+        Border radius is now included in styles dictionary.
         """
         get = (
             (lambda k: block.get(k, None))
             if isinstance(block, dict)
             else (lambda k: getattr(block, k, None))
         )
+        styles = get("styles") or {}
+        
         block_dict = {
             "id": get("id"),
             "name": get("name"),
             "figma_type": get("figma_type"),
             "sql_type": get("sql_type"),
             "dimensions": get("dimensions"),
-            "styles": get("styles"),
+            "styles": styles,
             "is_target": get("is_target"),
             "needs_null_styles": get("sql_type")
             in config.BLOCK_TYPES["null_style_types"],
             "needs_z_index": get("sql_type") in config.BLOCK_TYPES["z_index_types"],
-            "has_border_radius": (
-                get("has_border_radius")
-                if get("has_border_radius") is not None
-                else False
-            ),
             "comment": get("comment"),
         }
-
-        if get("border_radius") is not None:
-            block_dict["border_radius"] = get("border_radius")
         text_content = get("text_content")
         # Use existing 'words' if present in dict, else recalculate
         if isinstance(block, dict) and "words" in block and block["words"] is not None:
@@ -447,7 +439,7 @@ class FigmaExtractor:
         """Check if name contains z-index"""
         return "z-index" in name
 
-    def normalize_font_weight(self, weight: Any) -> int:
+    def normalize_font_weight(self, weight: Union[int, float, str, None]) -> int:
         """Normalize font weight to valid values from config"""
         if weight is None:
             return config.VALID_FONT_WEIGHTS[1]  # 400 as default
@@ -466,8 +458,8 @@ class FigmaExtractor:
             return config.VALID_FONT_WEIGHTS[2]  # 700
 
     def extract_text_styles(
-        self, node: Dict[str, Any], sql_type: str
-    ) -> Dict[str, Any]:
+        self, node: Dict[str, Union[str, int, float, bool, dict, list]], sql_type: str
+    ) -> Dict[str, Union[str, int, list]]:
         """Extract text styling information with config defaults (no color)."""
         defaults = config.DEFAULT_STYLES.get(sql_type, config.DEFAULT_STYLES["default"])
         styles = {
@@ -495,7 +487,27 @@ class FigmaExtractor:
                 styles["weight"] = self.normalize_font_weight(style["fontWeight"])
         return styles
 
-    def extract_border_radius(self, node: Dict[str, Any]) -> Tuple[bool, List[int]]:
+    def extract_opacity(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> Union[int, float]:
+        """Extract opacity from a Figma node"""
+        # Check for direct opacity property
+        if "opacity" in node:
+            opacity = node["opacity"]
+            if isinstance(opacity, (int, float)):
+                return int(opacity) if opacity == 1.0 else float(opacity)
+        
+        # Check for opacity in fills
+        fills = node.get("fills")
+        if fills and isinstance(fills, list):
+            for fill in fills:
+                if fill.get("visible", True) and fill.get("type") == "SOLID":
+                    opacity = fill.get("opacity", 1.0)
+                    if isinstance(opacity, (int, float)):
+                        return int(opacity) if opacity == 1.0 else float(opacity)
+        
+        # Default opacity
+        return 1
+
+    def extract_border_radius(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> Tuple[bool, List[int]]:
         """Extract border radius information"""
         border_radius = [0, 0, 0, 0]  # Default: all corners 0
         has_border_radius = False
@@ -516,7 +528,7 @@ class FigmaExtractor:
 
         return has_border_radius, border_radius
 
-    def is_target_frame(self, node: Dict[str, Any]) -> bool:
+    def is_target_frame(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> bool:
         """Check if node is a target frame, now supports 'ready to dev' marker"""
         if not BlockUtils.get_node_property(node, "absoluteBoundingBox"):
             return False
@@ -617,7 +629,7 @@ class FigmaExtractor:
 
     def collect_blocks(
         self,
-        node: Dict[str, Any],
+        node: Dict[str, Union[str, int, float, bool, dict, list]],
         frame_origin: Dict[str, int],
         slide_number: int,
         parent_container: str,
@@ -665,9 +677,15 @@ class FigmaExtractor:
                         sql_type, config.Z_INDEX_DEFAULTS["default"]
                     )
                 styles["zIndex"] = z_index
+                
+                # Extract border radius and add to styles (always include, even if 0)
                 has_border_radius, border_radius = (
                     BlockUtils.extract_border_radius_from_node(node)
                 )
+                styles["borderRadius"] = border_radius
+                
+                opacity = self.extract_opacity(node)
+                styles["opacity"] = opacity
                 text_content = None
                 if sql_type in [
                     "text",
@@ -697,8 +715,6 @@ class FigmaExtractor:
                     slide_number=slide_number,
                     parent_container=parent_container,
                     is_target=True,
-                    has_border_radius=has_border_radius,
-                    border_radius=border_radius,
                     text_content=text_content,
                     comment=comment,
                 )
@@ -913,7 +929,7 @@ class FigmaExtractor:
 
     def traverse_and_extract(
         self,
-        node: Dict[str, Any],
+        node: Dict[str, Union[str, int, float, bool, dict, list]],
         parent_name: str = "",
         comments_map: Dict[str, str] = None,
     ) -> List[ExtractedSlide]:
@@ -976,7 +992,7 @@ class FigmaExtractor:
 
         return slides
 
-    def extract_data(self) -> Dict[str, Any]:
+    def extract_data(self) -> Dict[str, Union[str, dict, list, int]]:
         """Main extraction method. Returns extracted slides and metadata, or error info on failure."""
         try:
             response = requests.get(
@@ -1060,7 +1076,7 @@ class FigmaExtractor:
                 "slides": [],
             }
 
-    def _slide_to_dict(self, slide: ExtractedSlide) -> Dict[str, Any]:
+    def _slide_to_dict(self, slide: ExtractedSlide) -> Dict[str, Union[str, int, dict, list, bool]]:
         """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs. Add slideColors extraction."""
         # Find the text block with the longest text_content
         max_text_block = None
@@ -1112,11 +1128,11 @@ class FigmaExtractor:
 
     def _block_to_dict(
         self, block: ExtractedBlock, slide_config=None
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Union[str, int, dict, list, bool]]:
         # Now just call build_block_dict for all block dict construction
         return BlockUtils.build_block_dict(block, slide_config)
 
-    def save_results(self, data: Dict[str, Any], output_file: str | None) -> str:
+    def save_results(self, data: Dict[str, Union[str, dict, list, int]], output_file: str | None) -> str:
         """Save extracted data to file"""
         if not data:
             return ""
@@ -1156,7 +1172,7 @@ class FigmaToSQLIntegrator:
         self.figma_file_id = figma_file_id
         self.figma_token = figma_token
 
-    def extract_specific_slides(self, slide_numbers: List[int]) -> Dict[str, Any]:
+    def extract_specific_slides(self, slide_numbers: List[int]) -> Dict[str, Union[str, dict, list, int]]:
         """Extract specific slides from Figma"""
         filter_config = FilterConfig(
             mode=FilterMode.SPECIFIC_SLIDES,
@@ -1168,7 +1184,7 @@ class FigmaToSQLIntegrator:
 
         return extractor.extract_data()
 
-    def extract_by_block_types(self, block_types: List[str]) -> Dict[str, Any]:
+    def extract_by_block_types(self, block_types: List[str]) -> Dict[str, Union[str, dict, list, int]]:
         """Extract slides containing specific block types"""
         filter_config = FilterConfig(
             mode=FilterMode.SPECIFIC_BLOCKS, target_block_types=block_types
@@ -1178,7 +1194,7 @@ class FigmaToSQLIntegrator:
 
         return extractor.extract_data()
 
-    def extract_by_containers(self, container_names: List[str]) -> Dict[str, Any]:
+    def extract_by_containers(self, container_names: List[str]) -> Dict[str, Union[str, dict, list, int]]:
         """Extract slides from specific containers"""
         filter_config = FilterConfig(
             mode=FilterMode.BY_TYPE, target_containers=container_names
@@ -1189,8 +1205,8 @@ class FigmaToSQLIntegrator:
         return extractor.extract_data()
 
     def prepare_sql_generator_input(
-        self, figma_data: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, figma_data: Dict[str, Union[str, dict, list, int]]
+    ) -> List[Dict[str, Union[str, int, dict, list, bool]]]:
         """Convert Figma data to format suitable for SQL Generator with config compatibility. Now includes slideConfig and presentationPaletteColors for each slide."""
         sql_input = []
         for slide in figma_data.get("slides", []):
@@ -1240,8 +1256,8 @@ class FigmaToSQLIntegrator:
         return sql_input
 
     def _get_auto_blocks_for_slide(
-        self, slide: Dict[str, Any], is_last: bool
-    ) -> Dict[str, Any]:
+        self, slide: Dict[str, Union[str, int, dict, list, bool]], is_last: bool
+    ) -> Dict[str, Union[str, dict]]:
         """Get automatic blocks configuration for a slide"""
         auto_blocks = {}
 
@@ -1270,8 +1286,8 @@ class FigmaToSQLIntegrator:
         return auto_blocks
 
     def _convert_styles_for_sql(
-        self, figma_styles: Dict[str, Any], block_type: str
-    ) -> Dict[str, Any]:
+        self, figma_styles: Dict[str, Union[str, int, float, bool]], block_type: str
+    ) -> Dict[str, Union[str, int]]:
         """Convert Figma styles to SQL Generator format with config defaults"""
         # Use config defaults as base
         defaults = config.DEFAULT_STYLES.get(
@@ -1346,7 +1362,7 @@ class FigmaToSQLIntegrator:
         # Generate instructions for SQL Generator
         self._generate_sql_instructions(sql_input, output_dir)
 
-    def _generate_sql_files(self, sql_input: List[Dict[str, Any]], output_dir: str):
+    def _generate_sql_files(self, sql_input: List[Dict[str, Union[str, int, dict, list, bool]]], output_dir: str):
         """Generate individual SQL files for each slide"""
         sql_dir = f"{output_dir}/sql_files"
         os.makedirs(sql_dir, exist_ok=True)
@@ -1360,7 +1376,7 @@ class FigmaToSQLIntegrator:
 
             LogUtils.log_block_event(f"   Generated SQL: {filename}")
 
-    def _create_sql_for_slide(self, slide: Dict[str, Any]) -> str:
+    def _create_sql_for_slide(self, slide: Dict[str, Union[str, int, dict, list, bool]]) -> str:
         """Create SQL content for a single slide using config templates"""
         lines = []
         lines.append(
@@ -1406,7 +1422,7 @@ class FigmaToSQLIntegrator:
         return "\n".join(lines)
 
     def _generate_sql_instructions(
-        self, sql_input: List[Dict[str, Any]], output_dir: str
+        self, sql_input: List[Dict[str, Union[str, int, dict, list, bool]]], output_dir: str
     ):
         """Generate comprehensive instructions for using with SQL Generator"""
         instructions = []
@@ -1655,7 +1671,7 @@ class BatchFigmaProcessor:
 
         return results
 
-    def validate_font_weights_across_presentation(self, file_id: str) -> Dict[str, Any]:
+    def validate_font_weights_across_presentation(self, file_id: str) -> Dict[str, Union[str, int, list, dict]]:
         """Extract all slides and validate font weight compliance"""
         integrator = FigmaToSQLIntegrator(file_id, self.figma_token)
         all_data = integrator.extract_specific_slides(list(range(1, 15)) + [-1])
