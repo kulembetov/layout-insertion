@@ -3,8 +3,7 @@ import configparser
 import json
 import os
 import sys
-import time
-import uuid
+import uuid_utils as uuid
 import csv
 from collections import defaultdict
 
@@ -12,23 +11,6 @@ try:
     import psycopg2
 except ImportError:
     psycopg2 = None
-
-
-# --- UUIDv7 generator ---
-def generate_uuid7() -> str:
-    """
-    Generate a UUID version 7 (time-ordered UUID)
-    Implementation based on the draft RFC for UUID v7 - time-ordered
-    """
-    unix_ts_ms = int(time.time() * 1000)
-    ts_bytes = unix_ts_ms.to_bytes(6, byteorder="big")
-    random_bytes = uuid.uuid4().bytes[6:]
-    uuid_bytes = ts_bytes + random_bytes
-    uuid_bytes = bytearray(uuid_bytes)
-    uuid_bytes[6] = (uuid_bytes[6] & 0x0F) | (7 << 4)
-    uuid_bytes[8] = (uuid_bytes[8] & 0x3F) | 0x80
-    return str(uuid.UUID(bytes=bytes(uuid_bytes)))
-
 
 # --- DB config parser ---
 def parse_db_config(ini_path):
@@ -133,7 +115,7 @@ def create_palette_configs(json_path):
     configs = []
     for palette_color in palette_colors:
         fonts = set()
-        config = {"id": generate_uuid7()}
+        config = {"id": uuid.uuid7()}
         for block_type in block_types:
             color_array = None
             for slide in slides:

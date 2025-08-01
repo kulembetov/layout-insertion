@@ -1,29 +1,10 @@
 import argparse
 import configparser
 import json
-import os
 import sys
-import time
-import uuid
 import csv
 import psycopg2
-
-
-# --- UUIDv7 generator (from slide_insertion.py) ---
-def generate_uuid7() -> str:
-    """
-    Generate a UUID version 7 (time-ordered UUID)
-    Implementation based on the draft RFC for UUID v7 - time-ordered
-    """
-    unix_ts_ms = int(time.time() * 1000)
-    ts_bytes = unix_ts_ms.to_bytes(6, byteorder="big")
-    random_bytes = uuid.uuid4().bytes[6:]
-    uuid_bytes = ts_bytes + random_bytes
-    uuid_bytes = bytearray(uuid_bytes)
-    uuid_bytes[6] = (uuid_bytes[6] & 0x0F) | (7 << 4)
-    uuid_bytes[8] = (uuid_bytes[8] & 0x3F) | 0x80
-    return str(uuid.UUID(bytes=bytes(uuid_bytes)))
-
+import uuid_utils as uuid
 
 # --- DB config parser ---
 def parse_db_config(ini_path):
@@ -87,7 +68,7 @@ def insert_palette_auto(pairs, db_config, csv_path):
     total = 0
     mapping = []
     for layout_id, color in pairs:
-        palette_id = generate_uuid7()
+        palette_id = uuid.uuid7()
         total += 1
         print(f"Trying: layout_id={layout_id}, color={color} ... ", end="")
         cur.execute(

@@ -12,6 +12,7 @@ This repository is organized to support a full workflow from Figma design extrac
 - `config.py`: Central configuration file for all scripts, storing Figma API credentials, mappings, and default values.
 - `database.ini`: Stores database connection parameters for PostgreSQL.
 - `schema.prisma`: Prisma schema file for Node.js backend integration.
+- `requirements.txt`: Lists all Python dependencies including `uuid_utils` for UUID7 generation.
 - `my_output/`, `my_sql_output/`: Output directories for extracted JSON and generated SQL files, respectively.
 - `slide_deletion/`: Contains SQL files and scripts for deleting slides/blocks, organized by layout type (e.g., 1cols, 2cols, etc.).
 
@@ -200,7 +201,7 @@ python3 account_creation.py
   - Uses `config.py` for all default values and mappings
   - Requires `database.ini` for database connection parameters
   - Supports custom output directories and file naming
-- **Dependencies:** `json`, `os`, `logging`, `config`, `argparse`
+- **Dependencies:** `json`, `os`, `logging`, `config`, `argparse`, `uuid_utils`
 - **Usage:** `python slide_insertion.py --auto-from-figma input.json --output-dir sql_output`
 
 ### `sql_validator.py`
@@ -325,28 +326,47 @@ python3 account_creation.py
   - Supports various image formats (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
   - Handles OAuth authentication with Google Drive API
   - Uses S3-compatible interface for Yandex Cloud storage
+  - Preserves folder structure from Google Drive in Yandex Cloud
+  - Recursively processes subfolders and their contents
+  - Provides progress tracking and error handling
 - **Configuration:** 
   - Requires `.env` file with Yandex Cloud credentials and Google Drive folder ID
   - Requires `credentials.json` file from Google Cloud Console for Google Drive API access
-- **Dependencies:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`
-- **Usage:** Run the script to migrate all images from Google Drive to Yandex Cloud storage 
+  - Supports environment variables for configuration
+- **Dependencies:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`, `uuid_utils`
+- **Usage:** Run the script to migrate all images from Google Drive to Yandex Cloud storage
+- **How it works:**
+  1. **Authentication:** Uses OAuth2 flow to authenticate with Google Drive API
+  2. **Folder Discovery:** Recursively scans Google Drive folder for images and subfolders
+  3. **Image Processing:** Downloads each image and uploads to Yandex Cloud with preserved path structure
+  4. **Error Handling:** Continues processing even if individual files fail
+  5. **Progress Tracking:** Shows download/upload progress and final statistics
 
 ### `update_blocks.py`
 - **Purpose:** Generates cleanup statements for existing blocks and combines them with new insertion statements
 - **Functionality:** 
   - Processes old SQL files to find existing SlideLayout IDs in the database
-  - Generates DELETE and UPDATE, INSERT statements to safely remove old block data
+  - Generates DELETE and UPDATE statements to safely remove old block data
   - Processes new SQL files and replaces new UUIDs with existing SlideLayout IDs
   - Maintains folder structure organization (title, 1cols, 2cols, etc.)
   - Creates cleanup files with `cleanup_` prefix and updated insertion files
   - Ensures foreign key constraint safety by updating UserBlockLayout.parentLayoutId first
   - Supports folder filtering for selective processing
+  - Provides detailed statistics on processed slides and operations
 - **Configuration:** 
   - Requires `database.ini` with PostgreSQL connection parameters
   - Uses existing SlideLayout IDs from database to avoid creating duplicates
   - Maintains referential integrity by cleaning up in correct dependency order
 - **Dependencies:** `psycopg2`, `os`, `re`, `argparse`, `shutil`, `datetime`, `pathlib`
 - **Usage:** `python update_blocks.py my_sql_output_old my_sql_output --output-dir final`
+- **How it works:**
+  1. **Database Connection:** Connects to PostgreSQL database to query existing SlideLayout records
+  2. **File Matching:** Finds corresponding new SQL files for each old SQL file
+  3. **SlideLayout Lookup:** Queries database to find existing SlideLayout IDs by name and number
+  4. **Cleanup Generation:** Creates DELETE statements for existing block data in correct dependency order
+  5. **ID Replacement:** Replaces new UUIDs with existing SlideLayout IDs in new SQL files
+  6. **File Generation:** Creates combined SQL files with cleanup statements followed by new INSERT statements
+  7. **Statistics:** Provides detailed counts of processed slides, operations, and generated files
 
 ---
 
@@ -364,6 +384,7 @@ python3 account_creation.py
 - `config.py`: Центральный конфиг для всех скриптов, хранит параметры Figma API, маппинги и значения по умолчанию.
 - `database.ini`: Параметры подключения к PostgreSQL.
 - `schema.prisma`: Файл схемы Prisma для интеграции с Node.js backend.
+- `requirements.txt`: Список всех Python зависимостей, включая `uuid_utils` для генерации UUID7.
 - `my_output/`, `my_sql_output/`: Папки для вывода извлечённых JSON и сгенерированных SQL-файлов соответственно.
 - `slide_deletion/`: Содержит SQL-файлы и скрипты для удаления слайдов/блоков, организованные по типу макета (например, 1cols, 2cols и т.д.).
 
@@ -560,7 +581,7 @@ python3 account_creation.py
   - Использует `config.py` для всех значений по умолчанию и сопоставлений
   - Требует `database.ini` для параметров подключения к базе данных
   - Поддерживает пользовательские выходные каталоги и именование файлов
-- **Зависимости:** `json`, `os`, `logging`, `config`, `argparse`
+- **Зависимости:** `json`, `os`, `logging`, `config`, `argparse`, `uuid_utils`
 - **Использование:** `python slide_insertion.py --auto-from-figma input.json --output-dir sql_output`
 
 ### `sql_validator.py`
@@ -685,25 +706,44 @@ python3 account_creation.py
   - Поддерживает различные форматы изображений (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
   - Обрабатывает OAuth аутентификацию с API Google Drive
   - Использует S3-совместимый интерфейс для хранилища Yandex Cloud
+  - Сохраняет структуру папок из Google Drive в Yandex Cloud
+  - Рекурсивно обрабатывает подпапки и их содержимое
+  - Предоставляет отслеживание прогресса и обработку ошибок
 - **Конфигурация:** 
   - Требует файл `.env` с учетными данными Yandex Cloud и ID папки Google Drive
   - Требует файл `credentials.json` из Google Cloud Console для доступа к API Google Drive
-- **Зависимости:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`
+  - Поддерживает переменные окружения для конфигурации
+- **Зависимости:** `boto3`, `google-api-python-client`, `google-auth-oauthlib`, `python-dotenv`, `uuid_utils`
 - **Использование:** Запустите скрипт для переноса всех изображений из Google Drive в хранилище Yandex Cloud
+- **Как работает:**
+  1. **Аутентификация:** Использует OAuth2 для аутентификации с API Google Drive
+  2. **Обнаружение папок:** Рекурсивно сканирует папку Google Drive для поиска изображений и подпапок
+  3. **Обработка изображений:** Загружает каждое изображение и выгружает в Yandex Cloud с сохранением структуры путей
+  4. **Обработка ошибок:** Продолжает обработку даже при сбое отдельных файлов
+  5. **Отслеживание прогресса:** Показывает прогресс загрузки/выгрузки и финальную статистику
 
 ### `update_blocks.py`
 - **Назначение:** Генерирует очистку для существующих блоков и объединяет их с новыми операторами вставки
 - **Функциональность:** 
   - Обрабатывает старые SQL файлы, чтобы найти существующие ID макетов слайдов в базе данных
-  - Генерирует операторы DELETE и UPDATE, INSERT, чтобы безопасно удалить старые данные блока
+  - Генерирует операторы DELETE и UPDATE, чтобы безопасно удалить старые данные блока
   - Обрабатывает новые SQL файлы и заменяет новые UUID на существующие ID макетов слайдов
   - Сохраняет организацию структуры папок (название, 1cols, 2cols и т.д.)
   - Создает файлы очистки с префиксом `cleanup_` и обновленные файлы вставки
   - Обеспечивает безопасность ссылочных ограничений, обновляя UserBlockLayout.parentLayoutId сначала
   - Поддерживает фильтрацию папок для выборочной обработки
+  - Предоставляет детальную статистику по обработанным слайдам и операциям
 - **Конфигурация:** 
   - Требует `database.ini` с параметрами подключения PostgreSQL
   - Использует существующие ID макетов слайдов из базы данных, чтобы избежать создания дубликатов
   - Сохраняет целостность ссылочных ограничений, очищая в правильном порядке зависимостей
 - **Зависимости:** `psycopg2`, `os`, `re`, `argparse`, `shutil`, `datetime`, `pathlib`
 - **Использование:** `python update_blocks.py my_sql_output_old my_sql_output --output-dir final`
+- **Как работает:**
+  1. **Подключение к БД:** Подключается к базе данных PostgreSQL для запроса существующих записей SlideLayout
+  2. **Сопоставление файлов:** Находит соответствующие новые SQL файлы для каждого старого SQL файла
+  3. **Поиск SlideLayout:** Запрашивает базу данных для поиска существующих ID макетов слайдов по имени и номеру
+  4. **Генерация очистки:** Создает операторы DELETE для существующих данных блоков в правильном порядке зависимостей
+  5. **Замена ID:** Заменяет новые UUID на существующие ID макетов слайдов в новых SQL файлах
+  6. **Генерация файлов:** Создает объединенные SQL файлы с операторами очистки, за которыми следуют новые операторы INSERT
+  7. **Статистика:** Предоставляет детальные подсчеты обработанных слайдов, операций и сгенерированных файлов

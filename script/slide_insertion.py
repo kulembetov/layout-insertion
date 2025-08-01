@@ -1,6 +1,5 @@
 import os
-import time
-import uuid
+import uuid_utils as uuid
 import logging
 import re
 import csv
@@ -278,40 +277,6 @@ class ConfigManager:
 
 
 # ================ Utility Services ================
-
-
-class IdGenerator:
-    """Generates unique IDs for entities."""
-
-    @staticmethod
-    def generate_uuid7() -> str:
-        """Generate a UUID version 7 (time-ordered UUID)."""
-        # Get current UNIX timestamp (milliseconds)
-        unix_ts_ms = int(time.time() * 1000)
-
-        # Convert to bytes (48 bits for timestamp)
-        ts_bytes = unix_ts_ms.to_bytes(6, byteorder="big")
-
-        # Generate 74 random bits (9 bytes with 2 bits used for version and variant)
-        random_bytes = uuid.uuid4().bytes[6:]
-
-        # Create the UUID combining timestamp and random bits
-        # First 6 bytes from timestamp, rest from random
-        uuid_bytes = ts_bytes + random_bytes
-
-        # Set the version (7) in the 6th byte
-        uuid_bytes = (
-            uuid_bytes[0:6] + bytes([((uuid_bytes[6] & 0x0F) | 0x70)]) + uuid_bytes[7:]
-        )
-
-        # Set the variant (RFC 4122) in the 8th byte
-        uuid_bytes = (
-            uuid_bytes[0:8] + bytes([((uuid_bytes[8] & 0x3F) | 0x80)]) + uuid_bytes[9:]
-        )
-
-        return str(uuid.UUID(bytes=uuid_bytes))
-
-
 class InputValidator:
     """Validates user input."""
 
@@ -406,7 +371,7 @@ class UserInputService:
 class BlockFactory:
     """Factory for creating different types of blocks"""
 
-    def __init__(self, config_manager: ConfigManager, id_generator: IdGenerator):
+    def __init__(self, config_manager: ConfigManager, id_generator):
         self.config = config_manager
         self.id_generator = id_generator
 
@@ -418,7 +383,7 @@ class BlockFactory:
             return None
 
         is_first_block = index == 0
-        block_id = self.id_generator.generate_uuid7()
+        block_id = str(uuid.uuid7())
 
         needs_null_styles = self.config.is_null_style_type(block_type)
         needs_z_index = self.config.is_z_index_type(block_type)
@@ -583,7 +548,7 @@ class BlockFactory:
 
     def create_watermark_block(self, dimension_config):
         """Create a watermark block with specified dimensions"""
-        wm_id = self.id_generator.generate_uuid7()
+        wm_id = str(uuid.uuid7())
         watermark_dimensions = dimension_config
 
         return Block(
@@ -614,7 +579,7 @@ class BlockFactory:
 
     def create_background_block(self, bg_config):
         """Create a background block with specified config"""
-        bg_id = self.id_generator.generate_uuid7()
+        bg_id = str(uuid.uuid7())
         bg_dims = bg_config["dimensions"]
 
         return Block(
@@ -729,7 +694,7 @@ class BlockFactory:
         data = dict(block_dict)  # shallow copy
         extra = extra or {}
         # Use provided or generate id
-        block_id = extra.get("id") or data.get("id") or str(uuid.uuid4())
+        block_id = extra.get("id") or data.get("id") or str(uuid.uuid7())
         # Normalize/clean name
         name = extra.get("name") or data.get("name") or ""
         name = BlockNameUtils.normalize_name(name)
@@ -1037,7 +1002,7 @@ class FigureCommand(SQLCommand):
     def __init__(
         self,
         config: ConfigManager,
-        id_generator: IdGenerator,
+        id_generator,
         figure_blocks: List[Dict[str, str]],
     ):
         self.config = config
@@ -1056,7 +1021,7 @@ class FigureCommand(SQLCommand):
         """Format the values for Figure SQL, extracting and storing the index from names like 'text_1'"""
         values = []
         for figure in self.figure_blocks:
-            figure_id = self.id_generator.generate_uuid7()
+            figure_id = str(uuid.uuid7())
             name = figure["name"]
             index = BlockNameUtils.extract_index(name, "figure")
             if index is not None:
@@ -1075,7 +1040,7 @@ class PrecompiledImageCommand(SQLCommand):
     def __init__(
         self,
         config: ConfigManager,
-        id_generator: IdGenerator,
+        id_generator,
         precompiled_image_blocks: List[Dict[str, str]],
     ):
         self.config = config
@@ -1096,7 +1061,7 @@ class PrecompiledImageCommand(SQLCommand):
         """Format the values for PrecompiledImage SQL"""
         values = []
         for precompiled_image in self.precompiled_image_blocks:
-            precompiled_image_id = self.id_generator.generate_uuid7()
+            precompiled_image_id = str(uuid.uuid7())
             color_value = (
                 f"'{precompiled_image['color']}'"
                 if precompiled_image["color"]
@@ -1198,7 +1163,7 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
     def __init__(
         self,
         config: ConfigManager,
-        id_generator: IdGenerator,
+        id_generator,
         blocks: List[Block],
         block_layout_config_mapping: List[dict],
         slide_config,
@@ -1237,7 +1202,7 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
 
                 for slideConfigColor in self.slide_config[block.type]:
                     # Generate a UUID for the record
-                    block_layout_index_config_id = self.id_generator.generate_uuid7()
+                    block_layout_index_config_id = str(uuid.uuid7())
 
                     block_style = self.slide_config[block.type][slideConfigColor][
                         block.index
@@ -1300,7 +1265,7 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
     def __init__(
         self,
         config: ConfigManager,
-        id_generator: IdGenerator,
+        id_generator,
         slide_layout: SlideLayout,
         blocks: List[Block],
         block_id_to_index_config_id: dict = None,
@@ -1339,7 +1304,7 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
                 slide_layout_id = self.slide_layout.id
 
                 for index, config in enumerate(slide_layout_index_config_mapping):
-                    slide_layout_index_config_id = self.id_generator.generate_uuid7()
+                    slide_layout_index_config_id = str(uuid.uuid7())
 
                     presentation_palette_id = config.presentation_palette_id
 
@@ -1552,7 +1517,7 @@ class SQLGenerator:
 
     def __init__(self, config_module, output_dir=None):
         self.config_manager = ConfigManager(config_module)
-        self.id_generator = IdGenerator()
+        self.id_generator = None  # We'll use uuid directly
         self.input_validator = InputValidator()
         self.user_input = UserInputService(self.input_validator)
         self.block_factory = BlockFactory(self.config_manager, self.id_generator)
@@ -1770,7 +1735,7 @@ class SQLGenerator:
                             )
                         else:
                             # Generate a new UUID if no matching config is found
-                            palette_id = self.id_generator.generate_uuid7()
+                            palette_id = str(uuid.uuid7())
                             logger.warning(
                                 f"No matching config found for color {color_hex_lc}, generating new palette_id {palette_id}"
                             )
@@ -1895,7 +1860,7 @@ class SQLGenerator:
                 )
 
         # Generate ID for slide layout
-        slide_layout_id = self.id_generator.generate_uuid7()
+        slide_layout_id = str(uuid.uuid7())
 
         return SlideLayout(
             id=slide_layout_id,
@@ -1959,7 +1924,7 @@ class SQLGenerator:
                     "watermark"
                 ]["dimensions"]
             watermark_block = Block(
-                id=self.id_generator.generate_uuid7(),
+                id=str(uuid.uuid7()),
                 type=self.BLOCK_TYPE_WATERMARK,
                 dimensions=watermark_dimensions,
                 styles={
@@ -2005,7 +1970,7 @@ class SQLGenerator:
                 "color": "#ffffff",
             }
             bg_block = Block(
-                id=self.id_generator.generate_uuid7(),
+                id=str(uuid.uuid7()),
                 type=self.BLOCK_TYPE_BACKGROUND,
                 dimensions=bg_config["dimensions"],
                 styles=bg_styles,
@@ -2295,7 +2260,7 @@ def _process_figma_slide(
     """Process a single slide from Figma JSON and generate SQL."""
 
     # Generate a UUID for the SlideLayout
-    slide_layout_id = generator.id_generator.generate_uuid7()
+    slide_layout_id = str(uuid.uuid7())
     # Strip z-index from slide layout name
     clean_slide_layout_name = strip_zindex(slide["slide_layout_name"])
     # Always use camelCase for type
@@ -2399,7 +2364,7 @@ def _process_figma_blocks(
     )
 
     for block in slide["blocks"]:
-        block_uuid = generator.id_generator.generate_uuid7()
+        block_uuid = str(uuid.uuid7())
         block_id_map[block["id"]] = block_uuid
         styles = dict(block["styles"]) if block.get("styles") else {}
         color = None
@@ -2498,7 +2463,7 @@ def _ensure_background_and_watermark_blocks(
         else:
             watermark_dimensions = config.AUTO_BLOCKS["watermark"]["dimensions"]
         watermark_block = Block(
-            id=generator.id_generator.generate_uuid7(),
+            id=str(uuid.uuid7()),
             type=generator.BLOCK_TYPE_WATERMARK,
             dimensions=watermark_dimensions,
             styles={
