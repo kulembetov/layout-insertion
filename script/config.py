@@ -124,7 +124,7 @@ PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
  Defaults and Templates
 ========================
 """
-MINIATURES_BASE_PATH: str = "/assets/miniatures/raiffeisen"
+MINIATURES_BASE_PATH: str = "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen/minitatures"
 DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"
 DEFAULT_COLOR: str = "#ffffff"
 MINIATURE_EXTENSION: str = ".png"

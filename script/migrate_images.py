@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
 Clean script to download images from Google Drive and upload to Yandex Cloud Object Storage
+Supports both individual images and folders containing images
 """
 
 import os
 import io
 import logging
-from typing import List, TypedDict, Optional
+from typing import List, TypedDict, Optional, Dict, Any
 from pathlib import Path
 import mimetypes
 
@@ -43,6 +44,12 @@ class GoogleDriveFile(TypedDict):
     name: str
     mimeType: str
     size: Optional[str]
+
+class GoogleDriveFolder(TypedDict):
+    """Type definition for Google Drive folder objects"""
+    id: str
+    name: str
+    mimeType: str
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -121,10 +128,47 @@ class GoogleDriveDownloader:
             logger.error(f"Error listing files: {error}")
             return all_files
     
+    def list_folders_in_folder(self, folder_id: str) -> List[GoogleDriveFolder]:
+        """List all folders in a Google Drive folder with pagination"""
+        all_folders: List[GoogleDriveFolder] = []
+        page_token: Optional[str] = None
+        
+        try:
+            while True:
+                query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                request_params = {
+                    'q': query,
+                    'fields': "nextPageToken, files(id, name, mimeType)",
+                    'pageSize': 1000
+                }
+                
+                if page_token:
+                    request_params['pageToken'] = page_token
+                
+                results = self.service.files().list(**request_params).execute()
+                folders = results.get('files', [])
+                all_folders.extend(folders)
+                
+                logger.info(f"Retrieved {len(folders)} folders (total: {len(all_folders)})")
+                
+                page_token = results.get('nextPageToken')
+                if not page_token:
+                    break
+            
+            return all_folders
+            
+        except HttpError as error:
+            logger.error(f"Error listing folders: {error}")
+            return all_folders
+    
     def is_image_file(self, filename: str, mime_type: str) -> bool:
         """Check if file is an image"""
         file_ext = Path(filename).suffix.lower()
         return file_ext in IMAGE_EXTENSIONS or mime_type.startswith('image/')
+    
+    def is_folder(self, mime_type: str) -> bool:
+        """Check if item is a folder"""
+        return mime_type == 'application/vnd.google-apps.folder'
     
     def download_file(self, file_id: str, filename: str) -> Optional[bytes]:
         """Download a file from Google Drive"""
@@ -145,6 +189,49 @@ class GoogleDriveDownloader:
         except HttpError as error:
             logger.error(f"Error downloading {filename}: {error}")
             return None
+    
+    def get_images_from_subfolder(self, folder_id: str, subfolder_name: str) -> List[Dict[str, Any]]:
+        """Get all images from a specific subfolder"""
+        images: List[Dict[str, Any]] = []
+        
+        try:
+            # Get all items in the subfolder
+            query = f"'{folder_id}' in parents and trashed=false"
+            request_params = {
+                'q': query,
+                'fields': "nextPageToken, files(id, name, mimeType, size)",
+                'pageSize': 1000
+            }
+            
+            page_token: Optional[str] = None
+            while True:
+                if page_token:
+                    request_params['pageToken'] = page_token
+                
+                results = self.service.files().list(**request_params).execute()
+                items = results.get('files', [])
+                
+                for item in items:
+                    if self.is_image_file(item['name'], item.get('mimeType', '')):
+                        # Add image with subfolder name as prefix
+                        image_path = f"{subfolder_name}/{item['name']}"
+                        images.append({
+                            'id': item['id'],
+                            'name': item['name'],
+                            'mimeType': item.get('mimeType', ''),
+                            'size': item.get('size'),
+                            'path': image_path
+                        })
+                
+                page_token = results.get('nextPageToken')
+                if not page_token:
+                    break
+            
+            return images
+            
+        except HttpError as error:
+            logger.error(f"Error getting images from subfolder {subfolder_name}: {error}")
+            return images
 
 
 class YandexCloudUploader:
@@ -212,7 +299,7 @@ def create_env_file():
     
     print("\nGoogle Drive & Path Configuration")
     google_folder_id = input("Google Drive folder ID [1m5H3yQJhTuCF3dmQGJ-zAVqsY_T6dSfk]: ").strip()
-    yandex_folder_path = input("Yandex folder path [layouts/raiffeisen/]: ").strip()
+    yandex_folder_path = input("Yandex folder path [layouts/raiffeisen/miniatures/]: ").strip()
     
     env_content = f"""# Yandex Cloud Credentials
 YANDEX_STATIC_KEY={yandex_static_key}
@@ -260,7 +347,7 @@ def main():
         
         # Get configuration
         folder_id = os.getenv('GOOGLE_DRIVE_FOLDER_ID', '1m5H3yQJhTuCF3dmQGJ-zAVqsY_T6dSfk')
-        folder_path = os.getenv('YANDEX_FOLDER_PATH', 'layouts/raiffeisen/')
+        folder_path = os.getenv('YANDEX_FOLDER_PATH', 'layouts/raiffeisen/miniatures/')
         bucket_name = os.getenv('YANDEX_BUCKET_NAME')
         
         logger.info(f"Starting migration from Google Drive to s3://{bucket_name}/{folder_path}")
@@ -273,44 +360,66 @@ def main():
             logger.error("Cannot access Yandex Cloud bucket. Exiting.")
             return
         
-        # Get and filter files
-        logger.info("Fetching files from Google Drive...")
-        files = gdrive.list_files_in_folder(folder_id)
+        # Get subfolders from Google Drive
+        logger.info("Fetching subfolders from Google Drive...")
+        subfolders = gdrive.list_folders_in_folder(folder_id)
         
-        if not files:
-            logger.warning("No files found in Google Drive folder")
+        if not subfolders:
+            logger.warning("No subfolders found in Google Drive folder")
             return
         
-        image_files = [f for f in files if gdrive.is_image_file(f['name'], f.get('mimeType', ''))]
-        logger.info(f"Found {len(image_files)} image files to migrate")
+        logger.info(f"Found {len(subfolders)} subfolders to process")
         
-        # Process files
-        successful_uploads = 0
-        failed_uploads = 0
+        # Process each subfolder
+        total_successful = 0
+        total_failed = 0
         
-        for i, file_info in enumerate(image_files, 1):
-            filename = file_info['name']
-            logger.info(f"Processing {i}/{len(image_files)}: {filename}")
+        for subfolder in subfolders:
+            subfolder_name = subfolder['name']
+            logger.info(f"Processing subfolder: {subfolder_name}")
             
-            # Download
-            file_data = gdrive.download_file(file_info['id'], filename)
-            if not file_data:
-                failed_uploads += 1
+            # Get images from this subfolder
+            images = gdrive.get_images_from_subfolder(subfolder['id'], subfolder_name)
+            
+            if not images:
+                logger.warning(f"No images found in subfolder: {subfolder_name}")
                 continue
             
-            # Upload
-            yandex_key = f"{folder_path}{filename}"
-            if yandex.upload_file(file_data, yandex_key, file_info.get('mimeType')):
-                successful_uploads += 1
-            else:
-                failed_uploads += 1
+            logger.info(f"Found {len(images)} images in {subfolder_name}")
+            
+            # Process images in this subfolder
+            successful_uploads = 0
+            failed_uploads = 0
+            
+            for i, image_info in enumerate(images, 1):
+                filename = image_info['name']
+                image_path = image_info['path']
+                logger.info(f"Processing {i}/{len(images)}: {image_path}")
+                
+                # Download
+                file_data = gdrive.download_file(image_info['id'], filename)
+                if not file_data:
+                    failed_uploads += 1
+                    continue
+                
+                # Upload inside the specified folder
+                yandex_key = f"{folder_path}{image_path}"
+                if yandex.upload_file(file_data, yandex_key, image_info.get('mimeType')):
+                    successful_uploads += 1
+                else:
+                    failed_uploads += 1
+            
+            total_successful += successful_uploads
+            total_failed += failed_uploads
+            
+            logger.info(f"Completed {subfolder_name}: {successful_uploads} successful, {failed_uploads} failed")
         
         # Summary
         logger.info("Migration completed!")
-        logger.info(f"Successful: {successful_uploads} files")
-        logger.info(f"Failed: {failed_uploads} files")
+        logger.info(f"Total successful: {total_successful} files")
+        logger.info(f"Total failed: {total_failed} files")
         
-        if successful_uploads > 0:
+        if total_successful > 0:
             logger.info(f"Files available at: s3://{bucket_name}/{folder_path}")
         
     except Exception as error:

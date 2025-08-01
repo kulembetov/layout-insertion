@@ -14,11 +14,11 @@ import shutil
 import logging
 import sys
 from datetime import datetime
-from typing import List, Dict, Union, Optional, TypedDict
+from typing import List, Dict, Optional, TypedDict
 from pathlib import Path
 from contextlib import contextmanager
 
-# Type definitions for better type safety
+
 class ExtractedData(TypedDict):
     slide_layout_ids: set[str]
     block_layout_ids: set[str]
@@ -29,15 +29,18 @@ class ExtractedData(TypedDict):
     presentation_layout_id: Optional[str]
     slide_layout_names: set[str]
 
+
 class SlideLayoutInfo(TypedDict):
     original_id: str
     name: str
     number: int
     presentation_layout_id: str
 
+
 class UserBlockLayout(TypedDict):
     id: str
     parentLayoutId: Optional[str]
+
 
 class SlideLayoutIndexConfig(TypedDict):
     id: str
@@ -46,22 +49,26 @@ class SlideLayoutIndexConfig(TypedDict):
     blockLayoutIndexConfigId: str
     configNumber: int
 
+
 class BlockLayoutIndexConfig(TypedDict):
     id: str
     blockLayoutId: str
     indexColorId: str
     indexFontId: str
 
+
 class Figure(TypedDict):
     id: str
     blockLayoutId: str
     name: str
+
 
 class PrecompiledImage(TypedDict):
     id: str
     blockLayoutId: str
     url: str
     color: str
+
 
 class BlockLayoutStyle(TypedDict):
     blockLayoutId: str
@@ -75,6 +82,7 @@ class BlockLayoutStyle(TypedDict):
     fontFamily: str
     background: str
 
+
 class BlockLayoutDimension(TypedDict):
     blockLayoutId: str
     x: float
@@ -83,15 +91,18 @@ class BlockLayoutDimension(TypedDict):
     h: float
     rotation: float
 
+
 class BlockLayoutLimit(TypedDict):
     blockLayoutId: str
     minWords: int
     maxWords: int
 
+
 class BlockLayout(TypedDict):
     id: str
     slideLayoutId: str
     blockLayoutType: str
+
 
 class ExistingData(TypedDict):
     user_block_layouts: List[UserBlockLayout]
@@ -334,18 +345,57 @@ def replace_slide_layout_id_in_sql(
 
 def extract_slide_layout_info(content: str) -> Optional[SlideLayoutInfo]:
     """Extract slide layout name, number, and presentation layout ID from SQL content."""
-    # Pattern to match SlideLayout INSERT statement
-    pattern = r'INSERT INTO "SlideLayout".*?VALUES\s*\(\s*\'([^\']+)\',\s*\'([^\']+)\',\s*(\d+),\s*\w+,\s*\'([^\']+)\''
+    # Pattern to match SlideLayout INSERT statement with flexible column structure
+    # This handles both simple 4-column format and complex multi-column format
+    pattern = r'INSERT INTO "SlideLayout".*?VALUES\s*\(\s*\'([^\']+)\',\s*\'([^\']+)\',\s*([^,]+),\s*[^,]*,\s*\'([^\']+)\''
     match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
 
     if match:
-        return SlideLayoutInfo(
-            original_id=match.group(1),
-            name=match.group(2),
-            number=int(match.group(3)),
-            presentation_layout_id=match.group(4),
-        )
+        try:
+            # Handle negative numbers (like -1 for last slides)
+            number_str = match.group(3).strip()
+            if number_str.startswith('-'):
+                number = int(number_str)
+            else:
+                number = int(number_str)
+                
+            return SlideLayoutInfo(
+                original_id=match.group(1),
+                name=match.group(2),
+                number=number,
+                presentation_layout_id=match.group(4),
+            )
+        except (ValueError, IndexError):
+            return None
     return None
+
+
+def remove_slide_layout_insert(content: str, existing_slide_layout_id: str) -> str:
+    """Remove SlideLayout INSERT statement and replace with comment about reusing existing one."""
+    # Updated regex pattern to handle multi-line comments and statements
+    slide_insert_patterns = [
+        # Pattern 1: Comment and INSERT on separate lines
+        r'-- Create SlideLayout\s*\n\s*INSERT INTO "SlideLayout".*?RETURNING \*;',
+        # Pattern 2: Comment and INSERT on same line
+        r'-- Create SlideLayout\s*INSERT INTO "SlideLayout".*?RETURNING \*;',
+        # Pattern 3: Just the INSERT statement without comment
+        r'INSERT INTO "SlideLayout".*?RETURNING \*;',
+    ]
+
+    replacement_comment = f"-- Using existing SlideLayout ID: {existing_slide_layout_id}\n-- SlideLayout INSERT statement removed (reusing existing layout)"
+
+    modified_content = content
+    for pattern in slide_insert_patterns:
+        if re.search(pattern, modified_content, re.DOTALL | re.IGNORECASE):
+            modified_content = re.sub(
+                pattern,
+                replacement_comment,
+                modified_content,
+                flags=re.DOTALL | re.IGNORECASE,
+            )
+            break  # Only apply the first matching pattern
+
+    return modified_content
 
 
 def build_in_clause(ids: List[str]) -> str:
@@ -375,7 +425,9 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
         try:
             # Query UserBlockLayout records that reference the block layouts
             if extracted_data["block_layout_ids"]:
-                block_ids_str = build_in_clause(list(extracted_data["block_layout_ids"]))
+                block_ids_str = build_in_clause(
+                    list(extracted_data["block_layout_ids"])
+                )
                 cursor.execute(
                     f"""
                     SELECT id, "parentLayoutId" 
@@ -384,12 +436,15 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
                 """
                 )
                 existing_data["user_block_layouts"] = [
-                    UserBlockLayout(id=row[0], parentLayoutId=row[1]) for row in cursor.fetchall()
+                    UserBlockLayout(id=row[0], parentLayoutId=row[1])
+                    for row in cursor.fetchall()
                 ]
 
             # Query SlideLayoutIndexConfig records
             if extracted_data["slide_layout_index_config_ids"]:
-                config_ids_str = build_in_clause(list(extracted_data["slide_layout_index_config_ids"]))
+                config_ids_str = build_in_clause(
+                    list(extracted_data["slide_layout_index_config_ids"])
+                )
                 cursor.execute(
                     f"""
                     SELECT id, "slideLayoutId", "blockLayoutConfigId", "blockLayoutIndexConfigId", "configNumber"
@@ -410,7 +465,9 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
 
             # Query BlockLayoutIndexConfig records
             if extracted_data["block_layout_index_config_ids"]:
-                config_ids_str = build_in_clause(list(extracted_data["block_layout_index_config_ids"]))
+                config_ids_str = build_in_clause(
+                    list(extracted_data["block_layout_index_config_ids"])
+                )
                 cursor.execute(
                     f"""
                     SELECT id, "blockLayoutId", "indexColorId", "indexFontId"
@@ -445,7 +502,9 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
 
             # Query PrecompiledImage records
             if extracted_data["precompiled_image_ids"]:
-                image_ids_str = build_in_clause(list(extracted_data["precompiled_image_ids"]))
+                image_ids_str = build_in_clause(
+                    list(extracted_data["precompiled_image_ids"])
+                )
                 cursor.execute(
                     f"""
                     SELECT id, "blockLayoutId", url, color
@@ -454,13 +513,17 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
                 """
                 )
                 existing_data["precompiled_images"] = [
-                    PrecompiledImage(id=row[0], blockLayoutId=row[1], url=row[2], color=row[3])
+                    PrecompiledImage(
+                        id=row[0], blockLayoutId=row[1], url=row[2], color=row[3]
+                    )
                     for row in cursor.fetchall()
                 ]
 
             # Query BlockLayoutStyles records
             if extracted_data["block_layout_ids"]:
-                block_ids_str = build_in_clause(list(extracted_data["block_layout_ids"]))
+                block_ids_str = build_in_clause(
+                    list(extracted_data["block_layout_ids"])
+                )
                 cursor.execute(
                     f"""
                     SELECT "blockLayoutId", "textVertical", "textHorizontal", "fontSize", "weight", 
@@ -516,7 +579,9 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
                 """
                 )
                 existing_data["block_layout_limits"] = [
-                    BlockLayoutLimit(blockLayoutId=row[0], minWords=row[1], maxWords=row[2])
+                    BlockLayoutLimit(
+                        blockLayoutId=row[0], minWords=row[1], maxWords=row[2]
+                    )
                     for row in cursor.fetchall()
                 ]
 
@@ -552,7 +617,9 @@ def generate_cleanup_statements(
     user_block_updates = 0
     user_block_ids = []
     for record in existing_data.get("user_block_layouts", []):
-        if record["parentLayoutId"]:  # Only update if parentLayoutId is not already NULL
+        if record[
+            "parentLayoutId"
+        ]:  # Only update if parentLayoutId is not already NULL
             user_block_ids.append(record["id"])
             user_block_updates += 1
 
@@ -759,13 +826,13 @@ def generate_cleanup_statements(
 def generate_cleanup_sql_file(
     sql_file_info: Dict[str, str],
     cleanup_statements: List[str],
-    original_content: str,
+    new_file_content: str,
     output_dir: str,
     existing_data: ExistingData,
     existing_slide_layout_id: Optional[str] = None,
     logger: Optional[logging.Logger] = None,
 ) -> Optional[str]:
-    """Generate a cleanup SQL file with DELETE/UPDATE statements followed by original INSERT statements."""
+    """Generate a cleanup SQL file with DELETE/UPDATE statements followed by INSERT statements from the NEW file."""
 
     if not cleanup_statements:
         if logger:
@@ -810,9 +877,9 @@ def generate_cleanup_sql_file(
                 ids_str = ids_match.group(1)
                 total_records += len(ids_str.split("','"))
 
-    # Process original content - extract slide layout info and replace ID if needed
-    processed_content = original_content
-    slide_info = extract_slide_layout_info(original_content)
+    # Process new file content - extract slide layout info and replace ID if needed
+    processed_content = new_file_content
+    slide_info = extract_slide_layout_info(new_file_content)
 
     if slide_info and existing_slide_layout_id:
         if slide_info["original_id"] != existing_slide_layout_id:
@@ -825,86 +892,50 @@ def generate_cleanup_sql_file(
                     f"    Replacing SlideLayout ID: {slide_info['original_id']} → {existing_slide_layout_id}"
                 )
             processed_content = replace_slide_layout_id_in_sql(
-                original_content, slide_info["original_id"], existing_slide_layout_id
+                new_file_content, slide_info["original_id"], existing_slide_layout_id
             )
 
         # Remove SlideLayout INSERT statement since we're reusing existing one
-        slide_insert_pattern = (
-            r'-- Create SlideLayout\s*INSERT INTO "SlideLayout".*?RETURNING \*;'
-        )
-        processed_content = re.sub(
-            slide_insert_pattern,
-            f"-- Using existing SlideLayout ID: {existing_slide_layout_id}",
-            processed_content,
-            flags=re.DOTALL,
+        processed_content = remove_slide_layout_insert(
+            processed_content, existing_slide_layout_id
         )
 
     # Generate combined SQL content
     sql_content = []
 
-    # Header
+    # Header with statistics only
     sql_content.extend(
         [
             f"-- Cleanup and insert for {sql_file_info['filename']}",
             f"-- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"-- Layout Type: {sql_file_info['layout_type']}",
             "",
-            f"-- Cleanup Summary:",
-            f"--   Strategy: Keep SlideLayout, update BlockLayout records only",
+            f"-- Statistics:",
             f"--   UserBlockLayout updates (parentLayoutId → NULL): {user_block_updates}",
             f"--   DELETE operations: {delete_operations}",
-            f"--   Total SQL statements: {len(cleanup_statements)} (grouped for faster execution)",
+            f"--   Total SQL statements: {len(cleanup_statements)}",
             f"--   Total records affected: {total_records}",
-            f"--",
-            f"--   NOTE: Using existing SlideLayout ID: {existing_slide_layout_id or 'N/A'}",
-            f"--         Only BlockLayout records and their dependencies are cleaned up.",
-            f"--         Statements are grouped by table for optimal performance.",
+            f"--   Using existing SlideLayout ID: {existing_slide_layout_id or 'N/A'}",
             "",
             "BEGIN;",
             "",
         ]
     )
 
-    # Add detailed cleanup section
+    # Add cleanup statements without instructional comments
     if cleanup_statements:
-        sql_content.extend(
-            [
-                "-- =====================================================",
-                "-- Cleanup Phase: Remove existing conflicting data",
-                "-- =====================================================",
-                "",
-            ]
-        )
-
-        # Separate UserBlockLayout updates from deletes for clarity
+        # Separate UserBlockLayout updates from deletes
         update_statements = [
             s for s in cleanup_statements if 'UPDATE "UserBlockLayout"' in s
         ]
         delete_statements = [s for s in cleanup_statements if "DELETE FROM" in s]
 
         if update_statements:
-            sql_content.extend(
-                [
-                    "-- Step 1: Set UserBlockLayout.parentLayoutId to NULL",
-                    "-- This prevents foreign key constraint violations when deleting BlockLayouts",
-                    "-- (Grouped for faster execution)",
-                    "",
-                ]
-            )
             sql_content.extend(update_statements)
             sql_content.append("")
 
         if delete_statements:
-            sql_content.extend(
-                [
-                    "-- Step 2: Delete existing records in dependency order",
-                    "-- Order is critical to avoid foreign key constraint violations",
-                    "-- (All statements are grouped by table for optimal performance)",
-                    "",
-                ]
-            )
-
-            # Group delete statements by table for better organization
+            # Group delete statements by table with record counts
             delete_by_table = {}
             for stmt in delete_statements:
                 table_match = re.search(r'DELETE FROM "([^"]+)"', stmt)
@@ -914,7 +945,7 @@ def generate_cleanup_sql_file(
                         delete_by_table[table_name] = []
                     delete_by_table[table_name].append(stmt)
 
-            # Add deletes grouped by table with comments
+            # Add deletes grouped by table with record counts
             table_order = [
                 "SlideLayoutIndexConfig",
                 "BlockLayoutIndexConfig",
@@ -929,18 +960,15 @@ def generate_cleanup_sql_file(
             for table_name in table_order:
                 if table_name in delete_by_table:
                     # Count records in the grouped statement
-                    stmt = delete_by_table[table_name][0]  # Only one statement per table now
+                    stmt = delete_by_table[table_name][
+                        0
+                    ]  # Only one statement per table now
                     ids_match = re.search(r"IN \('([^']+)'\)", stmt)
                     record_count = 0
                     if ids_match:
                         ids_str = ids_match.group(1)
                         record_count = len(ids_str.split("','"))
 
-                    sql_content.extend(
-                        [
-                            f"-- Delete {table_name} records ({record_count} records in 1 grouped statement)",
-                        ]
-                    )
                     sql_content.extend(delete_by_table[table_name])
                     sql_content.append("")
 
@@ -953,28 +981,17 @@ def generate_cleanup_sql_file(
 
     sql_content.append(cleaned_content)
 
-    # Footer with summary
+    # Footer with summary statistics
     sql_content.extend(
         [
             "",
             "COMMIT;",
             "",
-            f"-- =====================================================",
-            f"-- Summary for {sql_file_info['filename']}",
-            f"-- =====================================================",
-            f"-- Strategy: Reuse existing SlideLayout, update BlockLayout records only",
-            f"--",
-            f"-- Existing SlideLayout ID used: {existing_slide_layout_id or 'N/A'}",
-            f"-- UserBlockLayout.parentLayoutId set to NULL: {user_block_updates} records",
-            f"-- Records deleted: {total_records}",
-            f"-- Total SQL statements: {len(cleanup_statements)} (grouped for faster execution)",
-            f"--",
-            f"-- Preserved (not deleted):",
-            f"--   - SlideLayout records",
-            f"--   - SlideLayoutAdditionalInfo records",
-            f"--   - SlideLayoutDimensions records",
-            f"--   - SlideLayoutStyles records",
-            f"--",
+            f"-- Summary for {sql_file_info['filename']}:",
+            f"--   Existing SlideLayout ID used: {existing_slide_layout_id or 'N/A'}",
+            f"--   UserBlockLayout.parentLayoutId set to NULL: {user_block_updates} records",
+            f"--   Records deleted: {total_records}",
+            f"--   Total SQL statements: {len(cleanup_statements)}",
         ]
     )
 
@@ -991,14 +1008,114 @@ def generate_cleanup_sql_file(
         return None
 
 
+def find_corresponding_new_file(
+    old_sql_file_info: Dict[str, str],
+    new_sql_folder: str,
+    logger: Optional[logging.Logger] = None,
+) -> Optional[str]:
+    """Find the corresponding new SQL file for an old SQL file based on layout name and structure."""
+    new_sql_path = Path(new_sql_folder)
+
+    if not new_sql_path.exists():
+        return None
+
+    # Extract the base filename without path and extension
+    old_filename = Path(old_sql_file_info["filename"]).stem
+    old_folder = old_sql_file_info["folder"]
+
+    # Look for files with similar names in the same folder structure
+    search_patterns = [
+        # Exact match
+        old_sql_file_info["filename"],
+        # Without timestamp if present (more flexible pattern)
+        re.sub(r"_[A-Z][a-z]{2}\d{2}_\d{2}-\d{2}", "", old_sql_file_info["filename"]),
+        # Just the base name
+        f"{old_filename}.sql",
+    ]
+
+    for pattern in search_patterns:
+        if old_folder:
+            search_path = new_sql_path / old_folder / pattern
+        else:
+            search_path = new_sql_path / pattern
+
+        if search_path.exists():
+            if logger:
+                logger.info(f"    Found corresponding new file: {search_path}")
+            return str(search_path)
+
+    # If no exact match found, try to find files with same base name but different timestamps
+    base_name_without_timestamp = re.sub(r"_[A-Z][a-z]{2}\d{2}_\d{2}-\d{2}", "", old_filename)
+    
+    if old_folder:
+        folder_path = new_sql_path / old_folder
+    else:
+        folder_path = new_sql_path
+    
+    if folder_path.exists():
+        for new_file in folder_path.glob("*.sql"):
+            new_filename = new_file.stem
+            new_base_name = re.sub(r"_[A-Z][a-z]{2}\d{2}_\d{2}-\d{2}", "", new_filename)
+            
+            if new_base_name == base_name_without_timestamp:
+                if logger:
+                    logger.info(f"    Found corresponding new file by base name: {new_file}")
+                return str(new_file)
+
+    # If exact match not found, try to find by content matching (slide layout name)
+    try:
+        old_content = Path(old_sql_file_info["filepath"]).read_text(encoding="utf-8")
+        old_slide_info = extract_slide_layout_info(old_content)
+
+        if old_slide_info:
+            # Search all new files for matching slide layout name
+            for new_file in new_sql_path.rglob("*.sql"):
+                if new_file.name.startswith("00_master"):
+                    continue
+
+                try:
+                    new_content = new_file.read_text(encoding="utf-8")
+                    new_slide_info = extract_slide_layout_info(new_content)
+
+                    if (
+                        new_slide_info
+                        and new_slide_info["name"] == old_slide_info["name"]
+                        and new_slide_info["number"] == old_slide_info["number"]
+                    ):
+
+                        relative_path = new_file.relative_to(new_sql_path)
+                        folder_parts = relative_path.parts[:-1]
+
+                        # Check if folder structure matches
+                        if old_folder == "/".join(folder_parts):
+                            if logger:
+                                logger.info(
+                                    f"    Found corresponding new file by content: {new_file}"
+                                )
+                            return str(new_file)
+
+                except Exception:
+                    continue
+
+    except Exception:
+        pass
+
+    if logger:
+        logger.warning(
+            f"    No corresponding new file found for {old_sql_file_info['filename']}"
+        )
+    return None
+
+
 def copy_new_sql_files(
     new_sql_folder: str,
     output_dir: str,
     slide_layout_mappings: Dict[str, str],
     folder_filter: Optional[str] = None,
     logger: Optional[logging.Logger] = None,
+    processed_slide_keys: Optional[set] = None,
 ) -> List[str]:
-    """Copy new SQL files to output directory, replacing new UUIDs with existing SlideLayout IDs."""
+    """Copy new SQL files to output directory, replacing new UUIDs with existing SlideLayout IDs and removing SlideLayout INSERT statements. Skip files already processed in cleanup generation."""
     copied_files = []
     new_sql_path = Path(new_sql_folder)
 
@@ -1049,6 +1166,18 @@ def copy_new_sql_files(
         # Create a key to match with our mappings
         slide_key = f"{slide_info['name']}_{slide_info['number']}_{slide_info['presentation_layout_id']}"
 
+        # Skip if this file was already processed in cleanup generation
+        if processed_slide_keys and slide_key in processed_slide_keys:
+            if logger:
+                logger.info(
+                    f"  Skipping {relative_path} - already processed in cleanup generation"
+                )
+            else:
+                print(
+                    f"  Skipping {relative_path} - already processed in cleanup generation"
+                )
+            continue
+
         # Check if we have an existing SlideLayout ID for this slide
         if slide_key not in slide_layout_mappings:
             if logger:
@@ -1070,28 +1199,39 @@ def copy_new_sql_files(
             )
 
         # Replace the new UUID with the existing SlideLayout ID
-        modified_content = content.replace(
-            slide_info["original_id"], existing_slide_layout_id
+        modified_content = replace_slide_layout_id_in_sql(
+            content, slide_info["original_id"], existing_slide_layout_id
+        )
+
+        # Remove SlideLayout INSERT statement since we're reusing existing one
+        modified_content = remove_slide_layout_insert(
+            modified_content, existing_slide_layout_id
         )
 
         # Create output directory structure
         output_file_path = Path(output_dir) / relative_path
         output_file_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Generate new filename with timestamp
+        timestamp = datetime.now().strftime("%b%d_%H-%M")
+        base_name = output_file_path.stem
+        new_filename = f"new_{base_name}_{timestamp}.sql"
+        final_output_path = output_file_path.parent / new_filename
+
         # Write the modified content
         try:
-            with open(output_file_path, "w", encoding="utf-8") as f:
+            with open(final_output_path, "w", encoding="utf-8") as f:
                 f.write(modified_content)
-            copied_files.append(str(output_file_path))
+            copied_files.append(str(final_output_path))
             if logger:
-                logger.info(f"  Copied and updated: {relative_path}")
+                logger.info(f"  Copied and updated: {relative_path} → {new_filename}")
             else:
-                print(f"  Copied and updated: {relative_path}")
+                print(f"  Copied and updated: {relative_path} → {new_filename}")
         except Exception as e:
             if logger:
-                logger.error(f"Failed to write {output_file_path}: {e}")
+                logger.error(f"Failed to write {final_output_path}: {e}")
             else:
-                print(f"Error: Failed to write {output_file_path}: {e}")
+                print(f"Error: Failed to write {final_output_path}: {e}")
 
     return copied_files
 
@@ -1170,32 +1310,62 @@ def main():
 
             if not old_sql_files:
                 logger.warning("No old SQL files found matching criteria")
+                print("No old SQL files found matching criteria")
                 return 1
 
             logger.info(f"Found {len(old_sql_files)} old SQL files to process")
+            print(f"Found {len(old_sql_files)} old SQL files to process")
 
             cleanup_files = []
             slide_layout_mappings = {}  # Track which slide layouts we're updating
+            processed_slide_keys = (
+                set()
+            )  # Track which slide keys were already processed
             total_cleanup_operations = 0
+            processed_slides = 0
+            skipped_slides = 0
 
             # Process each old SQL file
             for sql_file_info in old_sql_files:
                 logger.info(f"\nProcessing: {sql_file_info['filepath']}")
 
-                # Read original SQL content first
+                # Find corresponding new file
+                corresponding_new_file = find_corresponding_new_file(
+                    sql_file_info, args.new_sql_folder, logger
+                )
+                
+                if not corresponding_new_file:
+                    logger.warning(f"  Skipping - no corresponding new file found")
+                    skipped_slides += 1
+                    continue
+
+                # Read new file content
+                try:
+                    with open(corresponding_new_file, "r", encoding="utf-8") as f:
+                        new_file_content = f.read()
+                except Exception as e:
+                    logger.error(
+                        f"Failed to read new file {corresponding_new_file}: {e}"
+                    )
+                    skipped_slides += 1
+                    continue
+
+                # Read original SQL content for analysis
                 try:
                     with open(sql_file_info["filepath"], "r", encoding="utf-8") as f:
                         original_content = f.read()
                 except Exception as e:
                     logger.error(f"Failed to read {sql_file_info['filepath']}: {e}")
+                    skipped_slides += 1
                     continue
 
-                # Extract slide layout info from the SQL content
+                # Extract slide layout info from the original content for database lookup
                 slide_info = extract_slide_layout_info(original_content)
                 if not slide_info:
                     logger.warning(
                         f"Could not extract slide layout info from {sql_file_info['filename']}"
                     )
+                    skipped_slides += 1
                     continue
 
                 logger.info(
@@ -1217,13 +1387,17 @@ def main():
                     logger.warning(
                         f"  Skipping this file - SlideLayout must exist in database first"
                     )
+                    skipped_slides += 1
                     continue
 
-                logger.info(f"  Found existing SlideLayout ID: {existing_slide_layout_id}")
+                logger.info(
+                    f"  Found existing SlideLayout ID: {existing_slide_layout_id}"
+                )
 
                 # Store the mapping for later use
                 slide_key = f"{slide_info['name']}_{slide_info['number']}_{slide_info['presentation_layout_id']}"
                 slide_layout_mappings[slide_key] = existing_slide_layout_id
+                processed_slide_keys.add(slide_key)  # Mark as processed
 
                 # Parse SQL file to extract data (using the existing slide layout ID)
                 extracted_data = parse_sql_file(sql_file_info["filepath"])
@@ -1237,6 +1411,7 @@ def main():
                     logger.warning(
                         f"No extractable data found in {sql_file_info['filename']}"
                     )
+                    skipped_slides += 1
                     continue
 
                 logger.info(
@@ -1252,16 +1427,17 @@ def main():
 
                 if not cleanup_statements:
                     logger.info(f"  No cleanup needed for {sql_file_info['filename']}")
+                    processed_slides += 1
                     continue
 
                 logger.info(f"  Generated {len(cleanup_statements)} cleanup statements")
                 total_cleanup_operations += len(cleanup_statements)
 
-                # Generate cleanup SQL file
+                # Generate cleanup SQL file using NEW file content
                 output_path = generate_cleanup_sql_file(
                     sql_file_info,
                     cleanup_statements,
-                    "",
+                    new_file_content,  # Use new file content instead of original
                     args.output_dir,
                     existing_data,
                     existing_slide_layout_id,
@@ -1271,12 +1447,16 @@ def main():
                 if output_path:
                     cleanup_files.append(output_path)
                     logger.info(f"  Generated: {output_path}")
+                    processed_slides += 1
 
         logger.info("Database connection closed.")
 
         # Step 2: Copy new SQL files (these contain the new insertion statements)
         logger.info(
-            f"\n=== STEP 2: Copying new insertion statements from {args.new_sql_folder} ==="
+            f"\n=== STEP 2: Copying remaining new insertion statements from {args.new_sql_folder} ==="
+        )
+        logger.info(
+            "Note: Files already processed in cleanup generation will be skipped"
         )
         logger.info(f"Found {len(slide_layout_mappings)} slide layout mappings")
         new_files = copy_new_sql_files(
@@ -1285,8 +1465,20 @@ def main():
             slide_layout_mappings,
             args.folder_filter,
             logger,
+            processed_slide_keys,
         )
 
+        # Print concise summary to console
+        print(f"Slides processed: {processed_slides}")
+        print(f"Slides skipped: {skipped_slides}")
+        print(f"Total slides found: {len(old_sql_files)}")
+        print(f"Cleanup files generated: {len(cleanup_files)}")
+        print(f"New files copied: {len(new_files)}")
+        print(f"Total cleanup operations: {total_cleanup_operations}")
+        print(f"Output directory: {args.output_dir}")
+        print(f"{'='*60}")
+
+        # Keep detailed logging in file
         logger.info(f"\nProcessing completed!")
         logger.info(f"Generated {len(cleanup_files)} cleanup SQL files")
         logger.info(f"Copied {len(new_files)} new SQL files")
@@ -1298,7 +1490,7 @@ def main():
         logger.info("=" * 60)
 
     except Exception as e:
-        if 'logger' in locals():
+        if "logger" in locals():
             logger.error(f"Error: {e}")
         else:
             print(f"Error: {e}")
