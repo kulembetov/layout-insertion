@@ -2,10 +2,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from api_v1.services.filters.filter_settings import FilterMode
-from api_v1.implemented import figma_instance
-from api_v1.implemented import filter_figma_instance
-from api_v1.utils.helpers import json_dump
+from django_app.api_v1.services.filters.filter_settings import FilterMode
+from django_app.api_v1.implemented import figma_instance
+from django_app.api_v1.implemented import filter_figma_instance
+from django_app.api_v1.utils.helpers import json_dump
 
 from log_utils import setup_logger, logs
 

@@ -1,7 +1,7 @@
 from typing import Optional
 
 from django.core.cache import cache
-from config.settings import CACHE_ENABLED
+from django_app.config.settings import CACHE_ENABLED
 
 
 # def gen_key(file_id: str, filter_type: Optional[str] = None, filter_names: Optional[list] = None) -> str:

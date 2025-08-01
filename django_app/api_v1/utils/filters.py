@@ -1,9 +1,9 @@
 from typing import Callable, Optional, Any
 
-from api_v1.constants import TYPES
-from api_v1.services.data_classes import ExtractedBlock
-from api_v1.services.filters.filter_settings import FilterMode, FilterConfig
-from api_v1.utils.checkers import Checker
+from django_app.api_v1.constants import TYPES
+from django_app.api_v1.services.data_classes import ExtractedBlock
+from django_app.api_v1.services.filters.filter_settings import FilterMode, FilterConfig
+from django_app.api_v1.utils.checkers import Checker
 
 
 # codeblock for 'should_include', don't use/import this

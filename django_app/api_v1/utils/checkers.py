@@ -1,6 +1,6 @@
 from typing import Optional
 
-from api_v1.constants import CONSTANTS
+from django_app.api_v1.constants import CONSTANTS
 
 
 class Checker:

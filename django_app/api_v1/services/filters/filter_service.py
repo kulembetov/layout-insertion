@@ -1,7 +1,7 @@
 from typing import Any, Optional, Dict
 
 from .filter_settings import FilterMode, FilterConfig
-from api_v1.services.figma_api import FigmaAPI
+from django_app.api_v1.services.figma_api import FigmaAPI
 
 
 class FilterFigmaApi(FigmaAPI):

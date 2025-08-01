@@ -4,7 +4,7 @@ from logging.handlers import TimedRotatingFileHandler
 from functools import wraps
 from types import FunctionType
 
-from config.settings import LOGGING_ON
+from django_app.config.settings import LOGGING_ON
 
 
 def setup_logger(name=__name__, level=logging.INFO) -> logging.Logger:

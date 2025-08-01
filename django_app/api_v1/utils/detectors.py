@@ -1,6 +1,6 @@
 import re
 
-from api_v1.constants import SLIDES, CONSTANTS, BLOCKS, TYPES
+from django_app.api_v1.constants import SLIDES, CONSTANTS, BLOCKS, TYPES
 
 
 def detect_slide_type(container_name: str, slide_number: int) -> str:

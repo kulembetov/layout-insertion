@@ -1,9 +1,9 @@
 import re
 from typing import Optional, Any
 
-from api_v1.constants import CONSTANTS
-from api_v1.utils.font import normalize_font_weight, normalize_font_family
-from api_v1.constants import TYPES
+from django_app.api_v1.constants import CONSTANTS
+from django_app.api_v1.utils.font import normalize_font_weight, normalize_font_family
+from django_app.api_v1.constants import TYPES
 
 
 # codeblock for 'extract_color_info', don't use/import this

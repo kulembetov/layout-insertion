@@ -6,15 +6,15 @@ from log_utils import setup_logger, logs
 from .data_classes import ExtractedBlock, ExtractedSlide
 from .filters.filter_settings import FilterMode, FilterConfig
 
-from api_v1.utils.helpers import round5, get_slide_number
-from api_v1.utils.checkers import Checker
-from api_v1.utils.filters import should_include
-from api_v1.utils.extractors import Extractor
-from api_v1.utils.builders import slide_to_dict
-from api_v1.utils.detectors import detect_slide_type, detect_block_type
-from api_v1.redis.utils import set_cached_request, get_cached_request
+from django_app.api_v1.utils.helpers import round5, get_slide_number
+from django_app.api_v1.utils.checkers import Checker
+from django_app.api_v1.utils.filters import should_include
+from django_app.api_v1.utils.extractors import Extractor
+from django_app.api_v1.utils.builders import slide_to_dict
+from django_app.api_v1.utils.detectors import detect_slide_type, detect_block_type
+from django_app.api_v1.redis.utils import set_cached_request, get_cached_request
 
-from api_v1.constants import BLOCKS, SLIDES, CONSTANTS, TYPES
+from django_app.api_v1.constants import BLOCKS, SLIDES, CONSTANTS, TYPES
 
 logger = setup_logger(__name__)
 

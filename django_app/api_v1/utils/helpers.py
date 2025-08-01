@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from api_v1.constants import SLIDES
+from django_app.api_v1.constants import SLIDES
 
 
 # ================ Helpful functions ================
