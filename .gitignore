@@ -11,6 +11,7 @@ token.json
 exports/
 *.xlsx
 *.log
+*.csv
 
 # Python
 __pycache__/
@@ -52,3 +53,11 @@ venv.bak/
 # OS
 .DS_Store
 Thumbs.db
+.venv
+
+# Other
+/my_output/
+/my_sql_output/
+/logs/
+output.json
+/tg/logs/

@@ -1,0 +1,116 @@
+{
+	"info": {
+		"_postman_id": "4f0ac79c-7d72-472c-a3d9-821b24f1bbe2",
+		"name": "Present Simple Layouts",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "36808934"
+	},
+	"item": [
+		{
+			"name": "Extract All Data",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \r\n    \"file_id\": \"[Your file_id]\" \r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:8000/api/v1/figma/extract/"
+			},
+			"response": []
+		},
+		{
+			"name": "Extract Filtered Data (Group)",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"file_id\": \"[Your file_id]\",\r\n    \"filter\": {\r\n        \"type\": \"slide_group\",\r\n        \"name\": [3] // 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, -1\r\n    }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:8000/api/v1/figma/filter/"
+			},
+			"response": []
+		},
+		{
+			"name": "Extract Filtered Data (Name)",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n\"file_id\": \"[Your file_id]\",\r\n    \"filter\": {\r\n        \"type\": \"slide_name\",\r\n        \"name\": [\"image_right background_1 z-index 0\"] // divider_image_none_right_logo background_3 z-index 2, image_right background_1 z-index 0\r\n    }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:8000/api/v1/figma/filter/"
+			},
+			"response": []
+		},
+		{
+			"name": "Extract Filtered Data (Status)",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"file_id\": \"[Your file_id]\",\r\n    \"filter\": {\r\n        \"type\": \"status\",\r\n        \"name\": [\"ready_to_dev\"] // ready_to_dev\r\n    }\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:8000/api/v1/figma/filter/"
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}
