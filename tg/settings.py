@@ -15,6 +15,7 @@ DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST
 
 # Bot settings
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_LIST = list(map(int, os.getenv("ADMIN_LIST").split(",")))
 
 # Redis
 CACHE_LOCATION = os.getenv("CACHE_LOCATION")
