@@ -156,8 +156,8 @@ class Block:
     index: int = (
         None  # Store the index extracted from the block name (e.g., "text_1" -> index=1)
     )
-    opacity: int = 1  # Always default to 1 if not provided
-    words: int = 1  # Add words field, default 1
+    opacity: int = 1
+    words: int = 1
     font_family: str = None  # Store the font family for font index extraction
 
 
@@ -2178,8 +2178,7 @@ def normalize_font_family(font_name: str) -> str:
     )
 
 
-def normalize_color(color: str) -> str:
-    return color.strip().lower()
+
 
 
 def safe_slide_type(config, name):
@@ -2620,23 +2619,6 @@ class FontIndexUtils:
 
 def main():
     """Main entry point for interactive mode"""
-    output_dir = config.OUTPUT_CONFIG["output_dir"]
-    # Remove output directory if it exists
-    if os.path.exists(output_dir):
-        logger.info(f"Preparing to remove existing output directory: {output_dir}")
-        # Close all file handlers for loggers to avoid PermissionError
-        loggers = [logging.getLogger(), logger]
-        for log in loggers:
-            handlers = log.handlers[:]
-            for handler in handlers:
-                logger.info(f"Closing logger handler: {handler}")
-                handler.close()
-                log.removeHandler(handler)
-        logger.info(f"All logger handlers closed. Removing directory: {output_dir}")
-        shutil.rmtree(output_dir)
-        logger.info(f"Removed output directory: {output_dir}")
-    os.makedirs(output_dir, exist_ok=True)
-    logger.info(f"Created output directory: {output_dir}")
     generator = SQLGenerator(config)
     generator.run()
 
@@ -2657,7 +2639,7 @@ if __name__ == "__main__":
         default=None,
         help="Output directory for SQL files (optional, overrides config)",
     )
-    args, unknown = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     if args.auto_from_figma:
         auto_generate_sql_from_figma(args.auto_from_figma, args.output_dir)
