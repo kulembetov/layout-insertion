@@ -174,7 +174,7 @@ VALUES
 {styles_values}
 RETURNING *;""",
     "block_dimensions": """-- Create BlockLayoutDimensions
-INSERT INTO "BlockLayoutDimensions" ("blockLayoutId", "x", "y", "w", "h")
+INSERT INTO "BlockLayoutDimensions" ("blockLayoutId", "x", "y", "w", "h", "rotation")
 VALUES
 {dimension_values}
 RETURNING *;""",
@@ -448,7 +448,7 @@ VALUES
 {styles_values}
 RETURNING *;""",
     "block_dimensions": """-- Create BlockLayoutDimensions
-INSERT INTO "BlockLayoutDimensions" ("blockLayoutId", "x", "y", "w", "h")
+INSERT INTO "BlockLayoutDimensions" ("blockLayoutId", "x", "y", "w", "h", "rotation")
 VALUES
 {dimension_values}
 RETURNING *;""",
