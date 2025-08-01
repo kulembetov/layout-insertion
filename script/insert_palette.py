@@ -113,7 +113,7 @@ def insert_palette_auto(pairs, db_config, csv_path):
 def insert_palette_manual(pairs, csv_path):
     mapping = []
     for layout_id, color in pairs:
-        palette_id = generate_uuid7()
+        palette_id = generate_uuid()
         sql = f"INSERT INTO \"PresentationPalette\" (id, \"presentationLayoutId\", color) VALUES ('{palette_id}', '{layout_id}', '{color}');"
         print(f"{sql}")
         mapping.append(
