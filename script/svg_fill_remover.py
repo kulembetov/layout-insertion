@@ -30,9 +30,10 @@ def remove_fill_attributes(svg_content):
             if 'fill' in elem.attrib:
                 del elem.attrib['fill']
         
-        # Convert back to string
-        # Note: ET.tostring returns bytes, so we decode to string
-        modified_svg = ET.tostring(root, encoding='unicode')
+        modified_svg = ET.tostring(root, encoding='unicode', xml_declaration=False)
+        
+        modified_svg = modified_svg.replace('ns0:', '')
+        modified_svg = modified_svg.replace('xmlns:ns0="http://www.w3.org/2000/svg"', 'xmlns="http://www.w3.org/2000/svg"')
         
         # Add XML declaration if it was present in original
         if svg_content.strip().startswith('<?xml'):
