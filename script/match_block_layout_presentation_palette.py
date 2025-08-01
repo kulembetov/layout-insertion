@@ -1,6 +1,10 @@
 import csv
 import uuid_utils as uuid
 
+def generate_uuid() -> str:
+    """Generate a UUID7 string for database use."""
+    return str(uuid.uuid7())
+
 
 def parse_pg_array(array_str):
     """Parse a Postgres curly-brace array string into a Python list of strings."""
@@ -56,7 +60,7 @@ def find_matches(palette_map, block_configs):
             # If multiple configs match this palette color, create multiple matches
             for block_config in matching_configs:
                 matches.append({
-                    'id': uuid.uuid7(),
+                    'id': generate_uuid(),
                     'presentationPaletteId': palette_id,
                     'blockLayoutConfigId': block_config['id'],
                     'matched_background_color': palette_color,
@@ -86,7 +90,7 @@ def create_strategic_matches(palette_map, block_configs):
             block_config = block_configs[i % len(block_configs)]
             
             matches.append({
-                'id': uuid.uuid7(),
+                'id': generate_uuid(),
                 'presentationPaletteId': palette_id,
                 'blockLayoutConfigId': block_config['id'],
                 'matched_background_color': palette_color,

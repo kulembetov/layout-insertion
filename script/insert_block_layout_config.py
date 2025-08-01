@@ -68,6 +68,10 @@ FONT_MAPPING = {
     "sbermarketing": "sbermarketing",
 }
 
+def generate_uuid() -> str:
+    """Generate a UUID7 string for database use."""
+    return str(uuid.uuid7())
+
 
 def normalize_font(font_name: str) -> str:
     """Normalize font name to match schema enum, fallback to lowercased name if not in mapping."""
@@ -115,7 +119,7 @@ def create_palette_configs(json_path):
     configs = []
     for palette_color in palette_colors:
         fonts = set()
-        config = {"id": uuid.uuid7()}
+        config = {"id": generate_uuid()}
         for block_type in block_types:
             color_array = None
             for slide in slides:

@@ -6,6 +6,10 @@ import csv
 import psycopg2
 import uuid_utils as uuid
 
+def generate_uuid() -> str:
+    """Generate a UUID7 string for database use."""
+    return str(uuid.uuid7())
+
 # --- DB config parser ---
 def parse_db_config(ini_path):
     config = configparser.ConfigParser()
@@ -68,7 +72,7 @@ def insert_palette_auto(pairs, db_config, csv_path):
     total = 0
     mapping = []
     for layout_id, color in pairs:
-        palette_id = uuid.uuid7()
+        palette_id = generate_uuid()
         total += 1
         print(f"Trying: layout_id={layout_id}, color={color} ... ", end="")
         cur.execute(

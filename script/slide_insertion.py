@@ -101,6 +101,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ================ Helper Functions ================
+
+def generate_uuid() -> str:
+    """Generate a UUID7 string for database use."""
+    return str(uuid.uuid7())
+
 # ================ Domain Models ================
 
 
@@ -383,7 +389,7 @@ class BlockFactory:
             return None
 
         is_first_block = index == 0
-        block_id = str(uuid.uuid7())
+        block_id = generate_uuid()
 
         needs_null_styles = self.config.is_null_style_type(block_type)
         needs_z_index = self.config.is_z_index_type(block_type)
@@ -548,7 +554,7 @@ class BlockFactory:
 
     def create_watermark_block(self, dimension_config):
         """Create a watermark block with specified dimensions"""
-        wm_id = str(uuid.uuid7())
+        wm_id = generate_uuid()
         watermark_dimensions = dimension_config
 
         return Block(
@@ -579,7 +585,7 @@ class BlockFactory:
 
     def create_background_block(self, bg_config):
         """Create a background block with specified config"""
-        bg_id = str(uuid.uuid7())
+        bg_id = generate_uuid()
         bg_dims = bg_config["dimensions"]
 
         return Block(
@@ -694,7 +700,7 @@ class BlockFactory:
         data = dict(block_dict)  # shallow copy
         extra = extra or {}
         # Use provided or generate id
-        block_id = extra.get("id") or data.get("id") or str(uuid.uuid7())
+        block_id = extra.get("id") or data.get("id") or generate_uuid()
         # Normalize/clean name
         name = extra.get("name") or data.get("name") or ""
         name = BlockNameUtils.normalize_name(name)
@@ -1021,7 +1027,7 @@ class FigureCommand(SQLCommand):
         """Format the values for Figure SQL, extracting and storing the index from names like 'text_1'"""
         values = []
         for figure in self.figure_blocks:
-            figure_id = str(uuid.uuid7())
+            figure_id = generate_uuid()
             name = figure["name"]
             index = BlockNameUtils.extract_index(name, "figure")
             if index is not None:
@@ -1061,7 +1067,7 @@ class PrecompiledImageCommand(SQLCommand):
         """Format the values for PrecompiledImage SQL"""
         values = []
         for precompiled_image in self.precompiled_image_blocks:
-            precompiled_image_id = str(uuid.uuid7())
+            precompiled_image_id = generate_uuid()
             color_value = (
                 f"'{precompiled_image['color']}'"
                 if precompiled_image["color"]
@@ -1202,7 +1208,7 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
 
                 for slideConfigColor in self.slide_config[block.type]:
                     # Generate a UUID for the record
-                    block_layout_index_config_id = str(uuid.uuid7())
+                    block_layout_index_config_id = generate_uuid()
 
                     block_style = self.slide_config[block.type][slideConfigColor][
                         block.index
@@ -1304,7 +1310,7 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
                 slide_layout_id = self.slide_layout.id
 
                 for index, config in enumerate(slide_layout_index_config_mapping):
-                    slide_layout_index_config_id = str(uuid.uuid7())
+                    slide_layout_index_config_id = generate_uuid()
 
                     presentation_palette_id = config.presentation_palette_id
 
@@ -1735,7 +1741,7 @@ class SQLGenerator:
                             )
                         else:
                             # Generate a new UUID if no matching config is found
-                            palette_id = str(uuid.uuid7())
+                            palette_id = generate_uuid()
                             logger.warning(
                                 f"No matching config found for color {color_hex_lc}, generating new palette_id {palette_id}"
                             )
@@ -1860,7 +1866,7 @@ class SQLGenerator:
                 )
 
         # Generate ID for slide layout
-        slide_layout_id = str(uuid.uuid7())
+        slide_layout_id = generate_uuid()
 
         return SlideLayout(
             id=slide_layout_id,
@@ -1924,7 +1930,7 @@ class SQLGenerator:
                     "watermark"
                 ]["dimensions"]
             watermark_block = Block(
-                id=str(uuid.uuid7()),
+                id=generate_uuid(),
                 type=self.BLOCK_TYPE_WATERMARK,
                 dimensions=watermark_dimensions,
                 styles={
@@ -1970,7 +1976,7 @@ class SQLGenerator:
                 "color": "#ffffff",
             }
             bg_block = Block(
-                id=str(uuid.uuid7()),
+                id=generate_uuid(),
                 type=self.BLOCK_TYPE_BACKGROUND,
                 dimensions=bg_config["dimensions"],
                 styles=bg_styles,
@@ -2259,7 +2265,7 @@ def _process_figma_slide(
     """Process a single slide from Figma JSON and generate SQL."""
 
     # Generate a UUID for the SlideLayout
-    slide_layout_id = str(uuid.uuid7())
+    slide_layout_id = generate_uuid()
     # Strip z-index from slide layout name
     clean_slide_layout_name = strip_zindex(slide["slide_layout_name"])
     # Always use camelCase for type
@@ -2363,7 +2369,7 @@ def _process_figma_blocks(
     )
 
     for block in slide["blocks"]:
-        block_uuid = str(uuid.uuid7())
+        block_uuid = generate_uuid()
         block_id_map[block["id"]] = block_uuid
         styles = dict(block["styles"]) if block.get("styles") else {}
         color = None
@@ -2462,7 +2468,7 @@ def _ensure_background_and_watermark_blocks(
         else:
             watermark_dimensions = config.AUTO_BLOCKS["watermark"]["dimensions"]
         watermark_block = Block(
-            id=str(uuid.uuid7()),
+            id=generate_uuid(),
             type=generator.BLOCK_TYPE_WATERMARK,
             dimensions=watermark_dimensions,
             styles={
