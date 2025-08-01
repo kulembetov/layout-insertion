@@ -115,6 +115,7 @@ class Dimensions(TypedDict):
     y: int
     w: int
     h: int
+    rotation: int
 
 
 class BlockStyles(TypedDict):
@@ -991,8 +992,9 @@ class BlockDimensionsCommand(SQLCommand):
         values = []
         for block in self.blocks:
             dim = block.dimensions
+            rotation = dim.get('rotation', 0)
             values.append(
-                f"    ('{block.id}', {dim['x']}, {dim['y']}, {dim['w']}, {dim['h']})"
+                f"    ('{block.id}', {dim['x']}, {dim['y']}, {dim['w']}, {dim['h']}, {rotation})"
             )
         return ",\n".join(values)
 
