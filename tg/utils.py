@@ -8,7 +8,7 @@ def has_access(user_id: int) -> bool:
     return False
 
 
-def str_user(user: User) -> str:
+def to_str_user(user: User) -> str:
     if user.username:
         return f'@{user.username}'
     return f'ID: {user.id}'
