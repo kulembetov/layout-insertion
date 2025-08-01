@@ -35,10 +35,6 @@ def setup_block_logger(output_dir):
     block_logger.addHandler(block_log_handler)
 
 
-# ================ Constants and Mappings ================
-
-# All constants moved to config.py
-
 # ================ Data Classes and Enums ================
 
 
@@ -74,14 +70,12 @@ class ExtractedBlock:
     slide_number: int
     parent_container: str
     is_target: bool = False
-    has_corner_radius: bool = False
-    corner_radius: List[int] = field(default_factory=lambda: [0, 0, 0, 0])
+    has_border_radius: bool = False
+    border_radius: List[int] = field(default_factory=lambda: [0, 0, 0, 0])
     text_content: str = None
     figure_info: Dict[str, Any] = field(default_factory=dict)
     precompiled_image_info: Dict[str, Any] = field(default_factory=dict)
-    comment: Optional[str] = None
-    comments: List[Dict[str, Any]] = field(default_factory=list)
-    comment_count: int = 0
+    comment: str = None
 
 
 @dataclass
@@ -118,12 +112,9 @@ class BlockTypeUtils:
             sql_type = BlockTypeUtils._detect_text_block_type(clean_name)
             if sql_type in config.BLOCK_TYPES["block_layout_type_options"]:
                 return sql_type, sql_type
-        elif node_type == "RECTANGLE":
-            sql_type = BlockTypeUtils._detect_rectangle_block_type(clean_name.lower())
-            if sql_type in config.BLOCK_TYPES["block_layout_type_options"]:
-                return sql_type, sql_type
-        elif node_type in ["FRAME", "GROUP"]:
-            sql_type = BlockTypeUtils._detect_frame_block_type(clean_name.lower())
+        # For RECTANGLE, FRAME, and GROUP nodes, use the same pattern matching
+        elif node_type in ["RECTANGLE", "FRAME", "GROUP"]:
+            sql_type = BlockTypeUtils._detect_text_block_type(clean_name)
             if sql_type in config.BLOCK_TYPES["block_layout_type_options"]:
                 return sql_type, sql_type
         # Default fallback
@@ -138,80 +129,13 @@ class BlockTypeUtils:
 
     @staticmethod
     def _detect_text_block_type(name: str) -> str:
-        # Canonical types mapping
-        CANONICAL_TYPES = {
-            "number": "number",
-            "percentage": "percentage",
-            "date": "date",
-            "email": "email",
-            "blocktitle": "blockTitle",
-            "slidetitle": "slideTitle",
-            "text": "text",
-            "subtitle": "subTitle",
-            "name": "name",
-            "figure": "figure",
-            "image": "image",
-            "icon": "icon",
-            "infographik": "infographik",
-            "table": "table",
-            "background": "background",
-            "watermark": "watermark",
-        }
+        # Use config mapping for canonical types
         norm = BlockTypeUtils._normalize_type_name(name)
         norm_flat = norm.replace("_", "")
-        for key, canonical in CANONICAL_TYPES.items():
-            if key in norm_flat:
-                return canonical
+        for pattern, sql_type in config.FIGMA_TO_SQL_BLOCK_MAPPING.items():
+            if pattern in norm_flat:
+                return sql_type
         return "text"
-
-    @staticmethod
-    def _detect_rectangle_block_type(name: str) -> str:
-        """Detect block type from rectangle node name."""
-        # Canonical types mapping for rectangles
-        CANONICAL_TYPES = {
-            "background": "background",
-            "image": "image",
-            "figure": "figure",
-            "icon": "icon",
-            "infographik": "infographik",
-            "table": "table",
-            "watermark": "watermark",
-        }
-        norm = BlockTypeUtils._normalize_type_name(name)
-        norm_flat = norm.replace("_", "")
-        for key, canonical in CANONICAL_TYPES.items():
-            if key in norm_flat:
-                return canonical
-        return "image"  # Default for rectangles
-
-    @staticmethod
-    def _detect_frame_block_type(name: str) -> str:
-        """Detect block type from frame/group node name."""
-        # Canonical types mapping for frames/groups
-        CANONICAL_TYPES = {
-            "background": "background",
-            "image": "image",
-            "figure": "figure",
-            "icon": "icon",
-            "infographik": "infographik",
-            "table": "table",
-            "watermark": "watermark",
-            "text": "text",
-            "blocktitle": "blockTitle",
-            "slidetitle": "slideTitle",
-            "subtitle": "subTitle",
-            "number": "number",
-            "email": "email",
-            "date": "date",
-            "name": "name",
-            "percentage": "percentage",
-        }
-        norm = BlockTypeUtils._normalize_type_name(name)
-        norm_flat = norm.replace("_", "")
-        for key, canonical in CANONICAL_TYPES.items():
-            if key in norm_flat:
-                return canonical
-        return "text"  # Default for frames/groups
 
 
 # ================ Text Utils ================
@@ -271,7 +195,7 @@ class BlockUtils:
         Build a block dictionary from an ExtractedBlock or dict and optional slide_config.
         This is the single source of truth for block dict construction.
         Adds figure_info and precompiled_image_info if relevant.
-        Always includes both has_corner_radius (bool) and corner_radius (list of 4 ints).
+        Always includes both has_border_radius (bool) and border_radius (list of 4 ints).
         """
         get = (
             (lambda k: block.get(k, None))
@@ -289,18 +213,16 @@ class BlockUtils:
             "needs_null_styles": get("sql_type")
             in config.BLOCK_TYPES["null_style_types"],
             "needs_z_index": get("sql_type") in config.BLOCK_TYPES["z_index_types"],
-            # Always include both fields for clarity and downstream use
-            "has_corner_radius": (
-                get("has_corner_radius")
-                if get("has_corner_radius") is not None
+            "has_border_radius": (
+                get("has_border_radius")
+                if get("has_border_radius") is not None
                 else False
             ),
-            "corner_radius": (
-                get("corner_radius")
-                if get("corner_radius") is not None
-                else [0, 0, 0, 0]
-            ),
+            "comment": get("comment"),
         }
+
+        if get("border_radius") is not None:
+            block_dict["border_radius"] = get("border_radius")
         text_content = get("text_content")
         # Use existing 'words' if present in dict, else recalculate
         if isinstance(block, dict) and "words" in block and block["words"] is not None:
@@ -313,10 +235,6 @@ class BlockUtils:
         block_dict["precompiled_image_info"] = (
             BlockUtils.extract_precompiled_image_info(block, slide_config)
         )
-        # Add comment if present
-        comment = get("comment")
-        if comment:
-            block_dict["comment"] = comment
         return block_dict
 
     @staticmethod
@@ -345,21 +263,21 @@ class BlockUtils:
         return info
 
     @staticmethod
-    def extract_corner_radius_from_node(node: dict) -> tuple[bool, list[int]]:
-        """Extract corner radius from a Figma node, returns (has_corner_radius, [tl, tr, br, bl])"""
-        corner_radius = [0, 0, 0, 0]
-        has_corner_radius = False
+    def extract_border_radius_from_node(node: dict) -> tuple[bool, list[int]]:
+        """Extract corner radius from a Figma node, map to border radius and returns (has_border_radius, [tl, tr, br, bl])"""
+        border_radius = [0, 0, 0, 0]
+        has_border_radius = False
         if "cornerRadius" in node:
             radius = node["cornerRadius"]
             if isinstance(radius, (int, float)) and radius > 0:
-                corner_radius = [int(radius)] * 4
-                has_corner_radius = True
+                border_radius = [int(radius)] * 4
+                has_border_radius = True
         if "rectangleCornerRadii" in node:
             radii = node["rectangleCornerRadii"]
             if isinstance(radii, list) and len(radii) == 4:
-                corner_radius = [int(r) for r in radii]
-                has_corner_radius = any(r > 0 for r in corner_radius)
-        return has_corner_radius, corner_radius
+                border_radius = [int(r) for r in radii]
+                has_border_radius = any(r > 0 for r in border_radius)
+        return has_border_radius, border_radius
 
     @staticmethod
     def get_node_property(node: dict, key: str, default=None):
@@ -424,107 +342,6 @@ class FontUtils:
             "",
             font_family.strip().lower().replace(" ", "_").replace("-", "_"),
         )
-
-
-# ================ Comment Utils ================
-
-
-class CommentUtils:
-    @staticmethod
-    def clean_unicode_comment(comment: str) -> Optional[str]:
-        """
-        Clean Unicode comments that contain problematic characters.
-        Returns None if the comment contains non-ASCII characters that would cause encoding issues.
-        """
-        if not comment:
-            return None
-        
-        # Check if comment contains non-ASCII characters
-        try:
-            # Try to encode as ASCII to see if it contains Unicode
-            comment.encode('ascii')
-            return comment
-        except UnicodeEncodeError:
-            # Contains Unicode characters, return None to avoid encoding issues
-            return None
-
-    @staticmethod
-    def extract_comment_from_node(node: dict) -> Optional[str]:
-        """
-        Extract comment from a Figma node.
-        Comments can be stored in various fields depending on the Figma API version.
-        """
-        # Check for direct comment field
-        if "comment" in node and node["comment"]:
-            comment = str(node["comment"])
-            return CommentUtils.clean_unicode_comment(comment)
-        
-        # Check for comments array
-        if "comments" in node and isinstance(node["comments"], list):
-            comments = node["comments"]
-            if comments:
-                # Return the first comment's message
-                comment = str(comments[0].get("message", ""))
-                return CommentUtils.clean_unicode_comment(comment)
-        
-        # Check for description field (sometimes used for comments)
-        if "description" in node and node["description"]:
-            comment = str(node["description"])
-            return CommentUtils.clean_unicode_comment(comment)
-        
-        # Check for userData field which might contain comments
-        if "userData" in node and isinstance(node["userData"], dict):
-            user_data = node["userData"]
-            if "comment" in user_data:
-                comment = str(user_data["comment"])
-                return CommentUtils.clean_unicode_comment(comment)
-            if "description" in user_data:
-                comment = str(user_data["description"])
-                return CommentUtils.clean_unicode_comment(comment)
-        
-        return None
-
-    @staticmethod
-    def extract_all_comments_from_node(node: dict) -> List[str]:
-        """
-        Extract all comments from a Figma node.
-        Returns a list of all comment messages.
-        """
-        comments = []
-        
-        # Check for comments array
-        if "comments" in node and isinstance(node["comments"], list):
-            for comment in node["comments"]:
-                if isinstance(comment, dict) and "message" in comment:
-                    cleaned_comment = CommentUtils.clean_unicode_comment(str(comment["message"]))
-                    if cleaned_comment:
-                        comments.append(cleaned_comment)
-        
-        # Check for direct comment field
-        if "comment" in node and node["comment"]:
-            cleaned_comment = CommentUtils.clean_unicode_comment(str(node["comment"]))
-            if cleaned_comment:
-                comments.append(cleaned_comment)
-        
-        # Check for description field
-        if "description" in node and node["description"]:
-            cleaned_comment = CommentUtils.clean_unicode_comment(str(node["description"]))
-            if cleaned_comment:
-                comments.append(cleaned_comment)
-        
-        # Check for userData field
-        if "userData" in node and isinstance(node["userData"], dict):
-            user_data = node["userData"]
-            if "comment" in user_data:
-                cleaned_comment = CommentUtils.clean_unicode_comment(str(user_data["comment"]))
-                if cleaned_comment:
-                    comments.append(cleaned_comment)
-            if "description" in user_data:
-                cleaned_comment = CommentUtils.clean_unicode_comment(str(user_data["description"]))
-                if cleaned_comment:
-                    comments.append(cleaned_comment)
-        
-        return comments
 
 
 # ================ Block Filter Utils ================
@@ -610,47 +427,6 @@ class FigmaExtractor:
         self.token = token
         self.filter_config = filter_config or FilterConfig()
         self.headers = {"X-Figma-Token": token}
-        self.node_comments = self._fetch_comments()
-
-    def _fetch_comments(self) -> dict:
-        """Fetch comments from the Figma API and map them by node_id with full metadata."""
-        try:
-            response = requests.get(
-                f"https://api.figma.com/v1/files/{self.file_id}/comments",
-                headers=self.headers
-            )
-            response.raise_for_status()
-            comments_data = response.json().get("comments", [])
-            node_comments = {}
-            
-            for comment in comments_data:
-                client_meta = comment.get("client_meta")
-                comment_info = {
-                    "message": comment.get("message", ""),
-                    "user": comment.get("user", {}),
-                    "created_at": comment.get("created_at"),
-                    "resolved_at": comment.get("resolved_at"),
-                    "comment_id": comment.get("id"),
-                    "parent_id": comment.get("parent_id"),
-                }
-                
-                if isinstance(client_meta, list):
-                    for meta in client_meta:
-                        node_id = meta.get("node_id")
-                        if node_id:
-                            node_comments.setdefault(node_id, []).append(comment_info)
-                elif isinstance(client_meta, dict):
-                    node_id = client_meta.get("node_id")
-                    if node_id:
-                        node_comments.setdefault(node_id, []).append(comment_info)
-            
-            LogUtils.log_block_event(f"Fetched {len(comments_data)} comments for {len(node_comments)} nodes")
-            if node_comments:
-                LogUtils.log_block_event(f"Comment distribution: {list(node_comments.keys())[:5]}...")  # Show first 5 node IDs
-            return node_comments
-        except Exception as e:
-            LogUtils.log_block_event(f"Failed to fetch comments: {e}", level="debug")
-            return {}
 
     def round_to_nearest_five(self, value: float) -> int:
         """Round value to nearest 5"""
@@ -672,14 +448,14 @@ class FigmaExtractor:
         return "z-index" in name
 
     def normalize_font_weight(self, weight: Any) -> int:
-        """Normalize font weight to valid values (300, 400, 700)"""
+        """Normalize font weight to valid values from config"""
         if weight is None:
-            return 400
+            return config.VALID_FONT_WEIGHTS[1]  # 400 as default
 
         try:
             weight_num = int(weight)
         except (ValueError, TypeError):
-            return 400
+            return config.VALID_FONT_WEIGHTS[1]  # 400 as default
 
         # Map font weights to nearest valid value
         if weight_num <= 350:
@@ -719,26 +495,26 @@ class FigmaExtractor:
                 styles["weight"] = self.normalize_font_weight(style["fontWeight"])
         return styles
 
-    def extract_corner_radius(self, node: Dict[str, Any]) -> Tuple[bool, List[int]]:
-        """Extract corner radius information"""
-        corner_radius = [0, 0, 0, 0]  # Default: all corners 0
-        has_corner_radius = False
+    def extract_border_radius(self, node: Dict[str, Any]) -> Tuple[bool, List[int]]:
+        """Extract border radius information"""
+        border_radius = [0, 0, 0, 0]  # Default: all corners 0
+        has_border_radius = False
 
         # Check for cornerRadius property
         if "cornerRadius" in node:
             radius = node["cornerRadius"]
             if isinstance(radius, (int, float)) and radius > 0:
-                corner_radius = [int(radius)] * 4
-                has_corner_radius = True
+                border_radius = [int(radius)] * 4
+                has_border_radius = True
 
         # Check for individual corner radii
         if "rectangleCornerRadii" in node:
             radii = node["rectangleCornerRadii"]
             if isinstance(radii, list) and len(radii) == 4:
-                corner_radius = [int(r) for r in radii]
-                has_corner_radius = any(r > 0 for r in corner_radius)
+                border_radius = [int(r) for r in radii]
+                has_border_radius = any(r > 0 for r in border_radius)
 
-        return has_corner_radius, corner_radius
+        return has_border_radius, border_radius
 
     def is_target_frame(self, node: Dict[str, Any]) -> bool:
         """Check if node is a target frame, now supports 'ready to dev' marker"""
@@ -788,12 +564,64 @@ class FigmaExtractor:
         # Replaced by ColorUtils.extract_color_info
         return ColorUtils.extract_color_info(node)
 
+    def fetch_all_comments(self) -> Dict[str, str]:
+        """Fetch all comments from Figma API in a single call and return a mapping of node_id to comment."""
+        comments_map = {}
+        try:
+            LogUtils.log_block_event("Fetching comments from Figma API...")
+            response = requests.get(
+                f"https://api.figma.com/v1/files/{self.file_id}/comments",
+                headers=self.headers,
+            )
+            response.raise_for_status()
+            comments_data = response.json()
+
+            LogUtils.log_block_event(
+                f"Comments API response keys: {list(comments_data.keys())}"
+            )
+
+            # Log the raw response for debugging
+            if "comments" in comments_data:
+                LogUtils.log_block_event(
+                    f"Total comments in response: {len(comments_data['comments'])}"
+                )
+                for i, comment in enumerate(comments_data["comments"][:3]):
+                    LogUtils.log_block_event(f"Comment {i+1}: {comment}")
+            else:
+                LogUtils.log_block_event(
+                    f"No 'comments' key found in response. Available keys: {list(comments_data.keys())}"
+                )
+
+            # Create a mapping of node_id to first comment message
+            for comment in comments_data.get("comments", []):
+                client_meta = comment.get("client_meta", {})
+                node_id = client_meta.get("node_id")
+                message = comment.get("message", "")
+                if node_id and message and node_id not in comments_map:
+                    comments_map[node_id] = message
+                    LogUtils.log_block_event(
+                        f"Mapped comment for node {node_id}: {message[:50]}..."
+                    )
+
+            LogUtils.log_block_event(
+                f"Successfully mapped {len(comments_map)} comments"
+            )
+            return comments_map
+
+        except requests.exceptions.RequestException as e:
+            LogUtils.log_block_event(f"Failed to fetch comments: {e}", level="debug")
+            return {}
+        except Exception as e:
+            LogUtils.log_block_event(f"Error fetching comments: {e}", level="debug")
+            return {}
+
     def collect_blocks(
         self,
         node: Dict[str, Any],
         frame_origin: Dict[str, int],
         slide_number: int,
         parent_container: str,
+        comments_map: Dict[str, str] = None,
     ) -> List[ExtractedBlock]:
         """Recursively collect blocks from a Figma node, filtering and normalizing as needed."""
         blocks = []
@@ -837,45 +665,28 @@ class FigmaExtractor:
                         sql_type, config.Z_INDEX_DEFAULTS["default"]
                     )
                 styles["zIndex"] = z_index
-                has_corner_radius, corner_radius = BlockUtils.extract_corner_radius_from_node(node)
+                has_border_radius, border_radius = (
+                    BlockUtils.extract_border_radius_from_node(node)
+                )
                 text_content = None
                 if sql_type in [
-                    "text", "blockTitle", "slideTitle", "subTitle", "number", "email", "date", "name", "percentage"
+                    "text",
+                    "blockTitle",
+                    "slideTitle",
+                    "subTitle",
+                    "number",
+                    "email",
+                    "date",
+                    "name",
+                    "percentage",
                 ] and BlockUtils.is_node_type(node, "TEXT"):
-                    text_content = BlockUtils.get_node_property(node, "characters", None)
-                # Extract comment from the node or from fetched comments
-                comment = CommentUtils.extract_comment_from_node(node)
-                comments_list = []
-                comment_count = 0
-                
-                # Attach Figma comments if available
-                node_id = node.get("id")
-                if node_id and node_id in self.node_comments:
-                    figma_comments = self.node_comments[node_id]
-                    comments_list.extend(figma_comments)
-                    comment_count = len(figma_comments)
-                    
-                    LogUtils.log_block_event(f"Attaching {comment_count} comments to block {node_id} ({name})", level="debug")
-                    
-                    # Create a formatted comment string for backward compatibility
-                    figma_messages = [c.get("message", "") for c in figma_comments if c.get("message")]
-                    if figma_messages:
-                        figma_comment_text = "\n".join(figma_messages)
-                        comment = figma_comment_text if not comment else f"{comment}\n{figma_comment_text}"
-                
-                # Add node-level comment if present
-                if comment and comment not in [c.get("message", "") for c in comments_list]:
-                    comments_list.append({
-                        "message": comment,
-                        "source": "node_property",
-                        "user": {},
-                        "created_at": None,
-                        "resolved_at": None,
-                        "comment_id": None,
-                        "parent_id": None,
-                    })
-                    comment_count += 1
-                
+                    text_content = BlockUtils.get_node_property(
+                        node, "characters", None
+                    )
+
+                # Get comment from the pre-fetched comments map
+                comment = comments_map.get(node["id"], "") if comments_map else ""
+
                 block = ExtractedBlock(
                     id=node["id"],
                     figma_type=figma_type,
@@ -886,33 +697,18 @@ class FigmaExtractor:
                     slide_number=slide_number,
                     parent_container=parent_container,
                     is_target=True,
-                    has_corner_radius=has_corner_radius,
-                    corner_radius=corner_radius,
+                    has_border_radius=has_border_radius,
+                    border_radius=border_radius,
                     text_content=text_content,
                     comment=comment,
-                    comments=comments_list,
-                    comment_count=comment_count,
                 )
                 if BlockFilterUtils.should_include_node_or_block(
                     block, self.filter_config
                 ):
                     blocks.append(block)
-                    comment_info = ""
-                    if comment_count > 0:
-                        comment_sources = []
-                        for c in comments_list:
-                            source = c.get("source", "figma_api")
-                            if source == "figma_api":
-                                user = c.get("user", {}).get("handle", "unknown")
-                                comment_sources.append(f"Figma({user})")
-                            else:
-                                comment_sources.append(source)
-                        comment_info = f" | Comments: {comment_count} ({', '.join(comment_sources)})"
-                    elif comment:
-                        comment_info = f" | Comment: {comment}"
-                    
+                    LogUtils.log_block_event(f"Added {sql_type} block: {name}")
                     LogUtils.log_block_event(
-                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{comment_info}",
+                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}",
                         level="debug",
                     )
         if BlockUtils.get_node_property(node, "children") and not (
@@ -922,7 +718,11 @@ class FigmaExtractor:
             for node_child in BlockUtils.get_node_property(node, "children"):
                 blocks.extend(
                     self.collect_blocks(
-                        node_child, frame_origin, slide_number, parent_container
+                        node_child,
+                        frame_origin,
+                        slide_number,
+                        parent_container,
+                        comments_map,
                     )
                 )
         return blocks
@@ -937,14 +737,18 @@ class FigmaExtractor:
             if BlockUtils.get_node_property(node_child, "name") == "slideColors":
                 if block_logger:
                     block_logger.info(f"[slideColors] Found slideColors table in slide")
-                for node_block in BlockUtils.get_node_property(node_child, "children", []):
+                for node_block in BlockUtils.get_node_property(
+                    node_child, "children", []
+                ):
                     block_type = BlockUtils.get_node_property(node_block, "name")
                     if block_logger:
                         block_logger.info(
                             f"[slideColors] Processing block type: {block_type}"
                         )
                     block_colors = {}
-                    for color_group in BlockUtils.get_node_property(node_block, "children", []):
+                    for color_group in BlockUtils.get_node_property(
+                        node_block, "children", []
+                    ):
                         color_hex = BlockUtils.get_node_property(color_group, "name")
                         if color_hex:
                             color_hex = color_hex.lower()
@@ -954,7 +758,9 @@ class FigmaExtractor:
                                 f"[slideColors] Processing color group: {color_hex}"
                             )
                         block_objs = []
-                        for text_child in BlockUtils.get_node_property(color_group, "children", []):
+                        for text_child in BlockUtils.get_node_property(
+                            color_group, "children", []
+                        ):
                             if BlockUtils.is_node_type(text_child, "TEXT"):
                                 text_obj = {}
                                 color_val, color_var = ColorUtils.extract_color_info(
@@ -969,11 +775,13 @@ class FigmaExtractor:
                                     and "fontFamily" in text_child["style"]
                                 ):
                                     font_family = text_child["style"]["fontFamily"]
-                                text_obj["fontFamily"] = FontUtils.normalize_font_family(
-                                    font_family
+                                text_obj["fontFamily"] = (
+                                    FontUtils.normalize_font_family(font_family)
                                 )
                                 if block_type == "figure":
-                                    idx = BlockUtils.get_node_property(text_child, "name", "").strip()
+                                    idx = BlockUtils.get_node_property(
+                                        text_child, "name", ""
+                                    ).strip()
                                     text_obj["figureName"] = idx
                                     if block_logger:
                                         block_logger.info(
@@ -1104,7 +912,10 @@ class FigmaExtractor:
                 )
 
     def traverse_and_extract(
-        self, node: Dict[str, Any], parent_name: str = ""
+        self,
+        node: Dict[str, Any],
+        parent_name: str = "",
+        comments_map: Dict[str, str] = None,
     ) -> List[ExtractedSlide]:
         """Traversal with filtering"""
         slides = []
@@ -1129,7 +940,9 @@ class FigmaExtractor:
 
             slide_type = self.detect_slide_type(parent_name, slide_number)
 
-            blocks = self.collect_blocks(node, frame_origin, slide_number, parent_name)
+            blocks = self.collect_blocks(
+                node, frame_origin, slide_number, parent_name, comments_map
+            )
 
             if blocks or self.filter_config.mode == FilterMode.ALL:
                 slide = ExtractedSlide(
@@ -1156,7 +969,9 @@ class FigmaExtractor:
         # Continue traversing children
         if node.get("children"):
             for child in node["children"]:
-                child_slides = self.traverse_and_extract(child, node["name"])
+                child_slides = self.traverse_and_extract(
+                    child, node["name"], comments_map
+                )
                 slides.extend(child_slides)
 
         return slides
@@ -1170,14 +985,19 @@ class FigmaExtractor:
             response.raise_for_status()
             data = response.json()
 
-            pages = BlockUtils.get_node_property(data["document"], config.FIGMA_KEY_CHILDREN, [])
+            # Fetch all comments in a single API call for efficiency
+            comments_map = self.fetch_all_comments()
+
+            pages = BlockUtils.get_node_property(
+                data["document"], config.FIGMA_KEY_CHILDREN, []
+            )
             all_slides = []
 
             for page in pages:
                 LogUtils.log_block_event(
                     f"\nProcessing page: {BlockUtils.get_node_property(page, config.FIGMA_KEY_NAME, 'Unnamed')}"
                 )
-                page_slides = self.traverse_and_extract(page)
+                page_slides = self.traverse_and_extract(page, comments_map)
                 all_slides.extend(page_slides)
 
             # Generate summary
@@ -1233,7 +1053,10 @@ class FigmaExtractor:
         except Exception as e:
             LogUtils.log_block_event(f"Unexpected error: {e}", level="debug")
             return {
-                "metadata": {"file_id": self.file_id, "error": f"Unexpected error: {e}"},
+                "metadata": {
+                    "file_id": self.file_id,
+                    "error": f"Unexpected error: {e}",
+                },
                 "slides": [],
             }
 
@@ -1254,6 +1077,10 @@ class FigmaExtractor:
             sentence_count = TextUtils.count_sentences(text_content)
         if sentence_count == 0:
             sentence_count = 1
+
+        # Count images in the slide
+        images_count = sum(1 for block in slide.blocks if block.sql_type == "image")
+
         # Extract slideConfig and palette colors if available
         slide_config = {}
         presentation_palette_colors = []
@@ -1271,6 +1098,7 @@ class FigmaExtractor:
             "frame_name": slide.frame_name,
             "slide_type": slide.slide_type,
             "sentences": sentence_count,
+            "imagesCount": images_count,
             "frame_id": slide.frame_id,
             "dimensions": slide.dimensions,
             "folder_name": config.SLIDE_NUMBER_TO_FOLDER.get(slide.number, "other"),
@@ -1375,6 +1203,7 @@ class FigmaToSQLIntegrator:
                 "presentation_layout_id": presentation_layout_id,
                 "is_last": is_last,
                 "folder_name": slide.get("folder_name", "other"),
+                "imagesCount": slide.get("imagesCount", 0),
                 "blocks": [],
                 "auto_blocks": self._get_auto_blocks_for_slide(slide, is_last),
                 "sql_config": {
@@ -1399,12 +1228,11 @@ class FigmaToSQLIntegrator:
                     "styles": dict(block_dict.get("styles", {})),
                     "needs_null_styles": block_dict.get("needs_null_styles", False),
                     "needs_z_index": block_dict.get("needs_z_index", False),
-                    "corner_radius": block_dict.get("corner_radius"),
+                    "border_radius": block_dict.get("border_radius"),
                     "sql_ready": True,
                     "words": block_dict.get("words", 0),
                     "figure_info": block_dict.get("figure_info"),
                     "precompiled_image_info": block_dict.get("precompiled_image_info"),
-                    "comment": block_dict.get("comment"),
                 }
                 # Do NOT add color/fontFamily to block_input["styles"]
                 slide_input["blocks"].append(block_input)
@@ -1450,7 +1278,7 @@ class FigmaToSQLIntegrator:
             block_type, config.DEFAULT_STYLES["default"]
         )
 
-        # Ensure font weight is valid
+        # Ensure font weight is valid from config
         weight = figma_styles.get("weight", defaults["weight"])
         if weight not in config.VALID_FONT_WEIGHTS:
             if weight <= 350:
@@ -1473,7 +1301,9 @@ class FigmaToSQLIntegrator:
         }
 
     def generate_sql_for_slides(
-        self, slide_numbers: List[int], output_dir: str = "sql_output"
+        self,
+        slide_numbers: List[int],
+        output_dir: str = config.OUTPUT_CONFIG["output_dir"],
     ):
         """Complete pipeline: extract from Figma and generate SQL with config compatibility"""
         LogUtils.log_block_event(f"Extracting slides {slide_numbers} from Figma...")
@@ -1496,13 +1326,13 @@ class FigmaToSQLIntegrator:
         # Print how many slides were extracted
         print(f"Extracted {len(figma_data.get('slides', []))} slides from Figma.")
         # Save extracted data
-        with open(f"{output_dir}/figma_extract.json", "w", encoding="utf-8") as f:
-            json.dump(figma_data, f, indent=2, ensure_ascii=False)
+        with open(f"{output_dir}/figma_extract.json", "w") as f:
+            json.dump(figma_data, f, indent=2)
         # Prepare for SQL Generator
         sql_input = self.prepare_sql_generator_input(figma_data)
         # Save SQL input format
-        with open(f"{output_dir}/sql_generator_input.json", "w", encoding="utf-8") as f:
-            json.dump(sql_input, f, indent=2, ensure_ascii=False)
+        with open(f"{output_dir}/sql_generator_input.json", "w") as f:
+            json.dump(sql_input, f, indent=2)
         # Generate ready-to-use SQL files for each slide
         self._generate_sql_files(sql_input, output_dir)
         LogUtils.log_block_event("\nProcessing complete!")
@@ -1525,7 +1355,7 @@ class FigmaToSQLIntegrator:
             sql_content = self._create_sql_for_slide(slide)
             filename = f"slide_{slide['slide_layout_number']:02d}_{slide['slide_layout_name']}.sql"
 
-            with open(f"{sql_dir}/{filename}", "w", encoding="utf-8") as f:
+            with open(f"{sql_dir}/{filename}", "w") as f:
                 f.write(sql_content)
 
             LogUtils.log_block_event(f"   Generated SQL: {filename}")
@@ -1565,10 +1395,8 @@ class FigmaToSQLIntegrator:
             lines.append(f"--   Dimensions: {block['dimensions']}")
             lines.append(f"--   Z-Index: {block['styles'].get('zIndex', 'N/A')}")
             lines.append(f"--   Styles: {block['styles']}")
-            if block.get("corner_radius"):
-                lines.append(f"--   Corner Radius: {block['corner_radius']}")
-            if block.get("comment"):
-                lines.append(f"--   Comment: {block['comment']}")
+            if block.get("border_radius"):
+                lines.append(f"--   Border Radius: {block['border_radius']}")
             lines.append("")
 
         lines.append(
@@ -1593,7 +1421,7 @@ class FigmaToSQLIntegrator:
         instructions.append("1. Import the config module into your SQL Generator")
         instructions.append("2. Use the data from sql_generator_input.json")
         instructions.append(
-            "3. All font weights are normalized to valid values (300, 400, 700)"
+            f"3. All font weights are normalized to valid values {config.VALID_FONT_WEIGHTS}"
         )
         instructions.append(
             "4. All block types are validated against config.VALID_BLOCK_TYPES"
@@ -1628,15 +1456,15 @@ class FigmaToSQLIntegrator:
             if slide.get("auto_blocks"):
                 instructions.append(f"**Auto Blocks:**")
                 for block_name, block_info in slide["auto_blocks"].items():
-                    instructions.append(
-                        f"- {block_name.title()}: {block_info['type']}"
-                    )
+                    instructions.append(f"- {block_name.title()}: {block_info['type']}")
 
             instructions.append(f"**User Blocks:**")
             for j, block in enumerate(slide["blocks"]):
                 instructions.append(f"  {j+1}. **{block['type']}** - {block['name']}")
                 instructions.append(f"     - Dimensions: {block['dimensions']}")
-                instructions.append(f"     - Z-Index: {block['styles'].get('zIndex', 'N/A')}")
+                instructions.append(
+                    f"     - Z-Index: {block['styles'].get('zIndex', 'N/A')}"
+                )
                 instructions.append(f"     - Null Styles: {block['needs_null_styles']}")
 
                 if not block["needs_null_styles"]:
@@ -1648,15 +1476,10 @@ class FigmaToSQLIntegrator:
                         f"     - Alignment: {styles.get('textVertical', '-') } / {styles.get('textHorizontal', '-')}"
                     )
 
-                if block.get("corner_radius"):
+                if block.get("border_radius"):
                     instructions.append(
-                        f"     - Corner Radius: {block['corner_radius']}"
+                        f"     - Border Radius: {block['border_radius']}"
                     )
-                
-                # Add comment information if present
-                if block.get("comment"):
-                    instructions.append(f"     - Comment: {block['comment']}")
-                
                 instructions.append("")
 
             instructions.append("")
@@ -1684,7 +1507,7 @@ class FigmaToSQLIntegrator:
         )
         instructions.append("- `sql_instructions.md`: This instruction file")
 
-        with open(f"{output_dir}/sql_instructions.md", "w", encoding="utf-8") as f:
+        with open(f"{output_dir}/sql_instructions.md", "w") as f:
             f.write("\n".join(instructions))
 
 
@@ -1714,8 +1537,8 @@ def example_usage():
 
         # Save for SQL Generator
         os.makedirs("output/tables", exist_ok=True)
-        with open("output/tables/table_slides_config.json", "w", encoding="utf-8") as f:
-            json.dump(sql_input, f, indent=2, ensure_ascii=False)
+        with open("output/tables/table_slides_config.json", "w") as f:
+            json.dump(sql_input, f, indent=2)
 
     # Example 3: Extract hero and infographics slides
     LogUtils.log_block_event(
@@ -1763,8 +1586,8 @@ def example_usage():
         for slide_type, slides in by_type.items():
             type_dir = f"{output_dir}/{slide_type}"
             os.makedirs(type_dir, exist_ok=True)
-            with open(f"{type_dir}/slides_config.json", "w", encoding="utf-8") as f:
-                json.dump(slides, f, indent=2, ensure_ascii=False)
+            with open(f"{type_dir}/slides_config.json", "w") as f:
+                json.dump(slides, f, indent=2)
             LogUtils.log_block_event(
                 f"  • {slide_type}: {len(slides)} slides saved to {type_dir}/"
             )
@@ -1821,11 +1644,11 @@ class BatchFigmaProcessor:
                 # Save to organized folders
                 group_dir = f"{output_base}/{group_name}"
                 os.makedirs(group_dir, exist_ok=True)
-                with open(f"{group_dir}/figma_extract.json", "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
+                with open(f"{group_dir}/figma_extract.json", "w") as f:
+                    json.dump(data, f, indent=2)
 
-                with open(f"{group_dir}/sql_config.json", "w", encoding="utf-8") as f:
-                    json.dump(sql_input, f, indent=2, ensure_ascii=False)
+                with open(f"{group_dir}/sql_config.json", "w") as f:
+                    json.dump(sql_input, f, indent=2)
                 LogUtils.log_block_event(
                     f"   {len(sql_input)} slides processed for {group_name}"
                 )
@@ -1889,7 +1712,11 @@ if __name__ == "__main__":
     parser.add_argument("--slides", type=int, nargs="*", help="Specific slide numbers")
     parser.add_argument("--block-types", nargs="*", help="Specific block types")
     parser.add_argument("--containers", nargs="*", help="Specific containers")
-    parser.add_argument("--output-dir", default="sql_output", help="Output directory")
+    parser.add_argument(
+        "--output-dir",
+        default=config.OUTPUT_CONFIG["output_dir"],
+        help="Output directory",
+    )
     parser.add_argument(
         "--batch", action="store_true", help="Enable batch processing mode"
     )
@@ -1924,8 +1751,8 @@ if __name__ == "__main__":
         if data:
             sql_input = integrator.prepare_sql_generator_input(data)
             os.makedirs(args.output_dir, exist_ok=True)
-            with open(f"{args.output_dir}/blocks_config.json", "w", encoding="utf-8") as f:
-                json.dump(sql_input, f, indent=2, ensure_ascii=False)
+            with open(f"{args.output_dir}/blocks_config.json", "w") as f:
+                json.dump(sql_input, f, indent=2)
             LogUtils.log_block_event(
                 f"Processed {len(sql_input)} slides with specified block types"
             )
@@ -1938,8 +1765,8 @@ if __name__ == "__main__":
         if data:
             sql_input = integrator.prepare_sql_generator_input(data)
             os.makedirs(args.output_dir, exist_ok=True)
-            with open(f"{args.output_dir}/containers_config.json", "w", encoding="utf-8") as f:
-                json.dump(sql_input, f, indent=2, ensure_ascii=False)
+            with open(f"{args.output_dir}/containers_config.json", "w") as f:
+                json.dump(sql_input, f, indent=2)
             LogUtils.log_block_event(
                 f"Processed {len(sql_input)} slides from specified containers"
             )

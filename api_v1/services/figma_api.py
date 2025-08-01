@@ -12,6 +12,7 @@ from api_v1.utils.filters import should_include
 from api_v1.utils.extractors import Extractor
 from api_v1.utils.builders import slide_to_dict
 from api_v1.utils.detectors import detect_slide_type, detect_block_type
+from api_v1.redis.utils import set_cached_request, get_cached_request
 
 from api_v1.constants import BLOCKS, SLIDES, CONSTANTS, TYPES
 
@@ -66,12 +67,16 @@ class FigmaAPI:
         """
         Returns JSON response from Figma by 'file_id'.
         """
+
         response = requests.get(
-            f'https://api.figma.com/v1/files/{self.file_id}',
-            headers=self.headers
+        f'https://api.figma.com/v1/files/{self.file_id}',
+        headers=self.headers
         )
         response.raise_for_status()
-        return response.json()['document'][TYPES.FK_CHILDREN]
+        response = response.json()['document'][TYPES.FK_CHILDREN]
+        set_cached_request(self.file_id, response)
+
+        return response
 
     @logs(logger, on=True)
     def fetch_comments(self) -> dict:
@@ -120,7 +125,13 @@ class FigmaAPI:
     # =========== Extract codeblocks ==============
     @logs(logger, on=True)
     def _get_slides(self) -> list[ExtractedSlide]:
-        pages = self.fetch()
+        data = get_cached_request(self.file_id)
+
+        if data:
+            pages = data
+        else:
+            pages = self.fetch()
+
         all_slides = []
         for page in pages:
             logger.info(f"\nProcessing page: {page.get(TYPES.FK_NAME, 'Unnamed')}")

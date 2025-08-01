@@ -57,6 +57,8 @@ VALID_FONT_WEIGHTS = [300, 400, 700]
  Enums for Types
 ========================
 """
+
+
 class SlideLayoutType(str, Enum):
     CLASSIC = "classic"
     MANY_TEXT = "manyText"
@@ -68,6 +70,7 @@ class SlideLayoutType(str, Enum):
     TITLE = "title"
     LAST = "last"
     OTHER = "other"
+
 
 class BlockType(str, Enum):
     TEXT = "text"
@@ -88,26 +91,30 @@ class BlockType(str, Enum):
     NUMBER = "number"
     CHART = "chart"
 
+
 """
 ========================
  TypedDicts for Structured Configs
 ========================
 """
+
+
 class PrecompiledImagesConfig(TypedDict):
     base_url: str
     default_colors: List[str]
     prefix: List[str]
+
 
 PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
     "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen",
     "default_colors": [
         "#bae4e4",  # мятно-бирюзовый
         "#c6d6f2",  # холодно-синий
-        "#dfe8f5",  # небесно-голубой
+        "#e0e8f5",  # небесно-голубой
         "#e3dcf8",  # сиреневый
         "#f0f0f0",  # светло-серый
         "#f5e7e7",  # розово-бежевый
-        "#fad2be",  # персиково-оранжевый
+        "#fce0d2",  # персиково-оранжевый
     ],
     "prefix": ["Green", "Blue", "Sky", "Purple", "Gray", "Pink", "Orange"],
 }
@@ -147,7 +154,7 @@ INSERT INTO "SlideLayout" (
     {slide_layout_number},
     true,
     '{presentation_layout_id}',
-    0,
+    {imagesCount},
     300,
     15,
     10,
@@ -421,7 +428,7 @@ INSERT INTO "SlideLayout" (
     {slide_layout_number},
     true,
     '{presentation_layout_id}',
-    0,
+    {imagesCount},
     300,
     15,
     10,
@@ -618,3 +625,9 @@ SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE = {
     "center_ring_chart": {"infographicsType": "doughnut"},
     "center_bar_chart": {"infographicsType": "bar"},
 }
+
+# Slide layout names that should have forGeneration = false
+SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE = [
+    "one_rectangle_outline_icon_card_image_right",
+    "one_rectangle_outline_icon_card_image_left",
+]
