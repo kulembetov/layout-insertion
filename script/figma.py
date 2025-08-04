@@ -72,7 +72,9 @@ class ExtractedBlock:
     is_target: bool = False
     text_content: str = None
     figure_info: Dict[str, Union[str, int, float, bool]] = field(default_factory=dict)
-    precompiled_image_info: Dict[str, Union[str, int, float, bool]] = field(default_factory=dict)
+    precompiled_image_info: Dict[str, Union[str, int, float, bool]] = field(
+        default_factory=dict
+    )
     comment: str = None
 
 
@@ -201,7 +203,7 @@ class BlockUtils:
             else (lambda k: getattr(block, k, None))
         )
         styles = get("styles") or {}
-        
+
         block_dict = {
             "id": get("id"),
             "name": get("name"),
@@ -270,6 +272,32 @@ class BlockUtils:
                 border_radius = [int(r) for r in radii]
                 has_border_radius = any(r > 0 for r in border_radius)
         return has_border_radius, border_radius
+
+    @staticmethod
+    def extract_blur_from_node(node: dict) -> int:
+        """Extract layer blur radius from a Figma node, checking nested layers. Returns 0 if no blur."""
+        # Check effects on current node
+        effects = node.get("effects")
+        if effects and isinstance(effects, list):
+            for effect in effects:
+                if (
+                    effect.get("visible", True)
+                    and effect.get("type") == "LAYER_BLUR"
+                    and "radius" in effect
+                ):
+                    radius = effect["radius"]
+                    if isinstance(radius, (int, float)) and radius > 0:
+                        return int(radius)
+
+        # Check nested children recursively
+        children = node.get("children")
+        if children and isinstance(children, list):
+            for child in children:
+                blur_radius = BlockUtils.extract_blur_from_node(child)
+                if blur_radius > 0:
+                    return blur_radius
+
+        return 0
 
     @staticmethod
     def get_node_property(node: dict, key: str, default=None):
@@ -485,16 +513,22 @@ class FigmaExtractor:
                 styles["fontSize"] = round(style["fontSize"])
             if "fontWeight" in style:
                 styles["weight"] = self.normalize_font_weight(style["fontWeight"])
+
+        # Extract blur information
+        styles["blur"] = self.extract_blur(node)
+
         return styles
 
-    def extract_opacity(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> Union[int, float]:
+    def extract_opacity(
+        self, node: Dict[str, Union[str, int, float, bool, dict, list]]
+    ) -> Union[int, float]:
         """Extract opacity from a Figma node"""
         # Check for direct opacity property
         if "opacity" in node:
             opacity = node["opacity"]
             if isinstance(opacity, (int, float)):
                 return int(opacity) if opacity == 1.0 else float(opacity)
-        
+
         # Check for opacity in fills
         fills = node.get("fills")
         if fills and isinstance(fills, list):
@@ -503,28 +537,32 @@ class FigmaExtractor:
                     opacity = fill.get("opacity", 1.0)
                     if isinstance(opacity, (int, float)):
                         return int(opacity) if opacity == 1.0 else float(opacity)
-        
+
         # Default opacity
         return 1
 
-    def extract_rotation(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> int:
+    def extract_rotation(
+        self, node: Dict[str, Union[str, int, float, bool, dict, list]]
+    ) -> int:
         """Extract rotation from a Figma node"""
         # Check for rotation property
         if "rotation" in node:
             rotation = node["rotation"]
             if isinstance(rotation, (int, float)):
                 return int(rotation)
-        
+
         # Check for rotation in absoluteTransform
         if "absoluteTransform" in node:
             transform = node["absoluteTransform"]
             if isinstance(transform, list) and len(transform) >= 2:
                 return 0
-        
+
         # Default rotation
         return 0
 
-    def extract_border_radius(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> Tuple[bool, List[int]]:
+    def extract_border_radius(
+        self, node: Dict[str, Union[str, int, float, bool, dict, list]]
+    ) -> Tuple[bool, List[int]]:
         """Extract border radius information"""
         border_radius = [0, 0, 0, 0]  # Default: all corners 0
         has_border_radius = False
@@ -545,7 +583,36 @@ class FigmaExtractor:
 
         return has_border_radius, border_radius
 
-    def is_target_frame(self, node: Dict[str, Union[str, int, float, bool, dict, list]]) -> bool:
+    def extract_blur(
+        self, node: Dict[str, Union[str, int, float, bool, dict, list]]
+    ) -> int:
+        """Extract layer blur radius from a Figma node, checking nested layers. Returns 0 if no blur."""
+        # Check effects on current node
+        effects = node.get("effects")
+        if effects and isinstance(effects, list):
+            for effect in effects:
+                if (
+                    effect.get("visible", True)
+                    and effect.get("type") == "LAYER_BLUR"
+                    and "radius" in effect
+                ):
+                    radius = effect["radius"]
+                    if isinstance(radius, (int, float)) and radius > 0:
+                        return int(radius)
+
+        # Check nested children recursively
+        children = node.get("children")
+        if children and isinstance(children, list):
+            for child in children:
+                blur_radius = self.extract_blur(child)
+                if blur_radius > 0:
+                    return blur_radius
+
+        return 0
+
+    def is_target_frame(
+        self, node: Dict[str, Union[str, int, float, bool, dict, list]]
+    ) -> bool:
         """Check if node is a target frame, now supports 'ready to dev' marker"""
         if not BlockUtils.get_node_property(node, "absoluteBoundingBox"):
             return False
@@ -667,7 +734,7 @@ class FigmaExtractor:
             top = abs_box["y"] - frame_origin["y"]
             # Extract rotation
             rotation = self.extract_rotation(node)
-            
+
             dimensions = {
                 "x": round(left),
                 "y": round(top),
@@ -698,15 +765,30 @@ class FigmaExtractor:
                         sql_type, config.Z_INDEX_DEFAULTS["default"]
                     )
                 styles["zIndex"] = z_index
-                
+
                 # Extract border radius and add to styles (always include, even if 0)
                 has_border_radius, border_radius = (
                     BlockUtils.extract_border_radius_from_node(node)
                 )
                 styles["borderRadius"] = border_radius
-                
+
                 opacity = self.extract_opacity(node)
                 styles["opacity"] = opacity
+
+                # Extract blur for non-text blocks (text blocks already have blur from extract_text_styles)
+                if sql_type not in [
+                    "text",
+                    "blockTitle",
+                    "slideTitle",
+                    "subTitle",
+                    "number",
+                    "email",
+                    "date",
+                    "name",
+                    "percentage",
+                ]:
+                    styles["blur"] = self.extract_blur(node)
+
                 text_content = None
                 if sql_type in [
                     "text",
@@ -744,8 +826,13 @@ class FigmaExtractor:
                 ):
                     blocks.append(block)
                     LogUtils.log_block_event(f"Added {sql_type} block: {name}")
+                    blur_info = (
+                        f" | Blur: {styles.get('blur', 0)}px"
+                        if styles.get("blur", 0) > 0
+                        else ""
+                    )
                     LogUtils.log_block_event(
-                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}",
+                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{blur_info}",
                         level="debug",
                     )
         if BlockUtils.get_node_property(node, "children") and not (
@@ -1097,7 +1184,9 @@ class FigmaExtractor:
                 "slides": [],
             }
 
-    def _slide_to_dict(self, slide: ExtractedSlide) -> Dict[str, Union[str, int, dict, list, bool]]:
+    def _slide_to_dict(
+        self, slide: ExtractedSlide
+    ) -> Dict[str, Union[str, int, dict, list, bool]]:
         """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs. Add slideColors extraction."""
         # Find the text block with the longest text_content
         max_text_block = None
@@ -1153,7 +1242,9 @@ class FigmaExtractor:
         # Now just call build_block_dict for all block dict construction
         return BlockUtils.build_block_dict(block, slide_config)
 
-    def save_results(self, data: Dict[str, Union[str, dict, list, int]], output_file: str | None) -> str:
+    def save_results(
+        self, data: Dict[str, Union[str, dict, list, int]], output_file: str | None
+    ) -> str:
         """Save extracted data to file"""
         if not data:
             return ""
@@ -1193,7 +1284,9 @@ class FigmaToSQLIntegrator:
         self.figma_file_id = figma_file_id
         self.figma_token = figma_token
 
-    def extract_specific_slides(self, slide_numbers: List[int]) -> Dict[str, Union[str, dict, list, int]]:
+    def extract_specific_slides(
+        self, slide_numbers: List[int]
+    ) -> Dict[str, Union[str, dict, list, int]]:
         """Extract specific slides from Figma"""
         filter_config = FilterConfig(
             mode=FilterMode.SPECIFIC_SLIDES,
@@ -1205,7 +1298,9 @@ class FigmaToSQLIntegrator:
 
         return extractor.extract_data()
 
-    def extract_by_block_types(self, block_types: List[str]) -> Dict[str, Union[str, dict, list, int]]:
+    def extract_by_block_types(
+        self, block_types: List[str]
+    ) -> Dict[str, Union[str, dict, list, int]]:
         """Extract slides containing specific block types"""
         filter_config = FilterConfig(
             mode=FilterMode.SPECIFIC_BLOCKS, target_block_types=block_types
@@ -1215,7 +1310,9 @@ class FigmaToSQLIntegrator:
 
         return extractor.extract_data()
 
-    def extract_by_containers(self, container_names: List[str]) -> Dict[str, Union[str, dict, list, int]]:
+    def extract_by_containers(
+        self, container_names: List[str]
+    ) -> Dict[str, Union[str, dict, list, int]]:
         """Extract slides from specific containers"""
         filter_config = FilterConfig(
             mode=FilterMode.BY_TYPE, target_containers=container_names
@@ -1383,7 +1480,11 @@ class FigmaToSQLIntegrator:
         # Generate instructions for SQL Generator
         self._generate_sql_instructions(sql_input, output_dir)
 
-    def _generate_sql_files(self, sql_input: List[Dict[str, Union[str, int, dict, list, bool]]], output_dir: str):
+    def _generate_sql_files(
+        self,
+        sql_input: List[Dict[str, Union[str, int, dict, list, bool]]],
+        output_dir: str,
+    ):
         """Generate individual SQL files for each slide"""
         sql_dir = f"{output_dir}/sql_files"
         os.makedirs(sql_dir, exist_ok=True)
@@ -1397,7 +1498,9 @@ class FigmaToSQLIntegrator:
 
             LogUtils.log_block_event(f"   Generated SQL: {filename}")
 
-    def _create_sql_for_slide(self, slide: Dict[str, Union[str, int, dict, list, bool]]) -> str:
+    def _create_sql_for_slide(
+        self, slide: Dict[str, Union[str, int, dict, list, bool]]
+    ) -> str:
         """Create SQL content for a single slide using config templates"""
         lines = []
         lines.append(
@@ -1434,6 +1537,10 @@ class FigmaToSQLIntegrator:
             lines.append(f"--   Styles: {block['styles']}")
             if block.get("border_radius"):
                 lines.append(f"--   Border Radius: {block['border_radius']}")
+            # Add blur information if present
+            blur_radius = block["styles"].get("blur", 0)
+            if blur_radius > 0:
+                lines.append(f"--   Blur: {blur_radius}px")
             lines.append("")
 
         lines.append(
@@ -1443,7 +1550,9 @@ class FigmaToSQLIntegrator:
         return "\n".join(lines)
 
     def _generate_sql_instructions(
-        self, sql_input: List[Dict[str, Union[str, int, dict, list, bool]]], output_dir: str
+        self,
+        sql_input: List[Dict[str, Union[str, int, dict, list, bool]]],
+        output_dir: str,
     ):
         """Generate comprehensive instructions for using with SQL Generator"""
         instructions = []
@@ -1517,6 +1626,11 @@ class FigmaToSQLIntegrator:
                     instructions.append(
                         f"     - Border Radius: {block['border_radius']}"
                     )
+
+                # Add blur information if present
+                blur_radius = block["styles"].get("blur", 0)
+                if blur_radius > 0:
+                    instructions.append(f"     - Blur: {blur_radius}px")
                 instructions.append("")
 
             instructions.append("")
@@ -1591,7 +1705,7 @@ def example_usage():
         # Show configuration details
         for slide in sql_input:
             LogUtils.log_block_event(
-                f"  • Slide {slide['slide_layout_number']}: {slide['slide_layout_name']}"
+                f"  Slide {slide['slide_layout_number']}: {slide['slide_layout_name']}"
             )
             LogUtils.log_block_event(
                 f"    Type: {slide['slide_type']}, Blocks: {len(slide['blocks'])}"
@@ -1692,7 +1806,9 @@ class BatchFigmaProcessor:
 
         return results
 
-    def validate_font_weights_across_presentation(self, file_id: str) -> Dict[str, Union[str, int, list, dict]]:
+    def validate_font_weights_across_presentation(
+        self, file_id: str
+    ) -> Dict[str, Union[str, int, list, dict]]:
         """Extract all slides and validate font weight compliance"""
         integrator = FigmaToSQLIntegrator(file_id, self.figma_token)
         all_data = integrator.extract_specific_slides(list(range(1, 15)) + [-1])
