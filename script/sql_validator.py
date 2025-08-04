@@ -1,18 +1,17 @@
 import os
 import sys
 import time
-from typing import List, Dict, Tuple
 
 
 class SQLValidator:
     """SQL file validator that checks for syntax issues."""
 
-    def __init__(self, directory: str, output_file: str = None, verbose: bool = False):
+    def __init__(self, directory: str, output_file: str | None = None, verbose: bool = False):
         self.directory = directory
         self.output_file = output_file
         self.verbose = verbose
 
-    def find_sql_files(self) -> List[str]:
+    def find_sql_files(self) -> list[str]:
         """Recursively find all SQL files in the given directory and subdirectories."""
         sql_files = []
         for root, _, files in os.walk(self.directory):
@@ -21,12 +20,12 @@ class SQLValidator:
                     sql_files.append(os.path.join(root, file))
         return sql_files
 
-    def check_sql_file(self, file_path: str) -> Dict:
+    def check_sql_file(self, file_path: str) -> dict[str, str | bool | list]:
         """Check a SQL file for trailing commas that cause syntax errors."""
-        issues = {"file_path": file_path, "has_issues": False, "issues": []}
+        issues: dict[str, str | bool | list] = {"file_path": file_path, "has_issues": False, "issues": []}
 
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 content = f.read()
 
             # Check for trailing commas line by line
@@ -36,28 +35,32 @@ class SQLValidator:
                     next_line_index = i + 1
                     if next_line_index < len(content.split("\n")):
                         next_line = content.split("\n")[next_line_index]
-                        if "RETURNING" in next_line or next_line.strip().startswith(
-                            ")"
-                        ):
-                            issues["issues"].append(
-                                {
-                                    "line": i + 1,
-                                    "content": line.strip(),
-                                    "message": "Trailing comma at the end of a statement",
-                                }
-                            )
+                        if "RETURNING" in next_line or next_line.strip().startswith(")"):
+                            issues_list = issues.get("issues", [])
+                            if isinstance(issues_list, list):
+                                issues_list.append(
+                                    {
+                                        "line": i + 1,
+                                        "content": line.strip(),
+                                        "message": "Trailing comma at the end of a statement",
+                                    }
+                                )
+                                issues["issues"] = issues_list
 
                 # Check for comma at end of VALUES list before RETURNING
                 if line.rstrip().endswith(",") and i + 1 < len(content.split("\n")):
                     next_line = content.split("\n")[i + 1]
                     if next_line.strip().startswith(")") and "RETURNING" in next_line:
-                        issues["issues"].append(
-                            {
-                                "line": i + 1,
-                                "content": line.strip(),
-                                "message": "Trailing comma at the end of VALUES list",
-                            }
-                        )
+                        issues_list = issues.get("issues", [])
+                        if isinstance(issues_list, list):
+                            issues_list.append(
+                                {
+                                    "line": i + 1,
+                                    "content": line.strip(),
+                                    "message": "Trailing comma at the end of VALUES list",
+                                }
+                            )
+                            issues["issues"] = issues_list
 
             # Set overall issue flag
             issues["has_issues"] = bool(issues["issues"])
@@ -107,27 +110,23 @@ class SQLValidator:
 
         # Summary
         if files_with_issues > 0:
-            print(
-                f"\nFound issues in {files_with_issues} out of {len(sql_files)} files"
-            )
+            print(f"\nFound issues in {files_with_issues} out of {len(sql_files)} files")
         else:
             print(f"\nNo issues found in any of the {len(sql_files)} SQL files")
 
         # Write to output file if specified
-        if self.output_file and files_with_issues > 0:
+        if self.output_file is not None and files_with_issues > 0:
             self._write_report(results, files_with_issues, len(sql_files))
 
-    def _write_report(
-        self, results: List[Dict], files_with_issues: int, total_files: int
-    ):
+    def _write_report(self, results: list[dict], files_with_issues: int, total_files: int):
         """Write validation results to the output file."""
+        if self.output_file is None:
+            return
         with open(self.output_file, "w", encoding="utf-8") as f:
             f.write("SQL Validation Results\n")
             f.write("====================\n\n")
 
-            f.write(
-                f"Checked {total_files} SQL files. Found issues in {files_with_issues} files.\n\n"
-            )
+            f.write(f"Checked {total_files} SQL files. Found issues in {files_with_issues} files.\n\n")
 
             for result in results:
                 if result["has_issues"]:

@@ -1,6 +1,6 @@
+import argparse
 import os
 import re
-import argparse
 import shutil
 
 # Table deletion order: child to parent
@@ -39,9 +39,7 @@ KEY_COLUMNS = {
 
 
 def extract_slide_layout_ids(sql):
-    m = re.search(
-        r"INSERT INTO \"SlideLayout\".*?VALUES\s*\(\s*'([^']+)'", sql, re.DOTALL
-    )
+    m = re.search(r"INSERT INTO \"SlideLayout\".*?VALUES\s*\(\s*'([^']+)'", sql, re.DOTALL)
     return [m.group(1)] if m else []
 
 
@@ -64,9 +62,7 @@ def extract_block_layout_styles_ids(sql):
 
 
 def extract_block_layout_dimensions_ids(sql):
-    m = re.search(
-        r"INSERT INTO \"BlockLayoutDimensions\".*?VALUES(.*?);", sql, re.DOTALL
-    )
+    m = re.search(r"INSERT INTO \"BlockLayoutDimensions\".*?VALUES(.*?);", sql, re.DOTALL)
     if not m:
         return []
     values = m.group(1)
@@ -101,9 +97,7 @@ def extract_precompiled_image_ids(sql):
 
 
 def extract_block_layout_index_config_ids(sql):
-    m = re.search(
-        r"INSERT INTO \"BlockLayoutIndexConfig\".*?VALUES(.*?);", sql, re.DOTALL
-    )
+    m = re.search(r"INSERT INTO \"BlockLayoutIndexConfig\".*?VALUES(.*?);", sql, re.DOTALL)
     if not m:
         return []
     values = m.group(1)
@@ -111,9 +105,7 @@ def extract_block_layout_index_config_ids(sql):
 
 
 def extract_slide_layout_index_config_ids(sql):
-    m = re.search(
-        r"INSERT INTO \"SlideLayoutIndexConfig\".*?VALUES(.*?);", sql, re.DOTALL
-    )
+    m = re.search(r"INSERT INTO \"SlideLayoutIndexConfig\".*?VALUES(.*?);", sql, re.DOTALL)
     if not m:
         return []
     values = m.group(1)
@@ -121,9 +113,7 @@ def extract_slide_layout_index_config_ids(sql):
 
 
 def extract_slide_layout_styles_ids(sql):
-    m = re.search(
-        r"INSERT INTO \"SlideLayoutStyles\".*?VALUES\s*\(\s*'([^']+)'", sql, re.DOTALL
-    )
+    m = re.search(r"INSERT INTO \"SlideLayoutStyles\".*?VALUES\s*\(\s*'([^']+)'", sql, re.DOTALL)
     return [m.group(1)] if m else []
 
 
@@ -162,9 +152,7 @@ EXTRACTORS = {
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate SQL delete scripts for all slide groups in my_sql_output/. Traverses all subfolders and processes each slide_insertion folder."
-    )
+    parser = argparse.ArgumentParser(description="Generate SQL delete scripts for all slide groups in my_sql_output/. Traverses all subfolders and processes each slide_insertion folder.")
     parser.add_argument(
         "--root-dir",
         type=str,
@@ -208,9 +196,7 @@ def main():
         os.makedirs(slide_deletion_dir, exist_ok=True)
         # If slide_insertion_dir does not exist, skip this group
         if not os.path.isdir(slide_insertion_dir):
-            print(
-                f"  Warning: {slide_insertion_dir} does not exist, skipping group {group}."
-            )
+            print(f"  Warning: {slide_insertion_dir} does not exist, skipping group {group}.")
             continue
 
         print(f"Processing group: {group}")
@@ -223,14 +209,14 @@ def main():
             ids = {table: EXTRACTORS[table](sql) for table in DELETE_ORDER}
             out_path = os.path.join(slide_deletion_dir, fname)
             with open(out_path, "w", encoding="utf-8") as out:
-                out.write("-- Generated delete statements for {}\n\n".format(fname))
+                out.write(f"-- Generated delete statements for {fname}\n\n")
                 for table in DELETE_ORDER:
                     key_col = KEY_COLUMNS[table]
                     id_list = ids[table]
                     if id_list:
                         id_str = ", ".join(f"'{id_}'" for id_ in id_list)
-                        out.write(f"-- Delete from {table}\n")
-                        out.write(f'DELETE FROM "{table}" WHERE "{key_col}" IN ({id_str});\n')
+                        out.write(f"-- Delete from {table}\n")  # nosec
+                        out.write(f'DELETE FROM "{table}" WHERE "{key_col}" IN ({id_str});\n')  # nosec
                 out.write("\n")
         print(f"  Completed group: {group}")
 

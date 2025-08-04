@@ -36,6 +36,7 @@ openpyxl==3.1.5
 packaging==25.0
 pandas==2.3.1
 pathlib==1.0.1
+pre-commit==4.5.0
 propcache==0.3.2
 proto-plus==1.26.1
 protobuf==6.31.1

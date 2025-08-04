@@ -1,16 +1,18 @@
 import argparse
 import configparser
+import csv
 import json
 import os
 import sys
-import uuid_utils as uuid
-import csv
 from collections import defaultdict
+
+import uuid_utils as uuid
 
 try:
     import psycopg2
 except ImportError:
     psycopg2 = None
+
 
 # --- DB config parser ---
 def parse_db_config(ini_path):
@@ -68,6 +70,7 @@ FONT_MAPPING = {
     "sbermarketing": "sbermarketing",
 }
 
+
 def generate_uuid() -> str:
     """Generate a UUID7 string for database use."""
     return str(uuid.uuid7())
@@ -80,7 +83,7 @@ def normalize_font(font_name: str) -> str:
 
 # --- Main logic ---
 def collect_block_type_colors_fonts(json_path):
-    with open(json_path, "r", encoding="utf-8") as f:
+    with open(json_path, encoding="utf-8") as f:
         slides = json.load(f)
     block_type_to_colors = defaultdict(set)
     block_type_to_fonts = defaultdict(set)
@@ -97,7 +100,7 @@ def collect_block_type_colors_fonts(json_path):
 
 
 def create_palette_configs(json_path):
-    with open(json_path, "r", encoding="utf-8") as f:
+    with open(json_path, encoding="utf-8") as f:
         slides = json.load(f)
     slide = slides[0]
     palette_colors = slide.get("presentationPaletteColors", [])
@@ -131,9 +134,7 @@ def create_palette_configs(json_path):
                         fonts.add(normalize_font(obj.get("fontFamily", "roboto")))
                     # Use the color array from the first occurrence
                     if color_array is None:
-                        color_array = [
-                            obj.get("color", "#ffffff").lower() for obj in color_objs
-                        ]
+                        color_array = [obj.get("color", "#ffffff").lower() for obj in color_objs]
             config[block_type] = color_array if color_array else ["#ffffff"]
         config["font"] = sorted(list(fonts))
         configs.append(config)
@@ -204,7 +205,7 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
             # Check if a similar config already exists
             cur.execute(
                 """
-                SELECT id FROM "BlockLayoutConfig" 
+                SELECT id FROM "BlockLayoutConfig"
                 WHERE "text" = %s AND "slideTitle" = %s AND "blockTitle" = %s AND "font" = %s::"FontFamilyType"[]
                 LIMIT 1
             """,
@@ -333,7 +334,7 @@ def insert_block_layout_config_manual(json_path, csv_path):
     {format_array(config['logo'])},
     {format_array(config['font'])}
 );
-"""
+"""  # nosec
         print(f"[MANUAL] {sql}")
         mapping.append(
             {
@@ -380,12 +381,8 @@ def insert_block_layout_config_manual(json_path, csv_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Insert BlockLayoutConfig records from sql_generator_input.json"
-    )
-    parser.add_argument(
-        "--json", required=True, help="Path to sql_generator_input.json"
-    )
+    parser = argparse.ArgumentParser(description="Insert BlockLayoutConfig records from sql_generator_input.json")
+    parser.add_argument("--json", required=True, help="Path to sql_generator_input.json")
     parser.add_argument(
         "--mode",
         choices=["auto", "manual"],
@@ -404,9 +401,7 @@ def main():
         print(f"Error: JSON file not found: {args.json}")
         sys.exit(1)
 
-    block_type_to_colors, block_type_to_fonts = collect_block_type_colors_fonts(
-        args.json
-    )
+    block_type_to_colors, block_type_to_fonts = collect_block_type_colors_fonts(args.json)
 
     if not block_type_to_colors:
         print("Error: No slideConfig data found in JSON")
@@ -414,9 +409,7 @@ def main():
 
     print(f"Found {len(block_type_to_colors)} block types:")
     for bt in sorted(block_type_to_colors.keys()):
-        print(
-            f"  {bt}: {len(block_type_to_colors[bt])} colors, {len(block_type_to_fonts[bt])} fonts"
-        )
+        print(f"  {bt}: {len(block_type_to_colors[bt])} colors, {len(block_type_to_fonts[bt])} fonts")
 
     if args.mode == "auto":
         db_config = parse_db_config(args.db)

@@ -1,17 +1,16 @@
+import argparse
 import os
 import sys
-import psycopg2
-import argparse
 from configparser import ConfigParser
+
+import psycopg2
 
 
 class ConfigManager:
     """Manages database configuration loading and creation."""
 
     def __init__(self, filename="database.ini", section="postgresql"):
-        self.filename = (
-            filename if os.path.isabs(filename) else os.path.abspath(filename)
-        )
+        self.filename = filename if os.path.isabs(filename) else os.path.abspath(filename)
         self.section = section
         print(f"Looking for config file at: {self.filename}")
 
@@ -29,9 +28,7 @@ class ConfigManager:
         if parser.has_section(self.section):
             return {param[0]: param[1] for param in parser.items(self.section)}
         else:
-            raise Exception(
-                f"Section {self.section} not found in the {self.filename} file."
-            )
+            raise Exception(f"Section {self.section} not found in the {self.filename} file.")
 
     def create_sample_config(self):
         """Create a sample config file for the user."""
@@ -46,9 +43,7 @@ port=5432
 """
             )
         print(f"A sample configuration file '{self.filename}' has been created.")
-        print(
-            "Please update it with your database connection details and run the script again."
-        )
+        print("Please update it with your database connection details and run the script again.")
 
 
 class DatabaseManager:
@@ -109,9 +104,7 @@ class SQLExecutor:
         if not os.path.isdir(self.sql_dir):
             print(f"Error: Directory '{self.sql_dir}' not found.")
             os.makedirs(self.sql_dir)
-            print(
-                f"Created empty directory '{self.sql_dir}'. Please add SQL files and run again."
-            )
+            print(f"Created empty directory '{self.sql_dir}'. Please add SQL files and run again.")
             return []
 
         # List all files in the directory for debugging
@@ -208,7 +201,7 @@ class SQLExecutor:
         for file_path in sql_files:
             print(f"\nExecuting {os.path.basename(file_path)}:")
             try:
-                with open(file_path, "r", encoding="utf-8") as file:
+                with open(file_path, encoding="utf-8") as file:
                     sql_content = file.read()
                     commands = self.db_manager.extract_sql_statements(sql_content)
 
@@ -230,9 +223,7 @@ class SQLExecutor:
                 print(f"  Failed to open or process file: {e}")
 
         print("\n" + "=" * 50)
-        print(
-            f"Execution summary: {successful_files}/{total_files} files executed successfully."
-        )
+        print(f"Execution summary: {successful_files}/{total_files} files executed successfully.")
         print("=" * 50)
 
         cursor.close()
@@ -240,9 +231,7 @@ class SQLExecutor:
 
 def main():
     """Main function to run the script."""
-    parser = argparse.ArgumentParser(
-        description="Execute SQL files from a directory against a PostgreSQL database."
-    )
+    parser = argparse.ArgumentParser(description="Execute SQL files from a directory against a PostgreSQL database.")
     parser.add_argument(
         "--input-dir",
         type=str,

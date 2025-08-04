@@ -56,8 +56,17 @@ Thumbs.db
 .venv
 
 # Other
-/my_output/
-/my_sql_output/
-/logs/
+script/issue_reports/
+script/my_output/
+script/my_sql_output/
+script/my_sql_output_old/
+script/logs/
 output.json
-/tg/logs/
+script/tg/logs/
+script/slide_deletion/
+script/final
+script/figures
+database.ini
+
+# Security reports
+bandit-report.json

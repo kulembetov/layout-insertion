@@ -13,15 +13,208 @@ This repository is organized to support a full workflow from Figma design extrac
 - `database.ini`: Stores database connection parameters for PostgreSQL.
 - `schema.prisma`: Prisma schema file for Node.js backend integration.
 - `requirements.txt`: Lists all Python dependencies including `uuid_utils` for UUID7 generation.
+- `.pre-commit-config.yaml`: Pre-commit hooks configuration for automated code quality checks.
 - `my_output/`, `my_sql_output/`: Output directories for extracted JSON and generated SQL files, respectively.
 - `slide_deletion/`: Contains SQL files and scripts for deleting slides/blocks, organized by layout type (e.g., 1cols, 2cols, etc.).
+
+---
+
+# Pre-commit Configuration
+
+## Overview
+This project uses pre-commit hooks to ensure code quality and consistency. The `.pre-commit-config.yaml` file configures automated checks that run every time before a commit is made, helping to catch issues early and maintain high code standards.
+
+## What is Pre-commit?
+Pre-commit is a framework for managing and maintaining pre-commit hooks. It automatically runs various code quality tools before each commit, ensuring that all code meets the project's standards before it's submitted for review.
+
+## Configuration File: `.pre-commit-config.yaml`
+
+The pre-commit configuration includes the following hooks:
+
+### Code Formatting & Style
+- **Black**: Uncompromising Python code formatter that automatically formats code to PEP 8 standards
+- **isort**: Automatically sorts and organizes Python imports alphabetically and by type
+- **autoflake**: Removes unused imports and variables from Python code
+
+### Code Quality & Linting
+- **flake8**: Python linter that checks for style guide enforcement, programming errors, and complexity
+- **mypy**: Static type checker for Python that ensures type safety and catches type-related errors
+
+### Code Modernization
+- **pyupgrade**: Automatically upgrades Python syntax to use newer language features
+
+### Security & Best Practices
+- **bandit**: Security linter that identifies common security issues in Python code
+- **check-docstring-first**: Ensures docstrings are placed correctly in files
+- **check-yaml**: Validates YAML file syntax
+- **end-of-file-fixer**: Ensures files end with a newline
+- **trailing-whitespace**: Removes trailing whitespace from files
+
+## Installation & Setup
+
+### 1. Install pre-commit
+```bash
+pip install pre-commit
+```
+
+### 2. Install the git hook scripts
+```bash
+pre-commit install
+```
+
+### 3. (Optional) Run against all files
+```bash
+pre-commit run --all-files
+```
+
+## How It Works
+
+1. **Automatic Execution**: Pre-commit hooks run automatically every time you make a commit
+2. **File Filtering**: Hooks only run on files that match their patterns (e.g., Python files for Black, mypy)
+3. **Fail-Safe**: If any hook fails, the commit is blocked until issues are resolved
+4. **Auto-Fix**: Many hooks automatically fix issues (like Black formatting) and stage the changes
+
+## Manual Execution
+
+You can run hooks manually on specific files or all files:
+
+```bash
+# Run all hooks on all files
+pre-commit run --all-files
+
+# Run a specific hook
+pre-commit run black --all-files
+pre-commit run mypy --all-files
+
+# Run on specific files
+pre-commit run --files script/figma.py script/slide_insertion.py
+```
+
+## Configuration Details
+
+### Line Length
+- **Black & isort**: Configured for 350 characters to accommodate long lines in this project
+- **flake8**: Set to ignore E203 (whitespace before ':') and allow 350 character lines
+
+### Type Checking
+- **mypy**: Configured with strict type checking to ensure robust type safety
+- **No implicit Optional**: Enforces explicit Optional types for better code clarity
+
+### Security Scanning
+- **bandit**: Outputs results to `bandit-report.json` for detailed security analysis
+- **Excludes**: Ignores test files and generated files
+
+## Benefits
+
+- **Consistent Code Style**: All code follows the same formatting standards
+- **Early Error Detection**: Catches issues before they reach code review
+- **Type Safety**: Ensures robust type annotations throughout the codebase
+- **Security**: Identifies potential security vulnerabilities
+- **Modern Code**: Automatically upgrades to newer Python syntax
+- **Quality Assurance**: Maintains high code quality standards
+
+---
+
+# Конфигурация Pre-commit
+
+## Обзор
+Этот проект использует pre-commit хуки для обеспечения качества и согласованности кода. Файл `.pre-commit-config.yaml` настраивает автоматические проверки, которые запускаются каждый раз перед коммитом, помогая выявлять проблемы на ранней стадии и поддерживать высокие стандарты кода.
+
+## Что такое Pre-commit?
+Pre-commit - это фреймворк для управления и поддержки pre-commit хуков. Он автоматически запускает различные инструменты качества кода перед каждым коммитом, обеспечивая соответствие всего кода стандартам проекта перед отправкой на ревью.
+
+## Файл конфигурации: `.pre-commit-config.yaml`
+
+Конфигурация pre-commit включает следующие хуки:
+
+### Форматирование и стиль кода
+- **Black**: Бескомпромиссный форматтер Python кода, который автоматически форматирует код по стандартам PEP 8
+- **isort**: Автоматически сортирует и организует импорты Python по алфавиту и типу
+- **autoflake**: Удаляет неиспользуемые импорты и переменные из Python кода
+
+### Качество и линтинг кода
+- **flake8**: Python линтер, который проверяет соблюдение руководства по стилю, ошибки программирования и сложность
+- **mypy**: Статический проверщик типов для Python, который обеспечивает безопасность типов и выявляет ошибки, связанные с типами
+
+### Модернизация кода
+- **pyupgrade**: Автоматически обновляет синтаксис Python для использования более новых языковых возможностей
+
+### Безопасность и лучшие практики
+- **bandit**: Линтер безопасности, который выявляет общие проблемы безопасности в Python коде
+- **check-docstring-first**: Обеспечивает правильное размещение docstring в файлах
+- **check-yaml**: Проверяет синтаксис YAML файлов
+- **end-of-file-fixer**: Обеспечивает завершение файлов новой строкой
+- **trailing-whitespace**: Удаляет завершающие пробелы из файлов
+
+## Установка и настройка
+
+### 1. Установите pre-commit
+```bash
+pip install pre-commit
+```
+
+### 2. Установите git hook скрипты
+```bash
+pre-commit install
+```
+
+### 3. (Опционально) Запустите для всех файлов
+```bash
+pre-commit run --all-files
+```
+
+## Как это работает
+
+1. **Автоматическое выполнение**: Pre-commit хуки запускаются автоматически каждый раз при создании коммита
+2. **Фильтрация файлов**: Хуки запускаются только для файлов, соответствующих их паттернам (например, Python файлы для Black, mypy)
+3. **Безопасность**: Если любой хук не проходит, коммит блокируется до разрешения проблем
+4. **Автоисправление**: Многие хуки автоматически исправляют проблемы (например, форматирование Black) и добавляют изменения в staging
+
+## Ручное выполнение
+
+Вы можете запускать хуки вручную для конкретных файлов или всех файлов:
+
+```bash
+# Запустить все хуки для всех файлов
+pre-commit run --all-files
+
+# Запустить конкретный хук
+pre-commit run black --all-files
+pre-commit run mypy --all-files
+
+# Запустить для конкретных файлов
+pre-commit run --files script/figma.py script/slide_insertion.py
+```
+
+## Детали конфигурации
+
+### Длина строки
+- **Black & isort**: Настроены на 350 символов для размещения длинных строк в этом проекте
+- **flake8**: Настроен игнорировать E203 (пробелы перед ':') и разрешать строки в 350 символов
+
+### Проверка типов
+- **mypy**: Настроен со строгой проверкой типов для обеспечения надежной безопасности типов
+- **No implicit Optional**: Принуждает явные Optional типы для лучшей ясности кода
+
+### Сканирование безопасности
+- **bandit**: Выводит результаты в `bandit-report.json` для детального анализа безопасности
+- **Исключения**: Игнорирует тестовые файлы и сгенерированные файлы
+
+## Преимущества
+
+- **Согласованный стиль кода**: Весь код следует одинаковым стандартам форматирования
+- **Раннее выявление ошибок**: Выявляет проблемы до того, как они попадут на ревью кода
+- **Безопасность типов**: Обеспечивает надежные аннотации типов во всей кодовой базе
+- **Безопасность**: Выявляет потенциальные уязвимости безопасности
+- **Современный код**: Автоматически обновляет до более нового синтаксиса Python
+- **Обеспечение качества**: Поддерживает высокие стандарты качества кода
 
 ---
 
 # Figma to SQL Generator Workflow (Internal Tool)
 
 ## Overview
-This internal tool automates the process of extracting design and content data from Figma and generating SQL files to populate your company's presentation database.  
+This internal tool automates the process of extracting design and content data from Figma and generating SQL files to populate your company's presentation database.
 It ensures that all slide layouts, blocks, styles, and related assets are consistently and safely transferred from design to production.
 
 ---
@@ -123,7 +316,7 @@ python account_creation.py
 **macOS:**
 ```bash
 # 1. Extract from Figma
-python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
 
 # 2. Insert into PresentationPalette
 # manual mode
@@ -172,7 +365,7 @@ python3 account_creation.py
 
 ### `figma.py`
 - **Purpose:** Extracts and normalizes design data from Figma files for SQL generation
-- **Functionality:** 
+- **Functionality:**
   - Connects to Figma API using authentication tokens
   - Extracts slides, blocks, styles, and metadata from Figma designs
   - Normalizes block types, colors, fonts, and dimensions
@@ -180,7 +373,7 @@ python3 account_creation.py
   - Processes comments and text content from Figma nodes
   - Validates font weights against allowed values (300, 400, 700)
   - Generates two output files: raw extraction and SQL-ready data
-- **Configuration:** 
+- **Configuration:**
   - Requires `config.py` with Figma API credentials and mappings
   - Uses environment variables for FIGMA_FILE_ID and FIGMA_TOKEN
   - Supports filtering by slide numbers, block types, or containers
@@ -189,7 +382,7 @@ python3 account_creation.py
 
 ### `slide_insertion.py`
 - **Purpose:** Generates SQL files from normalized Figma data for database population
-- **Functionality:** 
+- **Functionality:**
   - Reads normalized JSON from figma.py output
   - Generates INSERT statements for all database tables
   - Handles slide layouts, blocks, styles, dimensions, and figures
@@ -197,7 +390,7 @@ python3 account_creation.py
   - Creates SQL files organized by slide layout type
   - Validates data against config.py constraints
   - Generates comprehensive SQL instructions and documentation
-- **Configuration:** 
+- **Configuration:**
   - Uses `config.py` for all default values and mappings
   - Requires `database.ini` for database connection parameters
   - Supports custom output directories and file naming
@@ -206,14 +399,14 @@ python3 account_creation.py
 
 ### `sql_validator.py`
 - **Purpose:** Validates generated SQL files for syntax and referential integrity
-- **Functionality:** 
+- **Functionality:**
   - Checks SQL syntax for all generated files
   - Validates foreign key relationships between tables
   - Ensures required fields are present and properly formatted
   - Verifies UUID formats and data type consistency
   - Generates detailed validation reports with error locations
   - Supports batch validation of entire SQL directories
-- **Configuration:** 
+- **Configuration:**
   - Reads `database.ini` for connection parameters
   - Uses config.py for validation rules and constraints
   - Supports custom validation rules and error reporting
@@ -222,14 +415,14 @@ python3 account_creation.py
 
 ### `sql_pollution.py`
 - **Purpose:** Executes validated SQL files against PostgreSQL database
-- **Functionality:** 
+- **Functionality:**
   - Connects to PostgreSQL database using connection parameters
   - Executes SQL files in correct order to maintain referential integrity
   - Handles transaction management and rollback on errors
   - Supports batch execution of multiple SQL files
   - Provides detailed execution logs and error reporting
   - Ensures data consistency across all database tables
-- **Configuration:** 
+- **Configuration:**
   - Requires `database.ini` with PostgreSQL connection details
   - Uses config.py for execution order and table dependencies
   - Supports custom execution parameters and error handling
@@ -238,14 +431,14 @@ python3 account_creation.py
 
 ### `slide_deletion.py`
 - **Purpose:** Handles deletion of slides, blocks, and images from database
-- **Functionality:** 
+- **Functionality:**
   - Deletes slides and associated blocks by slide number
   - Removes specific block types across multiple slides
   - Handles cascading deletes for related data (figures, images, styles)
   - Supports selective deletion based on slide layout types
   - Generates deletion SQL files for review before execution
   - Provides safe deletion with confirmation prompts
-- **Configuration:** 
+- **Configuration:**
   - Uses `database.ini` for database connection
   - Supports custom deletion patterns and filters
   - Generates organized deletion SQL files by layout type
@@ -254,14 +447,14 @@ python3 account_creation.py
 
 ### `insert_palette.py`
 - **Purpose:** Manages presentation palette configuration and color settings
-- **Functionality:** 
+- **Functionality:**
   - Inserts color palette data into PresentationPalette table
   - Supports manual and automatic mode for data insertion
   - Handles CSV mapping files for palette configuration
   - Validates color values and palette relationships
   - Generates palette SQL files for database insertion
   - Manages color settings IDs and default configurations
-- **Configuration:** 
+- **Configuration:**
   - Requires CSV mapping file for palette data
   - Uses `database.ini` for automatic mode database connection
   - Supports custom palette configurations and color schemes
@@ -270,14 +463,14 @@ python3 account_creation.py
 
 ### `insert_block_layout_config.py`
 - **Purpose:** Manages block layout configuration and styling settings
-- **Functionality:** 
+- **Functionality:**
   - Inserts block layout configuration data into database
   - Handles block type mappings and default styles
   - Supports manual and automatic configuration modes
   - Validates block layout relationships and constraints
   - Generates configuration SQL files for database insertion
   - Manages block layout IDs and style inheritance
-- **Configuration:** 
+- **Configuration:**
   - Uses JSON input from figma.py extraction
   - Requires `database.ini` for automatic mode
   - Supports custom block layout configurations
@@ -286,14 +479,14 @@ python3 account_creation.py
 
 ### `match_block_layout_presentation_palette.py`
 - **Purpose:** Matches block layout configurations with presentation palettes
-- **Functionality:** 
+- **Functionality:**
   - Creates relationships between block layouts and color palettes
   - Handles palette-block matching based on configuration rules
   - Generates matching SQL files for database insertion
   - Validates palette-block relationships and constraints
   - Supports custom matching rules and configurations
   - Manages palette-block index configurations
-- **Configuration:** 
+- **Configuration:**
   - Uses existing block layout and palette data from database
   - Requires `database.ini` for database connection
   - Supports custom matching algorithms and rules
@@ -302,7 +495,7 @@ python3 account_creation.py
 
 ### `account_creation.py`
 - **Purpose:** Creates complete user accounts with authentication, subscriptions, payments, and AB testing groups
-- **Functionality:** 
+- **Functionality:**
   - Creates user accounts with role-based access control (ADMIN, USER, MIIN, etc.)
   - Supports multiple authentication providers (local, Google, Yandex, VKontakte, Telegram)
   - Generates secure password hashes using scrypt algorithm (compatible with Node.js)
@@ -311,7 +504,7 @@ python3 account_creation.py
   - Creates AB testing group assignments for user segmentation
   - Supports both automatic (direct DB) and manual (SQL generation) modes
   - Generates UUID7 time-ordered identifiers for better database performance
-- **Configuration:** 
+- **Configuration:**
   - Requires `database.ini` with PostgreSQL connection parameters
   - Uses Prisma schema for table structure validation
   - Supports custom subscription plans and payment statuses
@@ -320,7 +513,7 @@ python3 account_creation.py
 
 ### `migrate_images.py`
 - **Purpose:** Migrates images from Google Drive to Yandex Cloud Object Storage
-- **Functionality:** 
+- **Functionality:**
   - Downloads images from a specified Google Drive folder
   - Uploads them to Yandex Cloud S3-compatible storage
   - Supports various image formats (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
@@ -329,7 +522,7 @@ python3 account_creation.py
   - Preserves folder structure from Google Drive in Yandex Cloud
   - Recursively processes subfolders and their contents
   - Provides progress tracking and error handling
-- **Configuration:** 
+- **Configuration:**
   - Requires `.env` file with Yandex Cloud credentials and Google Drive folder ID
   - Requires `credentials.json` file from Google Cloud Console for Google Drive API access
   - Supports environment variables for configuration
@@ -344,7 +537,7 @@ python3 account_creation.py
 
 ### `update_blocks.py`
 - **Purpose:** Generates cleanup statements for existing blocks and combines them with new insertion statements
-- **Functionality:** 
+- **Functionality:**
   - Processes old SQL files to find existing SlideLayout IDs in the database
   - Generates DELETE and UPDATE statements to safely remove old block data
   - Processes new SQL files and replaces new UUIDs with existing SlideLayout IDs
@@ -353,7 +546,7 @@ python3 account_creation.py
   - Ensures foreign key constraint safety by updating UserBlockLayout.parentLayoutId first
   - Supports folder filtering for selective processing
   - Provides detailed statistics on processed slides and operations
-- **Configuration:** 
+- **Configuration:**
   - Requires `database.ini` with PostgreSQL connection parameters
   - Uses existing SlideLayout IDs from database to avoid creating duplicates
   - Maintains referential integrity by cleaning up in correct dependency order
@@ -385,8 +578,105 @@ python3 account_creation.py
 - `database.ini`: Параметры подключения к PostgreSQL.
 - `schema.prisma`: Файл схемы Prisma для интеграции с Node.js backend.
 - `requirements.txt`: Список всех Python зависимостей, включая `uuid_utils` для генерации UUID7.
+- `.pre-commit-config.yaml`: Конфигурация pre-commit хуков для автоматических проверок качества кода.
 - `my_output/`, `my_sql_output/`: Папки для вывода извлечённых JSON и сгенерированных SQL-файлов соответственно.
 - `slide_deletion/`: Содержит SQL-файлы и скрипты для удаления слайдов/блоков, организованные по типу макета (например, 1cols, 2cols и т.д.).
+
+---
+
+# Конфигурация Pre-commit
+
+## Обзор
+Этот проект использует pre-commit хуки для обеспечения качества и согласованности кода. Файл `.pre-commit-config.yaml` настраивает автоматические проверки, которые запускаются каждый раз перед коммитом, помогая выявлять проблемы на ранней стадии и поддерживать высокие стандарты кода.
+
+## Что такое Pre-commit?
+Pre-commit - это фреймворк для управления и поддержки pre-commit хуков. Он автоматически запускает различные инструменты качества кода перед каждым коммитом, обеспечивая соответствие всего кода стандартам проекта перед отправкой на ревью.
+
+## Файл конфигурации: `.pre-commit-config.yaml`
+
+Конфигурация pre-commit включает следующие хуки:
+
+### Форматирование и стиль кода
+- **Black**: Бескомпромиссный форматтер Python кода, который автоматически форматирует код по стандартам PEP 8
+- **isort**: Автоматически сортирует и организует импорты Python по алфавиту и типу
+- **autoflake**: Удаляет неиспользуемые импорты и переменные из Python кода
+
+### Качество и линтинг кода
+- **flake8**: Python линтер, который проверяет соблюдение руководства по стилю, ошибки программирования и сложность
+- **mypy**: Статический проверщик типов для Python, который обеспечивает безопасность типов и выявляет ошибки, связанные с типами
+
+### Модернизация кода
+- **pyupgrade**: Автоматически обновляет синтаксис Python для использования более новых языковых возможностей
+
+### Безопасность и лучшие практики
+- **bandit**: Линтер безопасности, который выявляет общие проблемы безопасности в Python коде
+- **check-docstring-first**: Обеспечивает правильное размещение docstring в файлах
+- **check-yaml**: Проверяет синтаксис YAML файлов
+- **end-of-file-fixer**: Обеспечивает завершение файлов новой строкой
+- **trailing-whitespace**: Удаляет завершающие пробелы из файлов
+
+## Установка и настройка
+
+### 1. Установите pre-commit
+```bash
+pip install pre-commit
+```
+
+### 2. Установите git hook скрипты
+```bash
+pre-commit install
+```
+
+### 3. (Опционально) Запустите для всех файлов
+```bash
+pre-commit run --all-files
+```
+
+## Как это работает
+
+1. **Автоматическое выполнение**: Pre-commit хуки запускаются автоматически каждый раз при создании коммита
+2. **Фильтрация файлов**: Хуки запускаются только для файлов, соответствующих их паттернам (например, Python файлы для Black, mypy)
+3. **Безопасность**: Если любой хук не проходит, коммит блокируется до разрешения проблем
+4. **Автоисправление**: Многие хуки автоматически исправляют проблемы (например, форматирование Black) и добавляют изменения в staging
+
+## Ручное выполнение
+
+Вы можете запускать хуки вручную для конкретных файлов или всех файлов:
+
+```bash
+# Запустить все хуки для всех файлов
+pre-commit run --all-files
+
+# Запустить конкретный хук
+pre-commit run black --all-files
+pre-commit run mypy --all-files
+
+# Запустить для конкретных файлов
+pre-commit run --files script/figma.py script/slide_insertion.py
+```
+
+## Детали конфигурации
+
+### Длина строки
+- **Black & isort**: Настроены на 350 символов для размещения длинных строк в этом проекте
+- **flake8**: Настроен игнорировать E203 (пробелы перед ':') и разрешать строки в 350 символов
+
+### Проверка типов
+- **mypy**: Настроен со строгой проверкой типов для обеспечения надежной безопасности типов
+- **No implicit Optional**: Принуждает явные Optional типы для лучшей ясности кода
+
+### Сканирование безопасности
+- **bandit**: Выводит результаты в `bandit-report.json` для детального анализа безопасности
+- **Исключения**: Игнорирует тестовые файлы и сгенерированные файлы
+
+## Преимущества
+
+- **Согласованный стиль кода**: Весь код следует одинаковым стандартам форматирования
+- **Раннее выявление ошибок**: Выявляет проблемы до того, как они попадут на ревью кода
+- **Безопасность типов**: Обеспечивает надежные аннотации типов во всей кодовой базе
+- **Безопасность**: Выявляет потенциальные уязвимости безопасности
+- **Современный код**: Автоматически обновляет до более нового синтаксиса Python
+- **Обеспечение качества**: Поддерживает высокие стандарты качества кода
 
 ---
 
@@ -454,7 +744,7 @@ python3 account_creation.py
 **Windows:**
 ```bash
 # 1. Извлечение из Figma
-python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
 
 # 2. Вставка в PresentationPalette
 # ручной режим
@@ -502,7 +792,7 @@ python account_creation.py
 **macOS:**
 ```bash
 # 1. Извлечение из Figma
-python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output 
+python3 figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
 
 # 2. Вставка в PresentationPalette
 # ручной режим
@@ -552,7 +842,7 @@ python3 account_creation.py
 
 ### `figma.py`
 - **Назначение:** Извлекает и нормализует данные дизайна из файлов Figma для генерации SQL
-- **Функциональность:** 
+- **Функциональность:**
   - Подключается к API Figma с использованием токенов аутентификации
   - Извлекает слайды, блоки, стили и метаданные из дизайнов Figma
   - Нормализует типы блоков, цвета, шрифты и размеры
@@ -560,7 +850,7 @@ python3 account_creation.py
   - Обрабатывает комментарии и текстовое содержимое из узлов Figma
   - Проверяет толщину шрифтов на соответствие разрешенным значениям (300, 400, 700)
   - Генерирует два выходных файла: сырое извлечение и данные, готовые для SQL
-- **Конфигурация:** 
+- **Конфигурация:**
   - Требует `config.py` с учетными данными API Figma и сопоставлениями
   - Использует переменные окружения для FIGMA_FILE_ID и FIGMA_TOKEN
   - Поддерживает фильтрацию по номерам слайдов, типам блоков или контейнерам
@@ -569,7 +859,7 @@ python3 account_creation.py
 
 ### `slide_insertion.py`
 - **Назначение:** Генерирует SQL файлы из нормализованных данных Figma для заполнения базы данных
-- **Функциональность:** 
+- **Функциональность:**
   - Читает нормализованный JSON из вывода figma.py
   - Генерирует операторы INSERT для всех таблиц базы данных
   - Обрабатывает макеты слайдов, блоки, стили, размеры и фигуры
@@ -577,7 +867,7 @@ python3 account_creation.py
   - Создает SQL файлы, организованные по типам макетов слайдов
   - Проверяет данные на соответствие ограничениям config.py
   - Генерирует исчерпывающие SQL инструкции и документацию
-- **Конфигурация:** 
+- **Конфигурация:**
   - Использует `config.py` для всех значений по умолчанию и сопоставлений
   - Требует `database.ini` для параметров подключения к базе данных
   - Поддерживает пользовательские выходные каталоги и именование файлов
@@ -586,14 +876,14 @@ python3 account_creation.py
 
 ### `sql_validator.py`
 - **Назначение:** Проверяет сгенерированные SQL файлы на синтаксис и ссылочную целостность
-- **Функциональность:** 
+- **Функциональность:**
   - Проверяет синтаксис SQL для всех сгенерированных файлов
   - Проверяет отношения внешних ключей между таблицами
   - Обеспечивает присутствие и правильное форматирование обязательных полей
   - Проверяет форматы UUID и согласованность типов данных
   - Генерирует подробные отчеты о проверке с указанием местоположения ошибок
   - Поддерживает пакетную проверку целых каталогов SQL
-- **Конфигурация:** 
+- **Конфигурация:**
   - Читает `database.ini` для параметров подключения
   - Использует config.py для правил проверки и ограничений
   - Поддерживает пользовательские правила проверки и отчеты об ошибках
@@ -602,14 +892,14 @@ python3 account_creation.py
 
 ### `sql_pollution.py`
 - **Назначение:** Выполняет проверенные SQL файлы в базе данных PostgreSQL
-- **Функциональность:** 
+- **Функциональность:**
   - Подключается к базе данных PostgreSQL, используя параметры подключения
   - Выполняет SQL файлы в правильном порядке для поддержания ссылочной целостности
   - Обрабатывает управление транзакциями и откат при ошибках
   - Поддерживает пакетное выполнение нескольких SQL файлов
   - Предоставляет подробные журналы выполнения и отчеты об ошибках
   - Обеспечивает согласованность данных во всех таблицах базы данных
-- **Конфигурация:** 
+- **Конфигурация:**
   - Требует `database.ini` с подробностями подключения PostgreSQL
   - Использует config.py для порядка выполнения и зависимостей таблиц
   - Поддерживает пользовательские параметры выполнения и обработку ошибок
@@ -618,14 +908,14 @@ python3 account_creation.py
 
 ### `slide_deletion.py`
 - **Назначение:** Обрабатывает удаление слайдов, блоков и изображений из базы данных
-- **Функциональность:** 
+- **Функциональность:**
   - Удаляет слайды и связанные блоки по номеру слайда
   - Удаляет определенные типы блоков в нескольких слайдах
   - Обрабатывает каскадные удаления связанных данных (фигуры, изображения, стили)
   - Поддерживает селективное удаление на основе типов макетов слайдов
   - Генерирует SQL файлы удаления для просмотра перед выполнением
   - Обеспечивает безопасное удаление с запросами подтверждения
-- **Конфигурация:** 
+- **Конфигурация:**
   - Использует `database.ini` для подключения к базе данных
   - Поддерживает пользовательские шаблоны удаления и фильтры
   - Генерирует организованные SQL файлы удаления по типам макетов
@@ -634,14 +924,14 @@ python3 account_creation.py
 
 ### `insert_palette.py`
 - **Назначение:** Управляет конфигурацией палитры презентации и настройками цветов
-- **Функциональность:** 
+- **Функциональность:**
   - Вставляет данные цветовой палитры в таблицу PresentationPalette
   - Поддерживает ручной и автоматический режимы вставки данных
   - Обрабатывает CSV файлы сопоставления для конфигурации палитры
   - Проверяет значения цветов и отношения палитр
   - Генерирует SQL файлы палитры для вставки в базу данных
   - Управляет ID настроек цветов и конфигурациями по умолчанию
-- **Конфигурация:** 
+- **Конфигурация:**
   - Требует CSV файл сопоставления для данных палитры
   - Использует `database.ini` для подключения к базе данных в автоматическом режиме
   - Поддерживает пользовательские конфигурации палитр и цветовые схемы
@@ -650,14 +940,14 @@ python3 account_creation.py
 
 ### `insert_block_layout_config.py`
 - **Назначение:** Управляет конфигурацией макета блоков и настройками стилей
-- **Функциональность:** 
+- **Функциональность:**
   - Вставляет данные конфигурации макета блоков в базу данных
   - Обрабатывает сопоставления типов блоков и стили по умолчанию
   - Поддерживает ручной и автоматический режимы конфигурации
   - Проверяет отношения макетов блоков и ограничения
   - Генерирует SQL файлы конфигурации для вставки в базу данных
   - Управляет ID макетов блоков и наследованием стилей
-- **Конфигурация:** 
+- **Конфигурация:**
   - Использует JSON ввод из извлечения figma.py
   - Требует `database.ini` для автоматического режима
   - Поддерживает пользовательские конфигурации макетов блоков
@@ -666,14 +956,14 @@ python3 account_creation.py
 
 ### `match_block_layout_presentation_palette.py`
 - **Назначение:** Сопоставляет конфигурации макетов блоков с палитрами презентации
-- **Функциональность:** 
+- **Функциональность:**
   - Создает отношения между макетами блоков и цветовыми палитрами
   - Обрабатывает сопоставление палитра-блок на основе правил конфигурации
   - Генерирует SQL файлы сопоставления для вставки в базу данных
   - Проверяет отношения палитра-блок и ограничения
   - Поддерживает пользовательские правила сопоставления и конфигурации
   - Управляет конфигурациями индексов палитра-блок
-- **Конфигурация:** 
+- **Конфигурация:**
   - Использует существующие данные макетов блоков и палитр из базы данных
   - Требует `database.ini` для подключения к базе данных
   - Поддерживает пользовательские алгоритмы сопоставления и правила
@@ -682,7 +972,7 @@ python3 account_creation.py
 
 ### `account_creation.py`
 - **Назначение:** Создает полные пользовательские аккаунты с аутентификацией, подписками, платежами и группами AB-тестирования
-- **Функциональность:** 
+- **Функциональность:**
   - Создает пользовательские аккаунты с ролевым доступом (ADMIN, USER, MIIN и т.д.)
   - Поддерживает несколько провайдеров аутентификации (local, Google, Yandex, VKontakte, Telegram)
   - Генерирует безопасные хеши паролей с использованием алгоритма scrypt (совместим с Node.js)
@@ -691,7 +981,7 @@ python3 account_creation.py
   - Создает назначения групп AB-тестирования для сегментации пользователей
   - Поддерживает как автоматический (прямая БД), так и ручной (генерация SQL) режимы
   - Генерирует UUID7 временно-упорядоченные идентификаторы для лучшей производительности БД
-- **Конфигурация:** 
+- **Конфигурация:**
   - Требует `database.ini` с параметрами подключения PostgreSQL
   - Использует схему Prisma для валидации структуры таблиц
   - Поддерживает пользовательские планы подписок и статусы платежей
@@ -700,7 +990,7 @@ python3 account_creation.py
 
 ### `migrate_images.py`
 - **Назначение:** Переносит изображения из Google Drive в объектное хранилище Yandex Cloud
-- **Функциональность:** 
+- **Функциональность:**
   - Загружает изображения из указанной папки Google Drive
   - Выгружает их в S3-совместимое хранилище Yandex Cloud
   - Поддерживает различные форматы изображений (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
@@ -709,7 +999,7 @@ python3 account_creation.py
   - Сохраняет структуру папок из Google Drive в Yandex Cloud
   - Рекурсивно обрабатывает подпапки и их содержимое
   - Предоставляет отслеживание прогресса и обработку ошибок
-- **Конфигурация:** 
+- **Конфигурация:**
   - Требует файл `.env` с учетными данными Yandex Cloud и ID папки Google Drive
   - Требует файл `credentials.json` из Google Cloud Console для доступа к API Google Drive
   - Поддерживает переменные окружения для конфигурации
@@ -724,7 +1014,7 @@ python3 account_creation.py
 
 ### `update_blocks.py`
 - **Назначение:** Генерирует очистку для существующих блоков и объединяет их с новыми операторами вставки
-- **Функциональность:** 
+- **Функциональность:**
   - Обрабатывает старые SQL файлы, чтобы найти существующие ID макетов слайдов в базе данных
   - Генерирует операторы DELETE и UPDATE, чтобы безопасно удалить старые данные блока
   - Обрабатывает новые SQL файлы и заменяет новые UUID на существующие ID макетов слайдов
@@ -733,7 +1023,7 @@ python3 account_creation.py
   - Обеспечивает безопасность ссылочных ограничений, обновляя UserBlockLayout.parentLayoutId сначала
   - Поддерживает фильтрацию папок для выборочной обработки
   - Предоставляет детальную статистику по обработанным слайдам и операциям
-- **Конфигурация:** 
+- **Конфигурация:**
   - Требует `database.ini` с параметрами подключения PostgreSQL
   - Использует существующие ID макетов слайдов из базы данных, чтобы избежать создания дубликатов
   - Сохраняет целостность ссылочных ограничений, очищая в правильном порядке зависимостей

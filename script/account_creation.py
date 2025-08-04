@@ -5,22 +5,20 @@ Creates user accounts for the presentation application based on Prisma schema.
 Includes support for creating subscriptions with payments and symbol purchases.
 """
 
-import os
-import sys
-import uuid_utils as uuid
-import hashlib
-import secrets
 import configparser
+import hashlib
+import os
 import random
-import time
+import secrets
+import sys
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Optional, Dict, Union, List
+
+import uuid_utils as uuid
 
 try:
     import psycopg2
     from psycopg2.extras import RealDictCursor
-    from psycopg2 import sql
 except ImportError:
     print("psycopg2 not found. Install it with: pip install psycopg2-binary")
     sys.exit(1)
@@ -79,7 +77,7 @@ class DatabaseManager:
         self.config_file = config_file
         self.connection = None
 
-    def read_db_config(self) -> Dict[str, str]:
+    def read_db_config(self) -> dict[str, str]:
         """Read database configuration from ini file."""
         if not os.path.exists(self.config_file):
             print(f"Database configuration file '{self.config_file}' not found.")
@@ -129,23 +127,27 @@ class DatabaseManager:
             self.connection.close()
             print("Database disconnected")
 
-    def execute_query(self, query: str, params: tuple = None) -> Optional[Dict]:
+    def execute_query(self, query: str, params: tuple | None = None) -> dict | None:
         """Execute a database query."""
+        if self.connection is None:
+            return None
         with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(query, params)
             if cursor.description:
                 return cursor.fetchone()
             return None
 
-    def execute_query_all(self, query: str, params: tuple = None) -> List[Dict]:
+    def execute_query_all(self, query: str, params: tuple | None = None) -> list[dict]:
         """Execute a database query and return all results."""
+        if self.connection is None:
+            return []
         with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute(query, params)
             if cursor.description:
                 return cursor.fetchall()
             return []
 
-    def format_sql_statement(self, query: str, params: tuple = None) -> str:
+    def format_sql_statement(self, query: str, params: tuple | None = None) -> str:
         """Format SQL statement with parameters for manual mode."""
         if params is None:
             return query.strip()
@@ -161,9 +163,7 @@ class DatabaseManager:
                 escaped_param = param.replace("'", "''")
                 formatted_query = formatted_query.replace("%s", f"'{escaped_param}'", 1)
             elif isinstance(param, datetime):
-                formatted_query = formatted_query.replace(
-                    "%s", f"'{param.isoformat()}'", 1
-                )
+                formatted_query = formatted_query.replace("%s", f"'{param.isoformat()}'", 1)
             elif isinstance(param, bool):
                 formatted_query = formatted_query.replace("%s", str(param).lower(), 1)
             else:
@@ -184,9 +184,7 @@ class PasswordHasher:
         """Hash password with salt using scrypt (matches Node.js crypto.scrypt)."""
         salt_bytes = salt.encode("utf-8")
 
-        derived_key = hashlib.scrypt(
-            password.encode("utf-8"), salt=salt_bytes, n=16384, r=8, p=1, dklen=64
-        )
+        derived_key = hashlib.scrypt(password.encode("utf-8"), salt=salt_bytes, n=16384, r=8, p=1, dklen=64)
         return derived_key.hex()
 
     @staticmethod
@@ -200,12 +198,12 @@ class UserAccountCreator:
     def __init__(self, db_manager: DatabaseManager):
         self.db = db_manager
         self.hasher = PasswordHasher()
-        self.sql_statements = []
+        self.sql_statements: list[dict[str, str]] = []
 
     def generate_uuid(self) -> str:
         return str(uuid.uuid7())
 
-    def add_sql_statement(self, description: str, query: str, params: tuple = None):
+    def add_sql_statement(self, description: str, query: str, params: tuple | None = None):
         """Add SQL statement to the list (for manual mode)."""
         formatted_sql = self.db.format_sql_statement(query, params)
         self.sql_statements.append({"description": description, "sql": formatted_sql})
@@ -222,7 +220,7 @@ class UserAccountCreator:
         """Clear the SQL statements list."""
         self.sql_statements = []
 
-    def get_user_input(self) -> Dict[str, Union[str, int, bool, None]]:
+    def get_user_input(self) -> dict[str, str | None]:
         """Collect user information through interactive input."""
         print("\n=== User Account Creation ===")
 
@@ -239,9 +237,7 @@ class UserAccountCreator:
 
         while True:
             try:
-                role_choice = input(
-                    f"Select role (1-{len(Role)}, default: USER): "
-                ).strip()
+                role_choice = input(f"Select role (1-{len(Role)}, default: USER): ").strip()
                 if not role_choice:
                     user_data["role"] = Role.USER.value
                     break
@@ -262,9 +258,7 @@ class UserAccountCreator:
 
         while True:
             try:
-                auth_choice = input(
-                    f"Select method (1-{len(Provider)}, default: local): "
-                ).strip()
+                auth_choice = input(f"Select method (1-{len(Provider)}, default: local): ").strip()
                 if not auth_choice:
                     user_data["provider"] = Provider.LOCAL.value
                     break
@@ -295,7 +289,12 @@ class UserAccountCreator:
                 break
         else:
             # Auth key for non-local providers
-            auth_key = input(f"{user_data['provider'].title()} identifier: ").strip()
+            provider_raw = user_data.get("provider")
+            if isinstance(provider_raw, str):
+                provider_title = provider_raw.title()
+            else:
+                provider_title = "Provider"
+            auth_key = input(f"{provider_title} identifier: ").strip()
             if not auth_key:
                 print("Authentication key is required for non-local providers.")
                 return self.get_user_input()
@@ -310,7 +309,7 @@ class UserAccountCreator:
 
         return user_data
 
-    def get_ab_test_input(self) -> Optional[str]:
+    def get_ab_test_input(self) -> str | None:
         """Get AB test group information from user input."""
         print("\n=== AB Test Group Setup ===")
 
@@ -326,9 +325,7 @@ class UserAccountCreator:
 
         while True:
             try:
-                type_choice = input(
-                    f"Select AB test type (1-{len(ABTestType)}, default: A): "
-                ).strip()
+                type_choice = input(f"Select AB test type (1-{len(ABTestType)}, default: A): ").strip()
                 if not type_choice:
                     return ABTestType.A.value
                 else:
@@ -340,9 +337,7 @@ class UserAccountCreator:
             except ValueError:
                 print("Please enter a valid number.")
 
-    def create_user_account(
-        self, user_data: Dict[str, Union[str, int, bool, None]]
-    ) -> str:
+    def create_user_account(self, user_data: dict[str, str | int | bool | None]) -> str:
         """Create a complete user account with all necessary records."""
         user_id = self.generate_uuid()
         auth_id = self.generate_uuid()
@@ -354,6 +349,8 @@ class UserAccountCreator:
 
         try:
             if self.db.mode == ExecutionMode.AUTO:
+                if self.db.connection is None:
+                    raise Exception("Database connection is not available")
                 with self.db.connection.cursor() as cursor:
                     # Create User record
                     user_query = """INSERT INTO "User" (id, role, username, image, ip, "createdAt", "presentationsCount")
@@ -374,22 +371,15 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                     # Create Auth record
                     auth_query = """INSERT INTO "Auth" (id, provider, key, "userId")
 VALUES (%s, %s, %s, %s)"""
-                    auth_key = user_data.get(
-                        "auth_key", user_data.get("username", user_id)
-                    )
-                    cursor.execute(
-                        auth_query, (auth_id, user_data["provider"], auth_key, user_id)
-                    )
+                    auth_key = user_data.get("auth_key", user_data.get("username", user_id))
+                    cursor.execute(auth_query, (auth_id, user_data["provider"], auth_key, user_id))
 
                     # Create Password record (only for local auth)
-                    if (
-                        user_data["provider"] == Provider.LOCAL.value
-                        and "password" in user_data
-                    ):
-                        salt = self.hasher.generate_salt()
-                        hashed_password = self.hasher.hash_password(
-                            user_data["password"], salt
-                        )
+                    if user_data["provider"] == Provider.LOCAL.value and "password" in user_data:
+                        password_raw = user_data["password"]
+                        if isinstance(password_raw, str):
+                            salt = self.hasher.generate_salt()
+                            hashed_password = self.hasher.hash_password(password_raw, salt)
 
                         password_query = """INSERT INTO "Password" ("userId", password, salt)
 VALUES (%s, %s, %s)"""
@@ -400,7 +390,8 @@ VALUES (%s, %s, %s)"""
 VALUES (%s, %s, %s)"""
                     cursor.execute(balance_query, (user_id, 0, 0))
 
-                self.db.connection.commit()
+                if self.db.connection is not None:
+                    self.db.connection.commit()
 
             else:
                 # Generate SQL statements
@@ -429,17 +420,14 @@ VALUES (%s, %s, %s, %s)"""
                     (auth_id, user_data["provider"], auth_key, user_id),
                 )
 
-                if (
-                    user_data["provider"] == Provider.LOCAL.value
-                    and "password" in user_data
-                ):
-                    salt = self.hasher.generate_salt()
-                    hashed_password = self.hasher.hash_password(
-                        user_data["password"], salt
-                    )
+                if user_data["provider"] == Provider.LOCAL.value and "password" in user_data:
+                    password_raw = user_data["password"]
+                    if isinstance(password_raw, str):
+                        salt = self.hasher.generate_salt()
+                        hashed_password = self.hasher.hash_password(password_raw, salt)
 
                     password_query = """INSERT INTO "Password" ("userId", password, salt)
-VALUES (%s, %s, %s)"""
+VALUES (%s, %s, %s)"""  # nosec
                     self.add_sql_statement(
                         "Create Password record",
                         password_query,
@@ -448,23 +436,19 @@ VALUES (%s, %s, %s)"""
 
                 balance_query = """INSERT INTO "Balance" ("userId", symbols, "subscriptionSymbols")
 VALUES (%s, %s, %s)"""
-                self.add_sql_statement(
-                    "Create Balance record", balance_query, (user_id, 0, 0)
-                )
+                self.add_sql_statement("Create Balance record", balance_query, (user_id, 0, 0))
 
             if self.db.mode == ExecutionMode.AUTO:
                 print("User account created successfully!")
             else:
                 print("SQL statements generated!")
 
-            print(
-                f"User ID: {user_id} | Username: {user_data['username'] or 'NULL'} | Role: {user_data['role']}"
-            )
+            print(f"User ID: {user_id} | Username: {user_data['username'] or 'NULL'} | Role: {user_data['role']}")
 
             return user_id
 
         except psycopg2.Error as e:
-            if self.db.mode == ExecutionMode.AUTO:
+            if self.db.mode == ExecutionMode.AUTO and self.db.connection is not None:
                 self.db.connection.rollback()
             print(f"Failed to create user account: {e}")
             raise
@@ -488,23 +472,17 @@ VALUES (%s, %s, %s)"""
             # Check if file exists and ask to overwrite
             file_mode = "w"
             if os.path.exists(filename):
-                overwrite = (
-                    input(f"File {filename} exists. Overwrite? (y/N): ").strip().lower()
-                )
+                overwrite = input(f"File {filename} exists. Overwrite? (y/N): ").strip().lower()
                 if overwrite not in ["y", "yes"]:
                     file_mode = "a"
 
             # Use UTF-8 encoding to handle Unicode characters
             with open(filename, file_mode, encoding="utf-8") as f:
                 if file_mode == "a":
-                    f.write(
-                        f"\n-- Account creation session: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                    )
+                    f.write(f"\n-- Account creation session: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 else:
                     f.write("-- User Account Creation SQL Statements\n")
-                    f.write(
-                        f"-- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                    )
+                    f.write(f"-- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
                 f.write("BEGIN TRANSACTION;\n\n")
 
@@ -520,7 +498,7 @@ VALUES (%s, %s, %s)"""
             print(f"Error saving SQL file: {e}")
             return False
 
-    def get_available_plans(self) -> List[Dict]:
+    def get_available_plans(self) -> list[dict]:
         """Fetch all available plans from the database."""
         print("Fetching active plans...")
         query = """
@@ -531,7 +509,7 @@ VALUES (%s, %s, %s)"""
         """
         return self.db.execute_query_all(query)
 
-    def get_subscription_input(self, plans: List[Dict]) -> Optional[Dict]:
+    def get_subscription_input(self, plans: list[dict]) -> dict | None:
         """Get subscription information from user input."""
         print("\n=== Subscription Setup ===")
 
@@ -545,9 +523,7 @@ VALUES (%s, %s, %s)"""
             print("No active plans available.")
             return None
 
-        mode_text = (
-            "Manual mode" if self.db.mode == ExecutionMode.MANUAL else "Auto mode"
-        )
+        mode_text = "Manual mode" if self.db.mode == ExecutionMode.MANUAL else "Auto mode"
         print(f"\n{mode_text}: Available subscription plans:")
         print("-" * 60)
 
@@ -556,9 +532,7 @@ VALUES (%s, %s, %s)"""
             recurring_text = " (Recurring)" if plan.get("isReccuring") else ""
             print(f"{i}. {plan['name'] or 'Unnamed Plan'} - {plan['price']} ₽")
             print(f"   ID: {plan['id']}")
-            print(
-                f"   Symbols: {plan['symbols']:,} | Type: {subscription_type}{recurring_text}"
-            )
+            print(f"   Symbols: {plan['symbols']:,} | Type: {subscription_type}{recurring_text}")
             if plan["description"]:
                 print(f"   Description: {plan['description']}")
             print()
@@ -577,9 +551,7 @@ VALUES (%s, %s, %s)"""
                 print("Please enter a valid number.")
 
         # Show selected plan
-        print(
-            f"\nSelected: {selected_plan['name']} ({selected_plan['price']} ₽, {selected_plan['symbols']:,} symbols)"
-        )
+        print(f"\nSelected: {selected_plan['name']} ({selected_plan['price']} ₽, {selected_plan['symbols']:,} symbols)")
 
         # Payment status
         print("\nPayment status:")
@@ -588,9 +560,7 @@ VALUES (%s, %s, %s)"""
 
         while True:
             try:
-                status_choice = input(
-                    f"Select status (1-{len(PaymentStatus)}, default: succeeded): "
-                ).strip()
+                status_choice = input(f"Select status (1-{len(PaymentStatus)}, default: succeeded): ").strip()
                 if not status_choice:
                     payment_status = PaymentStatus.SUCCEEDED.value
                     break
@@ -616,10 +586,8 @@ VALUES (%s, %s, %s)"""
                 duration_months = 12
 
         # Custom duration override
-        print(f"\nSubscription duration:")
-        custom_duration = input(
-            f"Duration in months (default: {duration_months}): "
-        ).strip()
+        print("\nSubscription duration:")
+        custom_duration = input(f"Duration in months (default: {duration_months}): ").strip()
         if custom_duration:
             try:
                 duration_months = int(custom_duration)
@@ -632,9 +600,7 @@ VALUES (%s, %s, %s)"""
             "duration_months": duration_months,
         }
 
-    def create_subscription(
-        self, user_id: str, subscription_data: Dict
-    ) -> Dict[str, str]:
+    def create_subscription(self, user_id: str, subscription_data: dict) -> dict[str, str]:
         """Create a complete subscription with payment and symbols purchase."""
         plan = subscription_data["plan"]
         payment_status = subscription_data["payment_status"]
@@ -647,9 +613,7 @@ VALUES (%s, %s, %s)"""
 
         # Calculate dates
         now = datetime.now()
-        expired_at = now + timedelta(
-            days=duration_months * 30
-        )  # Approximate months to days
+        expired_at = now + timedelta(days=duration_months * 30)  # Approximate months to days
 
         if self.db.mode == ExecutionMode.MANUAL:
             print("Generating subscription SQL...")
@@ -658,6 +622,8 @@ VALUES (%s, %s, %s)"""
 
         try:
             if self.db.mode == ExecutionMode.AUTO:
+                if self.db.connection is None:
+                    raise Exception("Database connection is not available")
                 with self.db.connection.cursor() as cursor:
                     # Create Payment record
                     payment_query = """INSERT INTO "Payment" (id, "userId", status, price, description, "createdAt")
@@ -711,9 +677,7 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
                     # Create SubscriptionPayment junction record
                     subscription_payment_query = """INSERT INTO "SubscriptionPayment" ("subscriptionId", "paymentId")
 VALUES (%s, %s)"""
-                    cursor.execute(
-                        subscription_payment_query, (subscription_id, payment_id)
-                    )
+                    cursor.execute(subscription_payment_query, (subscription_id, payment_id))
 
                     # Update user's balance if payment succeeded
                     if payment_status == PaymentStatus.SUCCEEDED.value:
@@ -722,7 +686,8 @@ SET "subscriptionSymbols" = "subscriptionSymbols" + %s
 WHERE "userId" = %s"""
                         cursor.execute(balance_update_query, (plan["symbols"], user_id))
 
-                self.db.connection.commit()
+                if self.db.connection is not None:
+                    self.db.connection.commit()
 
             else:
                 # Generate SQL statements
@@ -798,9 +763,7 @@ WHERE "userId" = %s"""
             else:
                 print("Subscription SQL generated!")
 
-            print(
-                f"Plan: {plan['name']} | Price: {plan['price']} ₽ | Symbols: {plan['symbols']:,} | Status: {payment_status}"
-            )
+            print(f"Plan: {plan['name']} | Price: {plan['price']} ₽ | Symbols: {plan['symbols']:,} | Status: {payment_status}")
             print(f"Expires: {expired_at.strftime('%Y-%m-%d')}")
 
             return {
@@ -810,7 +773,7 @@ WHERE "userId" = %s"""
             }
 
         except psycopg2.Error as e:
-            if self.db.mode == ExecutionMode.AUTO:
+            if self.db.mode == ExecutionMode.AUTO and self.db.connection is not None:
                 self.db.connection.rollback()
             print(f"Failed to create subscription: {e}")
             raise
@@ -824,12 +787,15 @@ WHERE "userId" = %s"""
 
         try:
             if self.db.mode == ExecutionMode.AUTO:
+                if self.db.connection is None:
+                    raise Exception("Database connection is not available")
                 with self.db.connection.cursor() as cursor:
                     ab_user_group_query = """INSERT INTO "ABUserGroup" ("userId", type)
 VALUES (%s, %s)"""
                     cursor.execute(ab_user_group_query, (user_id, ab_test_type))
 
-                self.db.connection.commit()
+                if self.db.connection is not None:
+                    self.db.connection.commit()
 
             else:
                 ab_user_group_query = """INSERT INTO "ABUserGroup" ("userId", type)
@@ -850,7 +816,7 @@ VALUES (%s, %s)"""
             return True
 
         except psycopg2.Error as e:
-            if self.db.mode == ExecutionMode.AUTO:
+            if self.db.mode == ExecutionMode.AUTO and self.db.connection is not None:
                 self.db.connection.rollback()
             print(f"Failed to create ABUserGroup record: {e}")
             raise
@@ -907,13 +873,11 @@ def main():
                 print(f"Role: {user_data['role']}")
                 print(f"Auth: {user_data['provider']}")
                 if user_data["provider"] == Provider.LOCAL.value:
-                    print(f"Password: [WILL BE HASHED]")
+                    print("Password: [WILL BE HASHED]")
                 else:
                     print(f"Auth Key: {user_data.get('auth_key', 'N/A')}")
 
-                action_text = (
-                    "Create account" if mode == ExecutionMode.AUTO else "Generate SQL"
-                )
+                action_text = "Create account" if mode == ExecutionMode.AUTO else "Generate SQL"
                 confirm = input(f"\n{action_text}? (y/N): ").strip().lower()
 
                 if confirm in ["y", "yes"]:
@@ -930,9 +894,7 @@ def main():
 
                         if subscription_data:
                             try:
-                                subscription_ids = creator.create_subscription(
-                                    user_id, subscription_data
-                                )
+                                creator.create_subscription(user_id, subscription_data)
                                 if mode == ExecutionMode.AUTO:
                                     print("Subscription verification: PASSED")
                             except Exception as sub_error:
@@ -959,25 +921,15 @@ def main():
                         creator.print_sql_statements()
 
                         # Ask if user wants to save SQL to file
-                        save_sql = (
-                            input("\nSave all SQL statements to file? (y/N): ")
-                            .strip()
-                            .lower()
-                        )
+                        save_sql = input("\nSave all SQL statements to file? (y/N): ").strip().lower()
                         if save_sql in ["y", "yes"]:
-                            filename = input(
-                                "Enter filename (default: user_account_creation.sql): "
-                            ).strip()
+                            filename = input("Enter filename (default: user_account_creation.sql): ").strip()
                             if not filename:
                                 filename = "user_account_creation.sql"
                             creator.save_sql_to_file(filename)
 
                 else:
-                    action_text = (
-                        "Account creation"
-                        if mode == ExecutionMode.AUTO
-                        else "SQL generation"
-                    )
+                    action_text = "Account creation" if mode == ExecutionMode.AUTO else "SQL generation"
                     print(f"{action_text} cancelled")
 
             except KeyboardInterrupt:
@@ -987,11 +939,7 @@ def main():
                 print(f"Error: {e}")
 
             # Ask if user wants to create another account
-            another_text = (
-                "Create another account"
-                if mode == ExecutionMode.AUTO
-                else "Generate SQL for another account"
-            )
+            another_text = "Create another account" if mode == ExecutionMode.AUTO else "Generate SQL for another account"
             another = input(f"\n{another_text}? (y/N): ").strip().lower()
             if another not in ["y", "yes"]:
                 break
