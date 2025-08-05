@@ -77,12 +77,12 @@ class ExportConfig:
 # Create output directory
 ExportConfig.OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Configure logging
+# Configure logging with fresh log file (mode='w' automatically truncates)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(ExportConfig.LOG_FILE, encoding="utf-8"),
+        logging.FileHandler(ExportConfig.LOG_FILE, encoding="utf-8", mode="w"),
         logging.StreamHandler(sys.stdout),
     ],
 )
@@ -193,7 +193,10 @@ class DatabaseService:
                         )
                     )
 
-                logger.info(f"Fetched {len(issue_reports)} issue reports")
+                # Double-check sorting to ensure newest first
+                issue_reports.sort(key=lambda x: x.created_at, reverse=True)
+
+                logger.info(f"Fetched and sorted {len(issue_reports)} issue reports by createdAt DESC")
                 return issue_reports
 
         except psycopg2.Error as e:
@@ -337,20 +340,40 @@ class GoogleSheetsService:
             raise
 
     def append_reports(self, issue_reports: list[IssueReport]) -> int:
-        """Add issue reports to Google Sheets, avoiding duplicates."""
+        """Add issue reports to Google Sheets, avoiding duplicates and maintaining sort order."""
         try:
             # Get existing IDs and filter out duplicates
             existing_ids = self.get_existing_ids()
             new_reports = [r for r in issue_reports if r.id not in existing_ids]
 
+            # Always re-sort existing data, even if no new records
             if not new_reports:
-                logger.info("No new records to add to Google Sheets")
-                return 0
+                logger.info("No new records to add, but will re-sort existing data")
 
             # Sort by creation date (newest first - descending order)
             new_reports.sort(key=lambda x: x.created_at, reverse=True)
 
-            # Prepare data for sheets
+            # Get all existing data to re-sort everything
+            existing_data = self._get_all_existing_data()
+
+            # Combine existing data with new data and sort everything
+            all_reports = existing_data + new_reports
+
+            # Sort by creation date (newest first - descending order)
+            all_reports.sort(key=lambda x: x.created_at, reverse=True)
+
+            # Verify sorting is correct
+            is_sorted = all(all_reports[i].created_at >= all_reports[i + 1].created_at for i in range(len(all_reports) - 1))
+
+            if not is_sorted:
+                logger.warning("Sorting verification failed - data may not be properly sorted!")
+            else:
+                logger.info(f"Sorted {len(all_reports)} total records by createdAt in descending order")
+
+            # Clear existing data and re-insert everything in correct order
+            self._clear_existing_data()
+
+            # Prepare data for sheets (skip header row)
             values = [
                 [
                     report.id,
@@ -360,24 +383,26 @@ class GoogleSheetsService:
                     report.contact,
                     report.description,
                 ]
-                for report in new_reports
+                for report in all_reports
             ]
 
-            # Append data to sheets
+            # Insert all data at once
             body = {"values": values}
-            self.sheets_service.spreadsheets().values().append(
+            self.sheets_service.spreadsheets().values().update(
                 spreadsheetId=ExportConfig.SPREADSHEET_ID,
-                range=f"{ExportConfig.SHEET_NAME}!A:F",
+                range=f"{ExportConfig.SHEET_NAME}!A2:F{len(values) + 1}",
                 valueInputOption="RAW",
-                insertDataOption="INSERT_ROWS",
                 body=body,
             ).execute()
 
-            # Apply formatting to new rows
-            if new_reports:
-                self._apply_formatting(len(new_reports))
+            # Apply formatting to all rows
+            if all_reports:
+                self._apply_formatting(len(all_reports))
 
-            logger.info(f"Added {len(new_reports)} new records to Google Sheets")
+            if new_reports:
+                logger.info(f"Added {len(new_reports)} new records and re-sorted {len(all_reports)} total records in Google Sheets")
+            else:
+                logger.info(f"Re-sorted {len(all_reports)} existing records in Google Sheets")
             return len(new_reports)
 
         except HttpError as error:
@@ -504,12 +529,9 @@ class GoogleSheetsService:
         except HttpError as error:
             logger.error(f"Failed to apply column width formatting: {error}")
 
-    def _apply_formatting(self, new_rows_count: int) -> None:
-        """Apply formatting to newly added rows."""
+    def _get_all_existing_data(self) -> list[IssueReport]:
+        """Get all existing data from Google Sheets as IssueReport objects."""
         try:
-            sheet_id = self._get_sheet_id()
-
-            # Get current row count to determine range
             result = (
                 self.sheets_service.spreadsheets()
                 .values()
@@ -521,17 +543,91 @@ class GoogleSheetsService:
             )
 
             values = result.get("values", [])
-            total_rows = len(values)
 
-            if total_rows <= 1:  # Only header or no data
+            # Skip header row and empty rows
+            existing_reports = []
+            for row in values[1:]:  # Skip header
+                if len(row) >= 6:  # Ensure we have all required columns
+                    try:
+                        # Parse the date string back to datetime
+                        created_at_str = row[2]  # Date column
+
+                        # Handle different possible date formats
+                        try:
+                            created_at = datetime.strptime(created_at_str, "%d.%m.%Y %H:%M:%S")
+                        except ValueError:
+                            # Try alternative format if the first one fails
+                            created_at = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
+
+                        existing_reports.append(
+                            IssueReport(
+                                id=row[0],
+                                user_id=row[1] if row[1] != "N/A" else None,
+                                created_at=created_at,
+                                name=row[3],
+                                contact=row[4],
+                                description=row[5],
+                            )
+                        )
+                    except (ValueError, IndexError) as e:
+                        logger.warning(f"Skipping malformed row: {row}, error: {e}")
+                        continue
+
+            # Sort existing reports by creation date (newest first)
+            existing_reports.sort(key=lambda x: x.created_at, reverse=True)
+
+            logger.info(f"Retrieved and sorted {len(existing_reports)} existing records from Google Sheets")
+            return existing_reports
+
+        except HttpError as error:
+            logger.error(f"Failed to get existing data: {error}")
+            return []
+
+    def _clear_existing_data(self) -> None:
+        """Clear all existing data rows (keep header)."""
+        try:
+            # Get current data to determine range
+            result = (
+                self.sheets_service.spreadsheets()
+                .values()
+                .get(
+                    spreadsheetId=ExportConfig.SPREADSHEET_ID,
+                    range=f"{ExportConfig.SHEET_NAME}!A:F",
+                )
+                .execute()
+            )
+
+            values = result.get("values", [])
+
+            if len(values) <= 1:  # Only header or no data
                 return
 
-            # Calculate range for newly added rows
-            start_row = total_rows - new_rows_count
-            end_row = total_rows
+            # Clear all data rows (keep header)
+            range_to_clear = f"{ExportConfig.SHEET_NAME}!A2:F{len(values)}"
+            self.sheets_service.spreadsheets().values().clear(
+                spreadsheetId=ExportConfig.SPREADSHEET_ID,
+                range=range_to_clear,
+            ).execute()
+
+            logger.info(f"Cleared {len(values) - 1} existing data rows")
+
+        except HttpError as error:
+            logger.error(f"Failed to clear existing data: {error}")
+
+    def _apply_formatting(self, total_rows_count: int) -> None:
+        """Apply formatting to all data rows."""
+        try:
+            sheet_id = self._get_sheet_id()
+
+            if total_rows_count <= 0:
+                return
+
+            # Calculate range for all data rows (skip header)
+            start_row = 1  # Start after header
+            end_row = total_rows_count + 1  # +1 because we're after header
 
             requests = [
-                # Apply font formatting to new rows
+                # Apply font formatting to all data rows
                 {
                     "repeatCell": {
                         "range": {
@@ -576,10 +672,10 @@ class GoogleSheetsService:
 
             self.sheets_service.spreadsheets().batchUpdate(spreadsheetId=ExportConfig.SPREADSHEET_ID, body={"requests": requests}).execute()
 
-            logger.info(f"Applied formatting to {new_rows_count} new rows")
+            logger.info(f"Applied formatting to {total_rows_count} data rows")
 
         except HttpError as error:
-            logger.error(f"Failed to apply formatting to new rows: {error}")
+            logger.error(f"Failed to apply formatting to data rows: {error}")
             # Don't raise to avoid breaking the main export process
 
 

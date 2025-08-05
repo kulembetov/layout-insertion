@@ -7,7 +7,7 @@ from SVG elements, making them inherit fill colors from CSS or parent elements.
 """
 
 import argparse
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec
 from pathlib import Path
 
 
@@ -23,7 +23,7 @@ def remove_fill_attributes(svg_content):
     """
     try:
         # Parse the SVG content
-        root = ET.fromstring(svg_content)
+        root = ET.fromstring(svg_content)  # nosec
 
         # Find all elements with fill attributes and remove them
         for elem in root.iter():

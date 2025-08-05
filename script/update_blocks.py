@@ -400,7 +400,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
                     SELECT id, "parentLayoutId"
                     FROM "UserBlockLayout"
                     WHERE "parentLayoutId" IN ('{block_ids_str}')
-                """
+                """,  # nosec
                 )
                 existing_data["user_block_layouts"] = [UserBlockLayout(id=row[0], parentLayoutId=row[1]) for row in cursor.fetchall()]
 

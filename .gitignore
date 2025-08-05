@@ -70,3 +70,4 @@ database.ini
 
 # Security reports
 bandit_report.json
+bandit-report.json

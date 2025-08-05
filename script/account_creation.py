@@ -8,7 +8,6 @@ Includes support for creating subscriptions with payments and symbol purchases.
 import configparser
 import hashlib
 import os
-import random
 import secrets
 import sys
 from datetime import datetime, timedelta
@@ -176,7 +175,8 @@ class PasswordHasher:
     @staticmethod
     def generate_salt() -> str:
         """Generate a random salt with length between 64-128 bytes (matches Node.js implementation)."""
-        salt_length = random.randint(64, 128)
+        # Use secrets.randbelow for cryptographically secure random number generation
+        salt_length = 64 + secrets.randbelow(65)  # 64 to 128 bytes
         return secrets.token_bytes(salt_length).hex()
 
     @staticmethod
@@ -382,7 +382,7 @@ VALUES (%s, %s, %s, %s)"""
                             hashed_password = self.hasher.hash_password(password_raw, salt)
 
                         password_query = """INSERT INTO "Password" ("userId", password, salt)
-VALUES (%s, %s, %s)"""
+VALUES (%s, %s, %s)"""  # nosec
                         cursor.execute(password_query, (user_id, hashed_password, salt))
 
                     # Create Balance record

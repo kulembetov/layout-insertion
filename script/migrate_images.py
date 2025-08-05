@@ -33,7 +33,7 @@ load_dotenv()
 # Configuration
 GOOGLE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 CREDENTIALS_FILE = "credentials.json"
-TOKEN_FILE = "token.json"
+TOKEN_FILE = "token.json"  # nosec
 YANDEX_ENDPOINT_URL = "https://storage.yandexcloud.net"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".svg"}
 
