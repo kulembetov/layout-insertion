@@ -18,6 +18,7 @@ class BlockBuilder:
 
     Comments: dict -> look 'fetch_comments' in FigmaAPI.
     """
+
     def __init__(self, block: dict | ExtractedBlock, comments: dict, slide_config: Optional[dict] = None):
         self.block = block
         self.slide_config = slide_config
@@ -238,8 +239,8 @@ def _update_figure_config_with_names(slide_config, blocks):
                 # logger.info(
                 #     f"[figureConfig] MATCHED: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
             # else:
-                # logger.info(
-                #     f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
+            # logger.info(
+            #     f"[figureConfig] NO BLOCK MATCH: color {color_hex}, figure '{figure_name}' -> color: {fill_color}, font: {normalized_font_family}")
 
             figure_obj = {
                 "color": fill_color,
@@ -250,6 +251,14 @@ def _update_figure_config_with_names(slide_config, blocks):
         new_figure_config[color_hex] = figure_objects
     slide_config[TYPES.BT_FIGURE] = new_figure_config
     # logger.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_by_name)} figure blocks")
+
+
+def _get_imagesCount(slide: ExtractedSlide):
+    imagesCount: int = 0
+    for block in slide.blocks:
+        if block.figma_type == 'image':
+            imagesCount += 1
+    return imagesCount
 
 
 def slide_to_dict(slide: ExtractedSlide, comments: dict) -> dict[str, Any]:
@@ -289,11 +298,12 @@ def slide_to_dict(slide: ExtractedSlide, comments: dict) -> dict[str, Any]:
         'frame_name': slide.frame_name,
         'slide_type': slide.slide_type,
         'sentences': sentence_count,
+        'imagesCount': _get_imagesCount(slide),
         'frame_id': slide.frame_id,
         'dimensions': slide.dimensions,
         'folder_name': SLIDES.SLIDE_NUMBER_TO_FOLDER.get(slide.number, 'other'),
         'blocks': [block_to_dict(block, comments, slide_config) for block in slide.blocks],
         'block_count': len(slide.blocks),
         'slideConfig': slide_config,
-        'presentationPaletteColors': presentation_palette_colors
+        'presentationPaletteColors': presentation_palette_colors,
     }
