@@ -1,8 +1,9 @@
 import argparse
 import configparser
+import csv
 import json
 import sys
-import csv
+
 import psycopg2
 import uuid_utils as uuid
 
@@ -52,7 +53,7 @@ def confirm_db_execution(db_config):
 
 
 def collect_palette_pairs(json_path):
-    with open(json_path, "r", encoding="utf-8") as f:
+    with open(json_path, encoding="utf-8") as f:
         slides = json.load(f)
     pairs = set()
     for slide in slides:
@@ -84,9 +85,7 @@ def insert_palette_auto(pairs, db_config, csv_path):
         row = cur.fetchone()
         if row:
             print("SKIPPED (already exists)")
-            mapping.append(
-                {"id": row[0], "presentationLayoutId": layout_id, "color": color}
-            )
+            mapping.append({"id": row[0], "presentationLayoutId": layout_id, "color": color})
             skipped += 1
         else:
             cur.execute(
@@ -94,9 +93,7 @@ def insert_palette_auto(pairs, db_config, csv_path):
                 (palette_id, layout_id, color),
             )
             print("INSERTED")
-            mapping.append(
-                {"id": palette_id, "presentationLayoutId": layout_id, "color": color}
-            )
+            mapping.append({"id": palette_id, "presentationLayoutId": layout_id, "color": color})
             inserted += 1
         conn.commit()
     print(f"Summary: Attempted {total}, Inserted {inserted}, Skipped {skipped}")
@@ -114,11 +111,9 @@ def insert_palette_manual(pairs, csv_path):
     mapping = []
     for layout_id, color in pairs:
         palette_id = generate_uuid()
-        sql = f"INSERT INTO \"PresentationPalette\" (id, \"presentationLayoutId\", color) VALUES ('{palette_id}', '{layout_id}', '{color}');"
+        sql = f"INSERT INTO \"PresentationPalette\" (id, \"presentationLayoutId\", color) VALUES ('{palette_id}', '{layout_id}', '{color}');"  # nosec
         print(f"{sql}")
-        mapping.append(
-            {"id": palette_id, "presentationLayoutId": layout_id, "color": color}
-        )
+        mapping.append({"id": palette_id, "presentationLayoutId": layout_id, "color": color})
     print(f"Summary: Generated {len(pairs)} SQL statements.")
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = ["id", "presentationLayoutId", "color"]
@@ -129,12 +124,8 @@ def insert_palette_manual(pairs, csv_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Insert PresentationPalette records from sql_generator_input.json"
-    )
-    parser.add_argument(
-        "--json", required=True, help="Path to sql_generator_input.json"
-    )
+    parser = argparse.ArgumentParser(description="Insert PresentationPalette records from sql_generator_input.json")
+    parser.add_argument("--json", required=True, help="Path to sql_generator_input.json")
     parser.add_argument(
         "--mode",
         choices=["auto", "manual"],

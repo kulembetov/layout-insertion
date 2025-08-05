@@ -1,23 +1,28 @@
+"""
+Configuration module for the layout insertion project.
+
+This module contains all configuration constants, enums, and settings
+used throughout the application including Figma API settings,
+block types, slide layouts, and database configurations.
+"""
+
 import os
 from enum import Enum
-from typing import Dict, List, TypedDict, Optional
+from typing import TypedDict
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-"""
-========================
- Environment Variables
-========================
-"""
+# ========================
+#  Environment Variables
+# ========================
 FIGMA_FILE_ID: str = os.environ.get("FIGMA_FILE_ID", "")
 FIGMA_TOKEN: str = os.environ.get("FIGMA_TOKEN", "")
 
-"""
-========================
- Figma Node/Block Constants
-========================
-"""
+# ========================
+#  Figma Node/Block Constants
+# ========================
 FIGMA_KEY_ABS_BOX = "absoluteBoundingBox"
 FIGMA_KEY_CHILDREN = "children"
 FIGMA_KEY_NAME = "name"
@@ -37,11 +42,9 @@ BLOCK_TYPE_FIGURE = "figure"
 BLOCK_TYPE_IMAGE = "image"
 BLOCK_TYPE_BACKGROUND = "background"
 
-"""
-========================
- Figma Configuration
-========================
-"""
+# ========================
+#  Figma Configuration
+# ========================
 FIGMA_CONFIG = {
     "TARGET_WIDTH": 1200,
     "TARGET_HEIGHT": 675,
@@ -52,11 +55,9 @@ FIGMA_CONFIG = {
 # Valid font weights - ONLY these are allowed
 VALID_FONT_WEIGHTS = [300, 400, 700]
 
-"""
-========================
- Enums for Types
-========================
-"""
+# ========================
+#  Enums for Types
+# ========================
 
 
 class SlideLayoutType(str, Enum):
@@ -92,17 +93,15 @@ class BlockType(str, Enum):
     CHART = "chart"
 
 
-"""
-========================
- TypedDicts for Structured Configs
-========================
-"""
+# ========================
+#  TypedDicts for Structured Configs
+# ========================
 
 
 class PrecompiledImagesConfig(TypedDict):
     base_url: str
-    default_colors: List[str]
-    prefix: List[str]
+    default_colors: list[str]
+    prefix: list[str]
 
 
 PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
@@ -119,17 +118,15 @@ PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
     "prefix": ["Green", "Blue", "Sky", "Purple", "Gray", "Pink", "Orange"],
 }
 
-"""
-========================
- Defaults and Templates
-========================
-"""
+# ========================
+#  Defaults and Templates
+# ========================
 MINIATURES_BASE_PATH: str = "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen/miniatures"
 DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"
 DEFAULT_COLOR: str = "#ffffff"
 MINIATURE_EXTENSION: str = ".png"
 
-DEFAULT_VALUES: Dict[str, object] = {
+DEFAULT_VALUES: dict[str, object] = {
     "slide_layout_name": "grid_cards_horizontal",
     "slide_layout_number": 9,
     "presentation_layout_id": "0197c55e-1c1b-7760-9525-f51752cf23e2",
@@ -137,12 +134,10 @@ DEFAULT_VALUES: Dict[str, object] = {
     "num_blocks": 5,
 }
 
-"""
-========================
- SQL Templates
-========================
-"""
-SQL_TEMPLATES: Dict[str, str] = {
+# ========================
+#  SQL Templates
+# ========================
+SQL_TEMPLATES: dict[str, str] = {
     "slide_layout": """-- Create SlideLayout
 INSERT INTO "SlideLayout" (
     "id", "name", "number", "isActive", "presentationLayoutId",
@@ -236,12 +231,10 @@ RETURNING *;""",
     "block_layout_limit": """-- Create BlockLayoutLimit\nINSERT INTO "BlockLayoutLimit" ("minWords", "maxWords", "blockLayoutId")\nVALUES\n{block_layout_limit_values}\nRETURNING *;""",
 }
 
-"""
-========================
- Mappings and Lookups
-========================
-"""
-SLIDE_LAYOUT_TYPES: Dict[str, str] = {
+# ========================
+#  Mappings and Lookups
+# ========================
+SLIDE_LAYOUT_TYPES: dict[str, str] = {
     "classic": "classic",
     "many_text": "manyText",
     "few_text": "fewText",
@@ -254,7 +247,7 @@ SLIDE_LAYOUT_TYPES: Dict[str, str] = {
     "other": "other",
 }
 
-AUTO_BLOCKS: Dict[str, object] = {
+AUTO_BLOCKS: dict[str, object] = {
     "add_background": True,  # Always add background by default
     "add_watermark": False,  # Default to not adding watermark
     "background": {
@@ -263,12 +256,10 @@ AUTO_BLOCKS: Dict[str, object] = {
     },
     "watermark": {"dimensions": {"x": 1065, "y": 636, "w": 118, "h": 26}},
     # Special configuration for last slide (slide number -1)
-    "last_slide": {
-        "watermark1": {"dimensions": {"x": 785, "y": 40, "w": 380, "h": 114}}
-    },
+    "last_slide": {"watermark1": {"dimensions": {"x": 785, "y": 40, "w": 380, "h": 114}}},
 }
 
-BLOCK_TYPES: Dict[str, List[str]] = {
+BLOCK_TYPES: dict[str, list[str]] = {
     "null_style_types": [
         "infographik",
         "figure",
@@ -317,7 +308,7 @@ BLOCK_TYPES: Dict[str, List[str]] = {
     ],
 }
 
-BLOCK_TYPE_MIN_WORDS: Dict[str, int] = {
+BLOCK_TYPE_MIN_WORDS: dict[str, int] = {
     "slideTitle": 3,
     "subTitle": 5,
     "blockTitle": 1,
@@ -329,7 +320,7 @@ BLOCK_TYPE_MIN_WORDS: Dict[str, int] = {
     "email": 1,
 }
 
-Z_INDEX_DEFAULTS: Dict[str, int] = {
+Z_INDEX_DEFAULTS: dict[str, int] = {
     "background": 0,
     "watermark": 10,
     "figure": 1,
@@ -349,7 +340,7 @@ Z_INDEX_DEFAULTS: Dict[str, int] = {
     "default": 1,
 }
 
-DEFAULT_DIMENSIONS: Dict[str, Dict[str, int]] = {
+DEFAULT_DIMENSIONS: dict[str, dict[str, int]] = {
     "background": {"x": 0, "y": 0, "w": 1200, "h": 675},
     "slideTitle": {"x": 37, "y": 37, "w": 1125, "h": 85},
     "subTitle": {"x": 37, "y": 250, "w": 875, "h": 65},
@@ -359,7 +350,7 @@ DEFAULT_DIMENSIONS: Dict[str, Dict[str, int]] = {
     "default": {"x": 37, "y": 230, "w": 1125, "h": 405},
 }
 
-DEFAULT_STYLES: Dict[str, Dict[str, object]] = {
+DEFAULT_STYLES: dict[str, dict[str, object]] = {
     "slideTitle": {
         "text_vertical": "top",
         "text_horizontal": "left",
@@ -567,7 +558,7 @@ SLIDE_NUMBER_TO_TYPE = {
     -1: "last",  # last
 }
 
-WATERMARK_SLIDES = []
+WATERMARK_SLIDES: list[int] = []
 
 CONTAINER_NAME_TO_SLIDE_NUMBER = {
     "title": 1,

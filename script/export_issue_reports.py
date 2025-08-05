@@ -16,18 +16,15 @@ Design Patterns Used:
 - Dependency Injection: Configurable services
 """
 
-import os
-import sys
-import logging
 import configparser
-from datetime import datetime
-from typing import List, Dict, Union, Optional, Set
+import logging
+import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import psycopg2
-from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
 # Google API imports
@@ -36,6 +33,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from psycopg2.extras import RealDictCursor
 
 # =============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -79,12 +77,12 @@ class ExportConfig:
 # Create output directory
 ExportConfig.OUTPUT_DIR.mkdir(exist_ok=True)
 
-# Configure logging
+# Configure logging with fresh log file (mode='w' automatically truncates)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(ExportConfig.LOG_FILE, encoding="utf-8"),
+        logging.FileHandler(ExportConfig.LOG_FILE, encoding="utf-8", mode="w"),
         logging.StreamHandler(sys.stdout),
     ],
 )
@@ -104,7 +102,7 @@ class IssueReport:
     """Data class for IssueReport records."""
 
     id: str
-    user_id: Optional[str]
+    user_id: str | None
     created_at: datetime
     name: str
     contact: str
@@ -117,7 +115,7 @@ class ExportResult:
 
     success: bool
     message: str
-    excel_file: Optional[str]
+    excel_file: str | None
     sheets_updated: bool
     records_count: int
     new_records_count: int
@@ -160,20 +158,20 @@ class DatabaseService:
             self.conn.close()
             logger.info("Database connection closed")
 
-    def fetch_issue_reports(self) -> List[IssueReport]:
+    def fetch_issue_reports(self) -> list[IssueReport]:
         """Fetch all IssueReport records from database."""
         if not self.conn:
             raise RuntimeError("Database not connected")
 
         query = """
-        SELECT 
-            id, 
-            "userId" as user_id, 
-            "createdAt" as created_at, 
-            name, 
-            contact, 
+        SELECT
+            id,
+            "userId" as user_id,
+            "createdAt" as created_at,
+            name,
+            contact,
             description
-        FROM "IssueReport" 
+        FROM "IssueReport"
         ORDER BY "createdAt" DESC
         """
 
@@ -195,7 +193,10 @@ class DatabaseService:
                         )
                     )
 
-                logger.info(f"Fetched {len(issue_reports)} issue reports")
+                # Double-check sorting to ensure newest first
+                issue_reports.sort(key=lambda x: x.created_at, reverse=True)
+
+                logger.info(f"Fetched and sorted {len(issue_reports)} issue reports by createdAt DESC")
                 return issue_reports
 
         except psycopg2.Error as e:
@@ -211,7 +212,7 @@ class DatabaseService:
 class ExcelExportService:
     """Service for exporting data to Excel format."""
 
-    def export(self, issue_reports: List[IssueReport]) -> str:
+    def export(self, issue_reports: list[IssueReport]) -> str:
         """Export issue reports to Excel file."""
         filepath = ExportConfig.OUTPUT_DIR / "issue_reports.xlsx"
 
@@ -257,22 +258,16 @@ class GoogleSheetsService:
         """Authenticate with Google Sheets API."""
         creds = None
         if ExportConfig.TOKEN_FILE.exists():
-            creds = Credentials.from_authorized_user_file(
-                str(ExportConfig.TOKEN_FILE), ExportConfig.SCOPES
-            )
+            creds = Credentials.from_authorized_user_file(str(ExportConfig.TOKEN_FILE), ExportConfig.SCOPES)
 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
                 if not ExportConfig.CREDENTIALS_FILE.exists():
-                    raise FileNotFoundError(
-                        f"Credentials file '{ExportConfig.CREDENTIALS_FILE}' not found"
-                    )
+                    raise FileNotFoundError(f"Credentials file '{ExportConfig.CREDENTIALS_FILE}' not found")
 
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    str(ExportConfig.CREDENTIALS_FILE), ExportConfig.SCOPES
-                )
+                flow = InstalledAppFlow.from_client_secrets_file(str(ExportConfig.CREDENTIALS_FILE), ExportConfig.SCOPES)
                 creds = flow.run_local_server(port=0)
 
             with open(ExportConfig.TOKEN_FILE, "w") as token:
@@ -281,7 +276,7 @@ class GoogleSheetsService:
         self.sheets_service = build("sheets", "v4", credentials=creds)
         logger.info("Google Sheets authentication successful")
 
-    def get_existing_ids(self) -> Set[str]:
+    def get_existing_ids(self) -> set[str]:
         """Get existing record IDs from Google Sheets."""
         try:
             # First, ensure the sheet exists
@@ -317,11 +312,7 @@ class GoogleSheetsService:
         """Create or get existing Reports sheet."""
         try:
             # Try to get existing sheet
-            result = (
-                self.sheets_service.spreadsheets()
-                .get(spreadsheetId=ExportConfig.SPREADSHEET_ID)
-                .execute()
-            )
+            result = self.sheets_service.spreadsheets().get(spreadsheetId=ExportConfig.SPREADSHEET_ID).execute()
 
             existing_sheets = result.get("sheets", [])
             for sheet in existing_sheets:
@@ -341,30 +332,48 @@ class GoogleSheetsService:
             )
 
             sheet_id = result["replies"][0]["addSheet"]["properties"]["sheetId"]
-            logger.info(
-                f"Created new sheet '{ExportConfig.SHEET_NAME}' with ID: {sheet_id}"
-            )
+            logger.info(f"Created new sheet '{ExportConfig.SHEET_NAME}' with ID: {sheet_id}")
             return sheet_id
 
         except Exception as e:
             logger.error(f"Failed to create/get sheet: {e}")
             raise
 
-    def append_reports(self, issue_reports: List[IssueReport]) -> int:
-        """Add issue reports to Google Sheets, avoiding duplicates."""
+    def append_reports(self, issue_reports: list[IssueReport]) -> int:
+        """Add issue reports to Google Sheets, avoiding duplicates and maintaining sort order."""
         try:
             # Get existing IDs and filter out duplicates
             existing_ids = self.get_existing_ids()
             new_reports = [r for r in issue_reports if r.id not in existing_ids]
 
+            # Always re-sort existing data, even if no new records
             if not new_reports:
-                logger.info("No new records to add to Google Sheets")
-                return 0
+                logger.info("No new records to add, but will re-sort existing data")
 
             # Sort by creation date (newest first - descending order)
             new_reports.sort(key=lambda x: x.created_at, reverse=True)
 
-            # Prepare data for sheets
+            # Get all existing data to re-sort everything
+            existing_data = self._get_all_existing_data()
+
+            # Combine existing data with new data and sort everything
+            all_reports = existing_data + new_reports
+
+            # Sort by creation date (newest first - descending order)
+            all_reports.sort(key=lambda x: x.created_at, reverse=True)
+
+            # Verify sorting is correct
+            is_sorted = all(all_reports[i].created_at >= all_reports[i + 1].created_at for i in range(len(all_reports) - 1))
+
+            if not is_sorted:
+                logger.warning("Sorting verification failed - data may not be properly sorted!")
+            else:
+                logger.info(f"Sorted {len(all_reports)} total records by createdAt in descending order")
+
+            # Clear existing data and re-insert everything in correct order
+            self._clear_existing_data()
+
+            # Prepare data for sheets (skip header row)
             values = [
                 [
                     report.id,
@@ -374,24 +383,26 @@ class GoogleSheetsService:
                     report.contact,
                     report.description,
                 ]
-                for report in new_reports
+                for report in all_reports
             ]
 
-            # Append data to sheets
+            # Insert all data at once
             body = {"values": values}
-            self.sheets_service.spreadsheets().values().append(
+            self.sheets_service.spreadsheets().values().update(
                 spreadsheetId=ExportConfig.SPREADSHEET_ID,
-                range=f"{ExportConfig.SHEET_NAME}!A:F",
+                range=f"{ExportConfig.SHEET_NAME}!A2:F{len(values) + 1}",
                 valueInputOption="RAW",
-                insertDataOption="INSERT_ROWS",
                 body=body,
             ).execute()
 
-            # Apply formatting to new rows
-            if new_reports:
-                self._apply_formatting(len(new_reports))
+            # Apply formatting to all rows
+            if all_reports:
+                self._apply_formatting(len(all_reports))
 
-            logger.info(f"Added {len(new_reports)} new records to Google Sheets")
+            if new_reports:
+                logger.info(f"Added {len(new_reports)} new records and re-sorted {len(all_reports)} total records in Google Sheets")
+            else:
+                logger.info(f"Re-sorted {len(all_reports)} existing records in Google Sheets")
             return len(new_reports)
 
         except HttpError as error:
@@ -477,9 +488,7 @@ class GoogleSheetsService:
                 }
             ]
 
-            self.sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=ExportConfig.SPREADSHEET_ID, body={"requests": requests}
-            ).execute()
+            self.sheets_service.spreadsheets().batchUpdate(spreadsheetId=ExportConfig.SPREADSHEET_ID, body={"requests": requests}).execute()
 
             logger.info("Applied header formatting")
 
@@ -520,12 +529,9 @@ class GoogleSheetsService:
         except HttpError as error:
             logger.error(f"Failed to apply column width formatting: {error}")
 
-    def _apply_formatting(self, new_rows_count: int) -> None:
-        """Apply formatting to newly added rows."""
+    def _get_all_existing_data(self) -> list[IssueReport]:
+        """Get all existing data from Google Sheets as IssueReport objects."""
         try:
-            sheet_id = self._get_sheet_id()
-
-            # Get current row count to determine range
             result = (
                 self.sheets_service.spreadsheets()
                 .values()
@@ -537,17 +543,91 @@ class GoogleSheetsService:
             )
 
             values = result.get("values", [])
-            total_rows = len(values)
 
-            if total_rows <= 1:  # Only header or no data
+            # Skip header row and empty rows
+            existing_reports = []
+            for row in values[1:]:  # Skip header
+                if len(row) >= 6:  # Ensure we have all required columns
+                    try:
+                        # Parse the date string back to datetime
+                        created_at_str = row[2]  # Date column
+
+                        # Handle different possible date formats
+                        try:
+                            created_at = datetime.strptime(created_at_str, "%d.%m.%Y %H:%M:%S")
+                        except ValueError:
+                            # Try alternative format if the first one fails
+                            created_at = datetime.strptime(created_at_str, "%Y-%m-%d %H:%M:%S")
+
+                        existing_reports.append(
+                            IssueReport(
+                                id=row[0],
+                                user_id=row[1] if row[1] != "N/A" else None,
+                                created_at=created_at,
+                                name=row[3],
+                                contact=row[4],
+                                description=row[5],
+                            )
+                        )
+                    except (ValueError, IndexError) as e:
+                        logger.warning(f"Skipping malformed row: {row}, error: {e}")
+                        continue
+
+            # Sort existing reports by creation date (newest first)
+            existing_reports.sort(key=lambda x: x.created_at, reverse=True)
+
+            logger.info(f"Retrieved and sorted {len(existing_reports)} existing records from Google Sheets")
+            return existing_reports
+
+        except HttpError as error:
+            logger.error(f"Failed to get existing data: {error}")
+            return []
+
+    def _clear_existing_data(self) -> None:
+        """Clear all existing data rows (keep header)."""
+        try:
+            # Get current data to determine range
+            result = (
+                self.sheets_service.spreadsheets()
+                .values()
+                .get(
+                    spreadsheetId=ExportConfig.SPREADSHEET_ID,
+                    range=f"{ExportConfig.SHEET_NAME}!A:F",
+                )
+                .execute()
+            )
+
+            values = result.get("values", [])
+
+            if len(values) <= 1:  # Only header or no data
                 return
 
-            # Calculate range for newly added rows
-            start_row = total_rows - new_rows_count
-            end_row = total_rows
+            # Clear all data rows (keep header)
+            range_to_clear = f"{ExportConfig.SHEET_NAME}!A2:F{len(values)}"
+            self.sheets_service.spreadsheets().values().clear(
+                spreadsheetId=ExportConfig.SPREADSHEET_ID,
+                range=range_to_clear,
+            ).execute()
+
+            logger.info(f"Cleared {len(values) - 1} existing data rows")
+
+        except HttpError as error:
+            logger.error(f"Failed to clear existing data: {error}")
+
+    def _apply_formatting(self, total_rows_count: int) -> None:
+        """Apply formatting to all data rows."""
+        try:
+            sheet_id = self._get_sheet_id()
+
+            if total_rows_count <= 0:
+                return
+
+            # Calculate range for all data rows (skip header)
+            start_row = 1  # Start after header
+            end_row = total_rows_count + 1  # +1 because we're after header
 
             requests = [
-                # Apply font formatting to new rows
+                # Apply font formatting to all data rows
                 {
                     "repeatCell": {
                         "range": {
@@ -590,14 +670,12 @@ class GoogleSheetsService:
                 }
             ]
 
-            self.sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=ExportConfig.SPREADSHEET_ID, body={"requests": requests}
-            ).execute()
+            self.sheets_service.spreadsheets().batchUpdate(spreadsheetId=ExportConfig.SPREADSHEET_ID, body={"requests": requests}).execute()
 
-            logger.info(f"Applied formatting to {new_rows_count} new rows")
+            logger.info(f"Applied formatting to {total_rows_count} data rows")
 
         except HttpError as error:
-            logger.error(f"Failed to apply formatting to new rows: {error}")
+            logger.error(f"Failed to apply formatting to data rows: {error}")
             # Don't raise to avoid breaking the main export process
 
 
@@ -680,14 +758,28 @@ class IssueReportExportFactory:
     """Factory for creating export components."""
 
     @staticmethod
-    def create_database_service(config: Dict[str, Union[str, int]]) -> DatabaseService:
+    def create_database_service(config: dict[str, str | int]) -> DatabaseService:
         """Create database service instance."""
+        # Ensure all config values are of the correct types
+        host = config.get("host", "")
+        database = config.get("database", "")
+        user = config.get("user", "")
+        password = config.get("password", "")
+        port_raw = config.get("port", 5432)
+
+        # Convert to proper types
+        host_str = str(host) if host is not None else ""
+        database_str = str(database) if database is not None else ""
+        user_str = str(user) if user is not None else ""
+        password_str = str(password) if password is not None else ""
+        port_int = int(port_raw) if port_raw is not None else 5432
+
         return DatabaseService(
-            host=config["host"],
-            database=config["database"],
-            user=config["user"],
-            password=config["password"],
-            port=config["port"],
+            host=host_str,
+            database=database_str,
+            user=user_str,
+            password=password_str,
+            port=port_int,
         )
 
     @staticmethod
@@ -717,7 +809,7 @@ class IssueReportExportApplication:
         self.config = self._load_config()
         self.factory = IssueReportExportFactory()
 
-    def _load_config(self) -> Dict[str, Union[str, int]]:
+    def _load_config(self) -> dict[str, str | int]:
         """Load database configuration."""
         config = configparser.ConfigParser()
         config_path = Path("../database.ini")
@@ -735,7 +827,7 @@ class IssueReportExportApplication:
             "database": db_config.get("database"),
             "user": db_config.get("user"),
             "password": db_config.get("password"),
-            "port": int(db_config.get("port", 5432)),
+            "port": int(db_config.get("port", "5432")),
         }
 
     def _get_user_confirmation(self) -> bool:
@@ -749,7 +841,7 @@ class IssueReportExportApplication:
         print(f"User: {self.config['user']}")
         print(f"Port: {self.config['port']}")
         print("=" * 40)
-        print(f"\nGoogle Sheets:")
+        print("\nGoogle Sheets:")
         print(f"Spreadsheet ID: {ExportConfig.SPREADSHEET_ID}")
         print(f"Sheet: {ExportConfig.SHEET_NAME}")
         print("=" * 40)
@@ -757,9 +849,7 @@ class IssueReportExportApplication:
         print("1. Connect to database and fetch IssueReport records")
         print("2. Export data to Excel file in 'issue_reports/' directory")
         print("3. Create 'Reports' sheet in Google Sheets if it doesn't exist")
-        print(
-            "4. Add new data to Google Sheets with Russian headers (avoiding duplicates)"
-        )
+        print("4. Add new data to Google Sheets with Russian headers (avoiding duplicates)")
         print("5. Apply professional formatting with Open Sans font")
         print("6. Log all operations to console and file")
 
@@ -777,9 +867,7 @@ class IssueReportExportApplication:
             db_service = self.factory.create_database_service(self.config)
             excel_service = self.factory.create_excel_service()
             sheets_service = self.factory.create_sheets_service()
-            exporter = self.factory.create_exporter(
-                db_service, excel_service, sheets_service
-            )
+            exporter = self.factory.create_exporter(db_service, excel_service, sheets_service)
 
             # Run export
             print("\nStarting export process...")
@@ -794,20 +882,18 @@ class IssueReportExportApplication:
 
     def _display_results(self, result: ExportResult) -> None:
         """Display export results."""
-        print(f"\nExport Results:")
+        print("\nExport Results:")
         print("=" * 50)
 
         if result.success:
-            print(f"Status: Success")
+            print("Status: Success")
             print(f"Total Records: {result.records_count}")
             print(f"New Records Added: {result.new_records_count}")
             if result.excel_file:
                 print(f"Excel File: {result.excel_file}")
             if result.sheets_updated:
-                print(f"Google Sheets: Updated")
-                print(
-                    f"URL: https://docs.google.com/spreadsheets/d/{ExportConfig.SPREADSHEET_ID}"
-                )
+                print("Google Sheets: Updated")
+                print(f"URL: https://docs.google.com/spreadsheets/d/{ExportConfig.SPREADSHEET_ID}")
             else:
                 print("Google Sheets: Not updated (authentication or access error)")
         else:
