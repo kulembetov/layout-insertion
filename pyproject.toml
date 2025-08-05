@@ -35,9 +35,11 @@ charset-normalizer = "3.4.2"
 idna = "3.10"
 urllib3 = "2.5.0"
 six = "1.17.0"
+defusedxml = "^0.7.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "4.2.0"
+bandit = "^1.8.6"
 
 [build-system]
 requires = ["poetry-core"]

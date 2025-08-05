@@ -69,4 +69,4 @@ script/figures
 database.ini
 
 # Security reports
-bandit-report.json
+bandit_report.json
