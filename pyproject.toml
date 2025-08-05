@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "layout-insertion"
+version = "0.1.0"
+description = "Layout insertion project with Figma integration and database operations"
+authors = ["Artur Kulembetov <artur_kulembetov@outlook.com>", "Stanislav Belyaev <dobro1996333@gmail.com>", "Vadim Vladimirov <vadimvladimirov467@gmail.com>", "Nikita Tihomirov <nikitatihomirov743@gmail.com>", "Roman Boronov <boronov06@mail.ru>"]
+readme = "README.md"
+packages = []
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.13"
+python-dotenv = "1.1.1"
+requests = "2.32.4"
+uuid-utils = "0.11.0"
+psycopg2 = "2.9.10"
+pandas = "2.3.1"
+openpyxl = "3.1.5"
+google-api-python-client = "2.177.0"
+google-auth = "2.40.3"
+google-auth-oauthlib = "1.2.2"
+google-auth-httplib2 = "0.2.0"
+googleapis-common-protos = "1.70.0"
+google-api-core = "2.25.1"
+boto3 = "1.40.0"
+botocore = "1.40.0"
+aiohttp = "3.12.15"
+aiofiles = "24.1.0"
+aiosignal = "1.4.0"
+async-timeout = "5.0.1"
+frozenlist = "1.7.0"
+multidict = "6.6.3"
+yarl = "1.20.1"
+certifi = "2025.7.14"
+charset-normalizer = "3.4.2"
+idna = "3.10"
+urllib3 = "2.5.0"
+six = "1.17.0"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "4.2.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
