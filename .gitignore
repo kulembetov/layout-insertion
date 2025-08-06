@@ -67,6 +67,8 @@ script/slide_deletion/
 script/final
 script/figures
 database.ini
+*.sql
+script/*.sql
 
 # Security reports
 bandit_report.json

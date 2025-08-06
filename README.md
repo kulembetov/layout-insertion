@@ -258,6 +258,9 @@ poetry run python update_blocks.py my_sql_output_old my_sql_output --output-dir 
 
 # 10. Create user accounts (optional)
 poetry run python account_creation.py
+
+# 11. Generate image options from S3 bucket
+poetry run python generate_image_options_sql.py
 ```
 
 **Alternative: Using Poetry Shell**
@@ -276,6 +279,7 @@ python sql_pollution.py
 python slide_deletion.py
 python update_blocks.py my_sql_output_old my_sql_output --output-dir final
 python account_creation.py
+python generate_image_options_sql.py
 
 # Exit shell when done
 exit
@@ -537,9 +541,49 @@ exit
   2. **Statistics Calculation:** Computes comprehensive feedback statistics (ratings, averages, rates)
   3. **Data Processing:** Processes and normalizes feedback records with metadata
   4. **Export Strategies:** Supports both Excel and Google Sheets export methods
-  5. **Google Sheets Integration:** Updates spreadsheet with statistics and detailed data
-  6. **Formatting:** Applies professional styling and column configurations
-  7. **Date Filtering:** Supports date range filtering for targeted exports
+
+### `generate_image_options_sql.py`
+- **Purpose:** Scans S3 bucket for images and generates SQL statements for ImageOption insertion
+- **Functionality:**
+  - Scans Yandex Cloud S3 bucket for images using specified prefix
+  - Generates UUID7 identifiers for each image following codebase patterns
+  - Creates SQL INSERT statements for ImageOption table following Prisma schema
+  - Supports various image formats (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
+  - Groups images by folder structure for organized SQL output
+  - Sets author fields to NULL as requested (no author information available)
+  - Generates batch SQL with transaction support
+  - Provides detailed logging to file and minimal console output
+  - Creates comprehensive log files in `logs/` directory
+- **Configuration:**
+  - Requires `.env` file with Yandex Cloud credentials (YANDEX_STATIC_KEY, YANDEX_STATIC_SECRET, YANDEX_BUCKET_NAME)
+  - Supports configurable S3 prefix for targeted scanning
+  - Configurable image source type (brand, uploaded, unsplash, etc.)
+  - Customizable output SQL file name
+  - Interactive `.env` file creation if credentials are missing
+- **Dependencies:** `boto3`, `python-dotenv`, `uuid-utils`
+- **Usage:** `poetry run python generate_image_options_sql.py`
+- **How it works:**
+  1. **Credential Check:** Validates Yandex Cloud credentials and offers interactive setup
+  2. **S3 Connection:** Authenticates with Yandex Cloud using static access keys
+  3. **Bucket Access:** Verifies bucket access and permissions
+  4. **Image Scanning:** Uses S3 paginator to efficiently scan bucket contents with prefix
+  5. **Image Detection:** Filters objects by image file extensions
+  6. **URL Generation:** Builds full URLs for each image in the bucket
+  7. **SQL Generation:** Creates INSERT statements with UUID7 IDs and proper field mapping
+  8. **Batch Processing:** Groups images by folder and generates organized SQL output
+  9. **File Output:** Saves generated SQL to specified file with transaction support
+  10. **Logging:** Provides detailed logs to file and summary to console
+- **Environment Variables:**
+  - `YANDEX_STATIC_KEY`: Yandex Cloud access key ID
+  - `YANDEX_STATIC_SECRET`: Yandex Cloud secret access key
+  - `YANDEX_BUCKET_NAME`: S3 bucket name
+  - `S3_PREFIX`: Prefix to scan in bucket (default: "layouts/raiffeisen/miniatures/")
+  - `IMAGE_SOURCE`: Image source type (default: "brand")
+  - `OUTPUT_FILE`: Output SQL file name (default: "image_options.sql")
+- **Output:**
+  - SQL file with INSERT statements for ImageOption table
+  - Detailed logs in `logs/image_options_generation.log`
+  - Console summary with processed image count and file locations
 
 ---
 
@@ -782,6 +826,9 @@ poetry run python update_blocks.py my_sql_output_old my_sql_output --output-dir 
 
 # 10. Создание пользовательских аккаунтов (опционально)
 poetry run python account_creation.py
+
+# 11. Генерация опций изображений из S3 bucket
+poetry run python generate_image_options_sql.py
 ```
 
 **Альтернатива: Использование Poetry Shell**
@@ -800,6 +847,7 @@ python sql_pollution.py
 python slide_deletion.py
 python update_blocks.py my_sql_output_old my_sql_output --output-dir final
 python account_creation.py
+python generate_image_options_sql.py
 
 # Выйти из shell когда закончили
 exit
@@ -898,6 +946,49 @@ exit
   5. **Интеграция с Google Sheets:** Обновляет таблицу статистикой и детальными данными
   6. **Форматирование:** Применяет профессиональное стилирование и конфигурации столбцов
   7. **Фильтрация по датам:** Поддерживает фильтрацию по диапазону дат для целевого экспорта
+
+### `generate_image_options_sql.py`
+- **Назначение:** Сканирует S3 bucket для изображений и генерирует SQL-запросы для вставки в таблицу ImageOption
+- **Функциональность:**
+  - Сканирует Yandex Cloud S3 bucket для изображений с указанным префиксом
+  - Генерирует UUID7 идентификаторы для каждого изображения, следуя паттернам кодовой базы
+  - Создает SQL INSERT-запросы для таблицы ImageOption, следуя схеме Prisma
+  - Поддерживает различные форматы изображений (JPG, PNG, GIF, BMP, WebP, TIFF, SVG)
+  - Группирует изображения по структуре папок для организованного SQL-вывода
+  - Устанавливает поля автора в NULL по запросу (информация об авторе недоступна)
+  - Генерирует пакетные SQL-запросы с поддержкой транзакций
+  - Предоставляет подробное логирование в файл и минимальный вывод в консоль
+  - Создает комплексные файлы логов в директории `logs/`
+- **Конфигурация:**
+  - Требует файл `.env` с учетными данными Yandex Cloud (YANDEX_STATIC_KEY, YANDEX_STATIC_SECRET, YANDEX_BUCKET_NAME)
+  - Поддерживает настраиваемый S3 префикс для целевого сканирования
+  - Настраиваемый тип источника изображения (brand, uploaded, unsplash и т.д.)
+  - Настраиваемое имя выходного SQL-файла
+  - Интерактивное создание файла `.env`, если учетные данные отсутствуют
+- **Зависимости:** `boto3`, `python-dotenv`, `uuid-utils`
+- **Использование:** `poetry run python generate_image_options_sql.py`
+- **Как работает:**
+  1. **Проверка учетных данных:** Валидирует учетные данные Yandex Cloud и предлагает интерактивную настройку
+  2. **S3 подключение:** Аутентифицируется с Yandex Cloud используя статические ключи доступа
+  3. **Доступ к bucket:** Проверяет доступ к bucket и разрешения
+  4. **Сканирование изображений:** Использует S3 пагинатор для эффективного сканирования содержимого bucket с префиксом
+  5. **Обнаружение изображений:** Фильтрует объекты по расширениям файлов изображений
+  6. **Генерация URL:** Строит полные URL для каждого изображения в bucket
+  7. **Генерация SQL:** Создает INSERT-запросы с UUID7 ID и правильным маппингом полей
+  8. **Пакетная обработка:** Группирует изображения по папкам и генерирует организованный SQL-вывод
+  9. **Файловый вывод:** Сохраняет сгенерированный SQL в указанный файл с поддержкой транзакций
+  10. **Логирование:** Предоставляет подробные логи в файл и сводку в консоль
+- **Переменные окружения:**
+  - `YANDEX_STATIC_KEY`: ID ключа доступа Yandex Cloud
+  - `YANDEX_STATIC_SECRET`: Секретный ключ доступа Yandex Cloud
+  - `YANDEX_BUCKET_NAME`: Имя S3 bucket
+  - `S3_PREFIX`: Префикс для сканирования в bucket (по умолчанию: "layouts/raiffeisen/miniatures/")
+  - `IMAGE_SOURCE`: Тип источника изображения (по умолчанию: "brand")
+  - `OUTPUT_FILE`: Имя выходного SQL-файла (по умолчанию: "image_options.sql")
+- **Вывод:**
+  - SQL-файл с INSERT-запросами для таблицы ImageOption
+  - Подробные логи в `logs/image_options_generation.log`
+  - Сводка в консоли с количеством обработанных изображений и расположением файлов
 
 ---
 
