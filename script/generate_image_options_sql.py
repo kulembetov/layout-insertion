@@ -182,6 +182,13 @@ class SQLGenerator:
 
         return sql
 
+    def generate_delete_sql(self, image_info: S3ImageInfo) -> str:
+        """Generate DELETE SQL statement for a single ImageOption"""
+        sql = f"""-- Delete ImageOption: {image_info['filename']}
+        DELETE FROM "ImageOption" WHERE "url" = '{image_info["url"]}';"""  # nosec
+
+        return sql
+
     def generate_batch_sql(self, images: list[S3ImageInfo], source: str = DEFAULT_IMAGE_SOURCE) -> str:
         """Generate batch SQL for multiple ImageOptions"""
         if not images:
@@ -194,6 +201,24 @@ class SQLGenerator:
 
         for image_info in images:
             sql_parts.append(self.generate_image_option_sql(image_info, source))
+            sql_parts.append("")
+
+        sql_parts.append("COMMIT;")
+
+        return "\n".join(sql_parts)
+
+    def generate_batch_delete_sql(self, images: list[S3ImageInfo]) -> str:
+        """Generate batch DELETE SQL for multiple ImageOptions"""
+        if not images:
+            return ""
+
+        sql_parts = []
+        sql_parts.append("-- Batch delete ImageOptions")
+        sql_parts.append("BEGIN;")
+        sql_parts.append("")
+
+        for image_info in images:
+            sql_parts.append(self.generate_delete_sql(image_info))
             sql_parts.append("")
 
         sql_parts.append("COMMIT;")
@@ -222,7 +247,7 @@ def create_env_file():
     print("\nConfiguration")
     s3_prefix = input("S3 prefix to scan [layouts/raiffeisen/miniatures/]: ").strip()
     image_source = input("Image source type [uploaded]: ").strip()
-    output_file = input("Output SQL file [image_options.sql]: ").strip()
+    output_file = input("Output SQL file [insert_image_options.sql]: ").strip()
 
     env_content = f"""# Yandex Cloud Credentials
 YANDEX_STATIC_KEY={yandex_static_key}
@@ -274,7 +299,7 @@ def main():
         # Get configuration
         s3_prefix = os.getenv("S3_PREFIX", "layouts/raiffeisen/miniatures/")
         image_source = os.getenv("IMAGE_SOURCE", DEFAULT_IMAGE_SOURCE)
-        output_file = os.getenv("OUTPUT_FILE", "image_options.sql")
+        output_file = os.getenv("OUTPUT_FILE", "insert_image_options.sql")
         bucket_name = os.getenv("YANDEX_BUCKET_NAME")
 
         logger.info(f"Starting image scan from s3://{bucket_name}/{s3_prefix}")
@@ -307,43 +332,66 @@ def main():
                 images_by_folder[folder] = []
             images_by_folder[folder].append(image)
 
-        # Generate SQL
-        all_sql_parts = []
-        all_sql_parts.append("-- Generated ImageOption SQL statements")
-        all_sql_parts.append(f"-- Source: s3://{bucket_name}/{s3_prefix}")
-        all_sql_parts.append(f"-- Total images: {len(images)}")
-        all_sql_parts.append("")
+        # Generate INSERT SQL
+        all_insert_sql_parts = []
+        all_insert_sql_parts.append("-- Generated ImageOption INSERT statements")
+        all_insert_sql_parts.append(f"-- Source: s3://{bucket_name}/{s3_prefix}")
+        all_insert_sql_parts.append(f"-- Total images: {len(images)}")
+        all_insert_sql_parts.append("")
+
+        # Generate DELETE SQL
+        all_delete_sql_parts = []
+        all_delete_sql_parts.append("-- Generated ImageOption DELETE statements")
+        all_delete_sql_parts.append(f"-- Source: s3://{bucket_name}/{s3_prefix}")
+        all_delete_sql_parts.append(f"-- Total images: {len(images)}")
+        all_delete_sql_parts.append("")
 
         for folder, folder_images in images_by_folder.items():
             logger.info(f"Processing folder: {folder} ({len(folder_images)} images)")
 
-            all_sql_parts.append(f"-- Folder: {folder}")
-            all_sql_parts.append(f"-- Images: {len(folder_images)}")
-            all_sql_parts.append("")
+            # Generate INSERT SQL for this folder
+            all_insert_sql_parts.append(f"-- Folder: {folder}")
+            all_insert_sql_parts.append(f"-- Images: {len(folder_images)}")
+            all_insert_sql_parts.append("")
 
-            # Generate SQL for this folder
-            folder_sql = sql_generator.generate_batch_sql(folder_images, image_source)
-            all_sql_parts.append(folder_sql)
-            all_sql_parts.append("")
+            folder_insert_sql = sql_generator.generate_batch_sql(folder_images, image_source)
+            all_insert_sql_parts.append(folder_insert_sql)
+            all_insert_sql_parts.append("")
+
+            # Generate DELETE SQL for this folder
+            all_delete_sql_parts.append(f"-- Folder: {folder}")
+            all_delete_sql_parts.append(f"-- Images: {len(folder_images)}")
+            all_delete_sql_parts.append("")
+
+            folder_delete_sql = sql_generator.generate_batch_delete_sql(folder_images)
+            all_delete_sql_parts.append(folder_delete_sql)
+            all_delete_sql_parts.append("")
 
             logger.info(f"Generated SQL for folder: {folder} ({len(folder_images)} images)")
 
         # Combine all SQL
-        final_sql = "\n".join(all_sql_parts)
+        final_insert_sql = "\n".join(all_insert_sql_parts)
+        final_delete_sql = "\n".join(all_delete_sql_parts)
 
-        # Save to file
-        sql_generator.save_sql_to_file(final_sql, output_file)
+        # Save INSERT SQL to file
+        sql_generator.save_sql_to_file(final_insert_sql, output_file)
+
+        # Save DELETE SQL to file
+        delete_output_file = "delete_image_options.sql"
+        sql_generator.save_sql_to_file(final_delete_sql, delete_output_file)
 
         # Summary
         logger.info("SQL generation completed!")
         logger.info(f"Total images processed: {len(images)}")
         logger.info(f"Folders found: {len(images_by_folder)}")
-        logger.info(f"SQL saved to: {output_file}")
+        logger.info(f"INSERT SQL saved to: {output_file}")
+        logger.info(f"DELETE SQL saved to: {delete_output_file}")
 
         # Print only the summary to console
         print(f"Processed {len(images)} images and generated SQL statements")
         print(f"Found {len(images_by_folder)} folders")
-        print(f"SQL saved to: {output_file}")
+        print(f"INSERT SQL saved to: {output_file}")
+        print(f"DELETE SQL saved to: {delete_output_file}")
         print("Detailed logs: image_options_generation.log")
 
     except Exception as error:
