@@ -3,9 +3,13 @@ from typing import Any
 
 
 def normalize_font_family(font_family: str) -> str:
-    if not font_family:
-        return ""
-    return re.sub(r"[^a-z0-9_]", "", font_family.strip().lower().replace(" ", "_").replace("-", "_"))
+        if not font_family:
+            return ""
+        return re.sub(
+            r"[^a-z0-9_]",
+            "",
+            font_family.strip().lower().replace(" ", "_").replace("-", "_"),
+        )
 
 
 def normalize_font_weight(weight: Any) -> int | None:

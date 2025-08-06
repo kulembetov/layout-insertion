@@ -11,7 +11,6 @@ from django_app.api_v1.utils.extractors import Extractor
 from django_app.api_v1.utils.filters import should_include
 from django_app.api_v1.utils.helpers import get_slide_number, round5
 from log_utils import logs, setup_logger
-
 from .data_classes import ExtractedBlock, ExtractedSlide
 from .filters.filter_settings import FilterConfig, FilterMode
 
@@ -116,6 +115,9 @@ class FigmaAPI:
         else:
             pages = self.fetch()
 
+        from django_app.api_v1.utils.helpers import json_dump
+        json_dump(data, 'testbag')
+
         all_slides: list[ExtractedSlide] = []
         for page in pages:
             logger.info(f"\nProcessing page: {page.get(TYPES.FK_NAME, 'Unnamed')}")
@@ -184,7 +186,7 @@ class FigmaAPI:
             if self.filter_config.mode == FilterMode.SLIDE_GROUP and slide_number not in self.filter_config.target_slides:
                 return slides
 
-            blocks = self.collect_enhanced_blocks(node, frame_origin, slide_number, parent_name)
+            blocks = self.collect_blocks(node, frame_origin, slide_number, parent_name)
 
             if blocks or self.filter_config.mode == FilterMode.ALL:
                 slide = ExtractedSlide(number=slide_number, container_name=parent_name, frame_name=node[TYPES.FK_NAME], slide_type=slide_type, blocks=blocks, frame_id=node["id"], dimensions={"w": CONSTANTS.FIGMA_CONFIG["TARGET_WIDTH"], "h": CONSTANTS.FIGMA_CONFIG["TARGET_HEIGHT"]})
@@ -225,66 +227,129 @@ class FigmaAPI:
 
         return True
 
-    # TO-DO: refactor ==========================================================================
-    @logs(logger, on=True)
-    def collect_enhanced_blocks(self, node: dict[str, Any], frame_origin: dict[str, int], slide_number: int, parent_container: str) -> list[ExtractedBlock]:
+    
+    def collect_blocks(
+        self,
+        node: dict[str, str | int | float | bool | dict | list],
+        frame_origin: dict[str, int],
+        slide_number: int,
+        parent_container: str,
+        comments_map: dict[str, str] | None = None,
+    ) -> list[ExtractedBlock]:
+        """Recursively collect blocks from a Figma node, filtering and normalizing as needed."""
         blocks: list[ExtractedBlock] = []
-        if not node.get(TYPES.FK_ABS_BOX):
+        if not Extractor.get_node_property(node, "absoluteBoundingBox"):
             return blocks
-
-        if self.filter_config.mode == FilterMode.STATUS:
-            dev_status = node.get("devStatus", {}).get("type")
-            if dev_status != "READY_FOR_DEV":
-                return blocks
-
-        # Centralized filtering for node
         if not should_include(node, self.filter_config):
             return blocks
-        name = node.get(TYPES.FK_NAME, "")
+        name = Extractor.get_node_property(node, "name", "")
         has_z = Checker.check_z_index(name)
-
-        # Only process nodes with z-index in the name
         if has_z:
             figma_type, sql_type = detect_block_type(node)
-            abs_box = node[TYPES.FK_ABS_BOX]
+            abs_box = Extractor.get_node_property(node, "absoluteBoundingBox")
             left = abs_box["x"] - frame_origin["x"]
             top = abs_box["y"] - frame_origin["y"]
-            dimensions = {"x": round5(left), "y": round5(top), "w": round5(abs_box["width"]), "h": round5(abs_box["height"])}
-            # Skip full-slide images unless 'precompiled' is in the name, but always include background blocks
+            # Extract rotation
+            rotation = Extractor.extract_rotation(node)
+
+            dimensions = {
+                "x": round(left),
+                "y": round(top),
+                "w": round(abs_box["width"]),
+                "h": round(abs_box["height"]),
+                "rotation": rotation,
+            }
             name_lower = name.lower()
             is_precompiled = "precompiled" in name_lower
-            should_skip = sql_type == "image" and dimensions["x"] == 0 and dimensions["y"] == 0 and dimensions["w"] == CONSTANTS.FIGMA_CONFIG["TARGET_WIDTH"] and dimensions["h"] == CONSTANTS.FIGMA_CONFIG["TARGET_HEIGHT"] and not is_precompiled  # Only skip images, not backgrounds
+            should_skip = sql_type == "image" and dimensions["x"] == 0 and dimensions["y"] == 0 and dimensions["w"] == CONSTANTS.FIGMA_CONFIG["TARGET_WIDTH"] and dimensions["h"] == CONSTANTS.FIGMA_CONFIG["TARGET_HEIGHT"] and not is_precompiled
             if should_skip:
-                logger.debug(f"Skipping {sql_type} block {name} (full image 1200x675)")
+                # logger.log_block_event(
+                #     f"Skipping {sql_type} block {name} (full image {CONSTANTS.FIGMA_CONFIG['TARGET_WIDTH']}x{CONSTANTS.FIGMA_CONFIG['TARGET_HEIGHT']})",
+                #     level="debug",
+                # )
+                ...
             else:
-                styles = Extractor.extract_text_styles(node, sql_type)
+                base_styles = Extractor.extract_text_styles(node, sql_type)
+                styles: dict[str, str | int | float | bool | list] = {}
+                for key, value in base_styles.items():
+                    if isinstance(value, (str, int, float, bool, list)):
+                        styles[key] = value
+                    else:
+                        styles[key] = str(value)  # Convert to string as fallback
                 z_index = Extractor.extract_z_index(name)
                 if z_index == 0:
                     z_index = CONSTANTS.Z_INDEX_DEFAULTS.get(sql_type, CONSTANTS.Z_INDEX_DEFAULTS["default"])
                 styles["zIndex"] = z_index
-                has_border_radius, border_radius = Extractor.extract_border_radius(node)
-                text_content: str | None = None
-                text_like_types = ["text", "blockTitle", "slideTitle", "subTitle", "number", "email", "date", "name", "percentage"]
-                if sql_type in text_like_types and node.get("type") == "TEXT":
-                    text_content = node.get(TYPES.FK_CHARACTERS, None)
 
-                # Extract color information for background and other relevant blocks
-                node_color = None
-                if sql_type in BLOCKS.BLOCK_TYPES["null_style_types"]:
-                    node_color = Extractor.extract_color_info(node)[0]  # Only get hex color
+                # Extract border radius and add to styles (always include, even if 0)
+                has_border_radius, border_radius = Extractor.extract_border_radius_from_node(node)
+                styles["borderRadius"] = border_radius
 
-                block = ExtractedBlock(id=node["id"], figma_type=figma_type, sql_type=sql_type, name=name, dimensions=dimensions, styles=styles, slide_number=slide_number, parent_container=parent_container, is_target=True, has_border_radius=has_border_radius, border_radius=border_radius, text_content=text_content)  # Pass text content
-                # Store the extracted color for later use
-                block.node_color = node_color
+                opacity = Extractor.extract_opacity(node)
+                styles["opacity"] = opacity
+
+                # Extract blur for non-text blocks (text blocks already have blur from extract_text_styles)
+                if sql_type not in [
+                    "text",
+                    "blockTitle",
+                    "slideTitle",
+                    "subTitle",
+                    "number",
+                    "email",
+                    "date",
+                    "name",
+                    "percentage",
+                ]:
+                    styles["blur"] = Extractor.extract_blur(node)
+
+                text_content = None
+                if sql_type in [
+                    "text",
+                    "blockTitle",
+                    "slideTitle",
+                    "subTitle",
+                    "number",
+                    "email",
+                    "date",
+                    "name",
+                    "percentage",
+                ] and Extractor.is_node_type(node, "TEXT"):
+                    text_content = Extractor.get_node_property(node, "characters", None)
+
+                # Get comment from the pre-fetched comments map
+                comments = comments_map.get(str(node["id"]), "") if comments_map else ""
+
+                block = ExtractedBlock(
+                    id=str(node["id"]),
+                    figma_type=figma_type,
+                    sql_type=sql_type,
+                    name=name,
+                    dimensions=dimensions,
+                    styles=styles,
+                    slide_number=slide_number,
+                    parent_container=parent_container,
+                    is_target=True,
+                    text_content=text_content,
+                    comments=comments,
+                )
                 if should_include(block, self.filter_config):
                     blocks.append(block)
-                    logger.info(f"Added {sql_type} block: {name}")
-                    color_info = f" | Color: {node_color}" if node_color else ""
-                    logger.info(
-                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{color_info}",
+                    # logger.log_block_event(f"Added {sql_type} block: {name}")
+                    blur_value = styles.get("blur", 0)
+                    blur_info = f" | Blur: {blur_value}px" if isinstance(blur_value, (int, float)) and blur_value > 0 else ""
+                    # logger.log_block_event(
+                    #     f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{blur_info}",
+                    #     level="debug",
+                    # )
+        if Extractor.get_node_property(node, "children") and not (getattr(self.filter_config, "exclude_hidden", True) and Extractor.get_node_property(node, "visible") is False):
+            for node_child in Extractor.get_node_property(node, "children"):
+                blocks.extend(
+                    self.collect_blocks(
+                        node_child,
+                        frame_origin,
+                        slide_number,
+                        parent_container,
+                        comments_map,
                     )
-        # Recursively process children (skip children of hidden nodes)
-        if node.get(TYPES.FK_CHILDREN) and not (getattr(self.filter_config, "exclude_hidden", True) and node.get(TYPES.FK_VISIBLE) is False):
-            for child in node[TYPES.FK_CHILDREN]:
-                blocks.extend(self.collect_enhanced_blocks(child, frame_origin, slide_number, parent_container))
+                )
         return blocks
