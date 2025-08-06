@@ -28,7 +28,5 @@ def round5(value: float) -> int:
 def get_slide_number(parent_name: str) -> int:
     """Get slide number from parent container name (case-insensitive, trimmed). Use config.py as the only source of truth."""
     key = parent_name.strip().lower()
-    num: int = SLIDES.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, 0)
-    if num:
-        return num
-    raise ValueError(f"Could not find slide number for {key}, parent name: {parent_name}")
+    num: int = SLIDES.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, 1)  # default slide number is 1
+    return num
