@@ -1,8 +1,8 @@
-from sqlalchemy import MetaData, Table, select, bindparam, insert
-from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import Session
 import uuid_utils as uuid
 from database import create_connection
+from sqlalchemy import MetaData, Table, bindparam, insert, select
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session
 
 
 def generate_uuid() -> str:
@@ -15,22 +15,20 @@ def select_an_entry_in_presentation_layout(name: str) -> bool:
 
     engine = create_connection()
     metadata = MetaData()
-    presentation_layout_table = Table('PresentationLayout', metadata, autoload_with=engine)
-    
-    query = select(presentation_layout_table).where(
-        presentation_layout_table.c.name == bindparam("name")
-    )
-    
+    presentation_layout_table = Table("PresentationLayout", metadata, autoload_with=engine)
+
+    query = select(presentation_layout_table).where(presentation_layout_table.c.name == bindparam("name"))
+
     try:
         with engine.connect() as connection:
             result_proxy = connection.execute(query, {"name": name})
             results = result_proxy.fetchone()
-            
+
             if results:
                 return True
             else:
                 return False
-            
+
     except DBAPIError:
         return False
 
@@ -43,12 +41,9 @@ def insert_an_entry_in_presentation_layout(name: str) -> bool:
 
     engine = create_connection()
     metadata = MetaData()
-    presentation_layout_table = Table('PresentationLayout', metadata, autoload_with=engine)
+    presentation_layout_table = Table("PresentationLayout", metadata, autoload_with=engine)
 
-    values = {
-        'id': generate_uuid(),
-        'name': name
-    }
+    values = {"id": generate_uuid(), "name": name}
     query = insert(presentation_layout_table).values(values)
 
     try:

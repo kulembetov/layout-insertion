@@ -1,6 +1,6 @@
 import uuid_utils as uuid
-
 from aiogram.types import User
+
 from tg.settings import ADMIN_LIST
 
 
@@ -12,8 +12,8 @@ def has_access(user_id: int) -> bool:
 
 def to_str_user(user: User) -> str:
     if user.username:
-        return f'@{user.username}'
-    return f'ID: {user.id}'
+        return f"@{user.username}"
+    return f"ID: {user.id}"
 
 
 def generate_uuid() -> str:

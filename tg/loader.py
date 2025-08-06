@@ -1,9 +1,9 @@
 """Loading bot and dispatcher."""
 
 import asyncio
+
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
-
 from settings import BOT_TOKEN, CACHE_LOCATION
 
 bot = Bot(token=BOT_TOKEN)

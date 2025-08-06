@@ -11,9 +11,7 @@ AUTO_BLOCKS: dict[str, Any] = {
     },
     "watermark": {"dimensions": {"x": 1065, "y": 636, "w": 118, "h": 26}},
     # Special configuration for last slide (slide number -1)
-    "last_slide": {
-        "watermark1": {"dimensions": {"x": 785, "y": 40, "w": 380, "h": 114}}
-    },
+    "last_slide": {"watermark1": {"dimensions": {"x": 785, "y": 40, "w": 380, "h": 114}}},
 }
 
 # Block type groups

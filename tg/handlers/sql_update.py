@@ -1,4 +1,4 @@
-from aiogram import Router, F
+from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
@@ -8,6 +8,7 @@ from tg.states import OptionState, UpdatingState
 update_router = Router()
 
 logger = setup_logger(__name__)
+
 
 @update_router.message(F.text, UpdatingState.name)
 async def update_logic(message: Message, state: FSMContext):

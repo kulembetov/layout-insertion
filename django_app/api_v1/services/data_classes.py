@@ -16,9 +16,10 @@ class ExtractedBlock:
     is_target: bool = False
     has_border_radius: bool = False
     border_radius: list[int] = field(default_factory=lambda: [0, 0, 0, 0])
-    text_content: str = None
+    text_content: str | None = None
     figure_info: dict[str, Any] = field(default_factory=dict)
     precompiled_image_info: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class ExtractedSlide:

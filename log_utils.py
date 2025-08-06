@@ -1,7 +1,7 @@
 import logging
 import os
-from logging.handlers import TimedRotatingFileHandler
 from functools import wraps
+from logging.handlers import TimedRotatingFileHandler
 from types import FunctionType
 
 from django_app.config.settings import LOGGING_ON
@@ -19,7 +19,7 @@ def setup_logger(name=__name__, level=logging.INFO) -> logging.Logger:
 
     log_file: str = os.path.join(log_dir, f"{name}.log")
 
-    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
@@ -51,15 +51,16 @@ def logs(logger: logging.Logger, *, on: bool = True):
 
     Also check if global variable 'LOGGING_ON' is True.
     """
+
     def deco(obj):
         # ============= class decorator =============
         if isinstance(obj, type):
             cls = obj
             for attr_name in dir(cls):
                 attr = getattr(cls, attr_name)
-                if hasattr(attr, '_is_logs_wrapper'):
+                if hasattr(attr, "_is_logs_wrapper"):
                     attr._class_on = on
-                elif isinstance(attr, (staticmethod, classmethod)) and hasattr(attr.__func__, '_is_logs_wrapper'):
+                elif isinstance(attr, (staticmethod, classmethod)) and hasattr(attr.__func__, "_is_logs_wrapper"):
                     attr.__func__._class_on = on
             return cls
 
@@ -93,11 +94,8 @@ def logs(logger: logging.Logger, *, on: bool = True):
             wrapper._class_on = True
             return wrapper
 
-        raise TypeError(
-            "logs(..., is_class=True) can only be decorated with class."
-            "logs(..., is_class=False) can only be decorated with function."
-            "Other cases raise TypeError."
-        )
+        raise TypeError("'logs' can be used only with classes and functions. Other cases raise TypeError.")
+
     return deco
 
 

@@ -1,11 +1,12 @@
-from sqlalchemy import create_engine
 import os
-from dotenv import load_dotenv
-
 from typing import Optional
+
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
 
 load_dotenv()
+
 
 def create_connection() -> Optional["Engine"]:
     """Create connection to DB."""

@@ -72,4 +72,3 @@ logs/
 # Security reports
 bandit_report.json
 bandit-report.json
-

@@ -1,11 +1,9 @@
 from enum import Enum
 from typing import TypedDict
 
-"""
-========================
- Figma Node/Block Constants
-========================
-"""
+# ========================
+# Figma Node/Block Constants
+# ========================
 
 # FK - FIGMA_KEY
 # FT - FIGMA_TYPE
@@ -29,11 +27,10 @@ BT_FIGURE = "figure"
 BT_IMAGE = "image"
 BT_BACKGROUND = "background"
 
-"""
-========================
- Enums for Types
-========================
-"""
+# ========================
+#  Enums for Types
+# ========================
+
 
 class SlideLayoutType(str, Enum):
     CLASSIC = "classic"
@@ -46,6 +43,7 @@ class SlideLayoutType(str, Enum):
     TITLE = "title"
     LAST = "last"
     OTHER = "other"
+
 
 class BlockType(str, Enum):
     TEXT = "text"
@@ -66,11 +64,12 @@ class BlockType(str, Enum):
     NUMBER = "number"
     CHART = "chart"
 
-"""
-========================
- TypedDicts for Structured Configs
-========================
-"""
+
+# ========================
+#  TypedDicts for Structured Configs
+# ========================
+
+
 class PrecompiledImagesConfig(TypedDict):
     base_url: str
     default_colors: list[str]

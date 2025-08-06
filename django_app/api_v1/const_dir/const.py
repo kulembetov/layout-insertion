@@ -1,26 +1,19 @@
-from .types import PrecompiledImagesConfig, SlideLayoutType
 from typing import Any
+
+from .types import PrecompiledImagesConfig, SlideLayoutType
 
 # Precompiled Images configuration
 PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
     "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen",
-    "default_colors": [
-        "#bae4e4",  # мятно-бирюзовый
-        "#c6d6f2",  # холодно-синий
-        "#dfe8f5",  # небесно-голубой
-        "#e3dcf8",  # сиреневый
-        "#f0f0f0",  # светло-серый
-        "#f5e7e7",  # розово-бежевый
-        "#fad2be"   # персиково-оранжевый
-    ],
-    "prefix": ["Green", "Blue", "Sky","Purple", "Gray", "Pink", "Orange"]
+    "default_colors": ["#bae4e4", "#c6d6f2", "#dfe8f5", "#e3dcf8", "#f0f0f0", "#f5e7e7", "#fad2be"],  # мятно-бирюзовый  # холодно-синий  # небесно-голубой  # сиреневый  # светло-серый  # розово-бежевый  # персиково-оранжевый
+    "prefix": ["Green", "Blue", "Sky", "Purple", "Gray", "Pink", "Orange"],
 }
 
-"""
-========================
- Defaults and Templates
-========================
-"""
+
+# ========================
+# Defaults and Templates
+# ========================
+
 
 MINIATURES_BASE_PATH: str = "/assets/miniatures/raiffeisen"
 DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"
@@ -163,12 +156,7 @@ FIGMA_TO_SQL_BLOCK_MAPPING: dict[str, str] = {
     "label": "text",
 }
 
-FIGMA_CONFIG: dict[str, Any] = {
-    'TARGET_WIDTH': 1200,
-    'TARGET_HEIGHT': 675,
-    'OUTPUT_DIR': 'figma_extract',
-    'OUTPUT_FILE': 'extracted_data'
-}
+FIGMA_CONFIG: dict[str, Any] = {"TARGET_WIDTH": 1200, "TARGET_HEIGHT": 675, "OUTPUT_DIR": "figma_extract", "OUTPUT_FILE": "extracted_data"}
 
 # Valid font weights - ONLY these are allowed
 VALID_FONT_WEIGHTS = [300, 400, 700]
