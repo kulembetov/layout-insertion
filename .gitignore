@@ -68,6 +68,8 @@ script/final
 script/figures
 database.ini
 logs/
+*.sql
+script/*.sql
 
 # Security reports
 bandit_report.json

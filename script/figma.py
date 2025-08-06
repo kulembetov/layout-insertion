@@ -7,6 +7,7 @@ Fully compatible with config.py specifications.
 import argparse
 import json
 import logging
+import math
 import os
 import re
 import shutil
@@ -299,34 +300,135 @@ class ColorUtils:
     @staticmethod
     def extract_color_info(node: dict) -> tuple[str | None, str | None]:
         """
-        Extracts the first visible solid fill color and its variable/style from a Figma node.
-        Returns (hex_color, color_variable_id).
+        Extracts the first visible fill color/gradient and its variable/style from a Figma node.
+        Returns (hex_or_gradient_color, color_variable_id, gradient_css).
         """
+
         fills = node.get("fills")
         if fills and isinstance(fills, list):
-            for fill in fills:
-                if fill.get("visible", True) and fill.get("type") == "SOLID" and "color" in fill:
-                    c = fill["color"]
-                    r = int(round(c.get("r", 0) * 255))
-                    g = int(round(c.get("g", 0) * 255))
-                    b = int(round(c.get("b", 0) * 255))
-                    a = fill.get("opacity", c.get("a", 1))
-                    if a < 1:
-                        hex_color = f"#{r:02x}{g:02x}{b:02x}{int(a * 255):02x}"
-                    else:
-                        hex_color = f"#{r:02x}{g:02x}{b:02x}"
-                    # Extract variable/style if present
-                    color_variable = None
-                    if "boundVariables" in fill and "color" in fill["boundVariables"]:
-                        color_variable = fill["boundVariables"]["color"].get("id")
-                    elif "fillStyleId" in fill:
-                        color_variable = fill["fillStyleId"]
-                    return hex_color, color_variable
+            if len(fills) > 1:
+                fill = fills[1]
+            else:
+                fill = fills[0]
+
+            fill_type = fill.get("type")
+
+            # Handle SOLID fills
+            if fill_type == "SOLID" and fill.get("visible", True) and "color" in fill:
+                c = fill["color"]
+                r = int(round(c.get("r", 0) * 255))
+                g = int(round(c.get("g", 0) * 255))
+                b = int(round(c.get("b", 0) * 255))
+                a = fill.get("opacity", c.get("a", 1))
+                if a < 1:
+                    hex_or_gradient_color = f"#{r:02x}{g:02x}{b:02x}{int(a * 255):02x}"
+                else:
+                    hex_or_gradient_color = f"#{r:02x}{g:02x}{b:02x}"
+                # Extract variable/style if present
+                color_variable = None
+                if "boundVariables" in fill and "color" in fill["boundVariables"]:
+                    color_variable = fill["boundVariables"]["color"].get("id")
+                elif "fillStyleId" in fill:
+                    color_variable = fill["fillStyleId"]
+                return hex_or_gradient_color, color_variable
+
+            # Handle gradient fills
+            elif fill.get("visible", True) and fill_type in ["GRADIENT_LINEAR", "GRADIENT_RADIAL", "GRADIENT_ANGULAR", "GRADIENT_DIAMOND"]:
+                hex_or_gradient_color = ColorUtils._create_gradient_css(fill)
+                # Extract variable/style if present
+                color_variable = None
+
+                if "boundVariables" in fill and "color" in fill["boundVariables"]:
+                    color_variable = fill["boundVariables"]["color"].get("id")
+                elif "fillStyleId" in fill:
+                    color_variable = fill["fillStyleId"]
+                return hex_or_gradient_color, color_variable
+
         # Fallback: check for direct color field
         color = node.get("color")
         if color and isinstance(color, str):
             return color.lower(), None
         return None, None
+
+    @staticmethod
+    def _create_gradient_css(fill: dict) -> str:
+        """
+        Creates CSS gradient string from Figma gradient fill.
+        """
+        gradient_type = fill.get("type")
+        gradient_stops = fill.get("gradientStops", [])
+        gradient_handle_positions = fill.get("gradientHandlePositions", [])
+
+        if not gradient_stops:
+            return ""
+
+        # Convert gradient stops to CSS format
+        css_stops = []
+        for stop in gradient_stops:
+            color = stop.get("color", {})
+            position = stop.get("position", 0)
+
+            # Convert color to hex
+            r = int(round(color.get("r", 0) * 255))
+            g = int(round(color.get("g", 0) * 255))
+            b = int(round(color.get("b", 0) * 255))
+            a = color.get("a", 1)
+
+            if a < 1:
+                hex_color = f"#{r:02x}{g:02x}{b:02x}{int(a * 255):02x}"
+            else:
+                hex_color = f"#{r:02x}{g:02x}{b:02x}"
+
+            # Convert position to percentage
+            percentage = int(position * 100)
+            css_stops.append(f"{hex_color} {percentage}%")
+
+        # Create gradient based on type
+        if gradient_type == "GRADIENT_LINEAR":
+            # Calculate angle from handle positions
+            angle = ColorUtils._calculate_linear_angle(gradient_handle_positions)
+            return f"linear-gradient({angle}deg\\, {'\\, '.join(css_stops)})"
+
+        elif gradient_type == "GRADIENT_RADIAL":
+            # For radial gradients, we'll use a simple radial format
+            # Figma's radial gradients are more complex, but this is a good approximation
+            return f"radial-gradient(circle\\, {'\\, '.join(css_stops)})"
+
+        elif gradient_type == "GRADIENT_ANGULAR":
+            # Angular gradients in CSS are conic gradients
+            return f"conic-gradient({'\\, '.join(css_stops)})"
+
+        elif gradient_type == "GRADIENT_DIAMOND":
+            # Diamond gradients can be approximated with radial gradients
+            return f"radial-gradient(ellipse at center\\, {'\\, '.join(css_stops)})"
+
+        return ""
+
+    @staticmethod
+    def _calculate_linear_angle(handle_positions: list) -> int:
+        """
+        Calculate the angle for linear gradient from handle positions.
+        Returns angle in degrees (0-360).
+        """
+        if len(handle_positions) < 2:
+            return 0
+
+        # Get start and end positions
+        start = handle_positions[0]
+        end = handle_positions[1]
+
+        # Calculate vector
+        dx = end.get("x", 0) - start.get("x", 0)
+        dy = end.get("y", 0) - start.get("y", 0)
+
+        # Calculate angle in radians
+        angle_rad = math.atan2(dy, dx)
+
+        # Convert to degrees and normalize to 0-360
+        angle_deg = math.degrees(angle_rad)
+        angle_deg = (angle_deg + 360) % 360
+
+        return int(angle_deg)
 
 
 # ================ Font Utils ================
