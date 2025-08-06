@@ -1,8 +1,8 @@
-from database import BaseManager
 from sqlalchemy import insert, select
 from sqlalchemy.exc import DBAPIError
-from utils import generate_uuid
 
+from db_work.database import BaseManager
+from db_work.utils import generate_uuid
 from log_utils import setup_logger
 
 logger = setup_logger(__name__)
