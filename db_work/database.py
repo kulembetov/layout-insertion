@@ -1,24 +1,21 @@
-import os
-from typing import Optional
+from sqlalchemy import MetaData, Table, create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.engine.base import Engine
+from tg.settings import DATABASE_URL
 
-load_dotenv()
 
-def create_connection() -> Optional["Engine"]:
-    """Create connection to DB."""
+class BaseManager:
+    """Base Class For Managers."""
 
-    DB_NAME = os.getenv("POSTGRES_DB")
-    USERNAME = os.getenv("POSTGRES_USER")
-    PASSWORD = os.getenv("POSTGRES_PASSWORD")
-    HOST = os.getenv("POSTGRES_HOST")
-    PORT = os.getenv("POSTGRES_PORT")
-    DATABASE_URL = f"postgresql://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DB_NAME}"
+    def __init__(self):
+        self.engine = create_engine(DATABASE_URL, echo=False)
+        self.metadata = MetaData()
 
-    try:
-        engine = create_engine(DATABASE_URL, echo=False)
-        return engine
-    except Exception:
-        raise
+    def open_session(self, table_name: str) -> tuple[Table, Session]:
+        """Open session for some table."""
+
+        ps_table = Table(table_name, self.metadata, autoload_with=self.engine)
+        Session = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        session = Session()
+
+        return ps_table, session
