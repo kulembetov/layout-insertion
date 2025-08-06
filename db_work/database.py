@@ -7,7 +7,6 @@ from sqlalchemy.engine.base import Engine
 
 load_dotenv()
 
-
 def create_connection() -> Optional["Engine"]:
     """Create connection to DB."""
 
