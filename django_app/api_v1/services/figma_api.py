@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -9,8 +9,9 @@ from django_app.api_v1.utils.checkers import Checker
 from django_app.api_v1.utils.detectors import detect_block_type, detect_slide_type
 from django_app.api_v1.utils.extractors import Extractor
 from django_app.api_v1.utils.filters import should_include
-from django_app.api_v1.utils.helpers import get_slide_number, round5
+from django_app.api_v1.utils.helpers import get_slide_number
 from log_utils import logs, setup_logger
+
 from .data_classes import ExtractedBlock, ExtractedSlide
 from .filters.filter_settings import FilterConfig, FilterMode
 
@@ -116,7 +117,8 @@ class FigmaAPI:
             pages = self.fetch()
 
         from django_app.api_v1.utils.helpers import json_dump
-        json_dump(data, 'testbag')
+
+        json_dump(data, "testbag")
 
         all_slides: list[ExtractedSlide] = []
         for page in pages:
@@ -129,16 +131,24 @@ class FigmaAPI:
     @staticmethod
     def _get_summary(slides: list[ExtractedSlide]) -> dict[str, int | dict[str | int, Any]]:
         # Generate summary
-        summary: dict[str, int | dict] = {"total_slides": len(slides), "total_blocks": sum(len(slide.blocks) for slide in slides), "slide_types": {}, "block_types": {}, "slide_distribution": {}}
+        summary: dict[str, int | dict[Any, Any]] = {"total_slides": len(slides), "total_blocks": sum(len(slide.blocks) for slide in slides), "slide_types": {}, "block_types": {}, "slide_distribution": {}}
 
         for slide in slides:
             slide_type = slide.slide_type
-            summary["slide_types"][slide_type] = summary["slide_types"].get(slide_type, 0) + 1
-            summary["slide_distribution"][slide.number] = slide.container_name
+
+            slide_types = cast(dict[Any, Any], summary["slide_types"])
+            slide_types[slide_type] = slide_types.get(slide_type, 0) + 1
+            summary["slide_types"] = slide_types
+
+            slide_distribution = cast(dict[Any, Any], summary["slide_distribution"])
+            slide_distribution[slide.number] = slide.container_name
+            summary["slide_distribution"] = slide_distribution
 
             for block in slide.blocks:
                 block_type = block.sql_type
-                summary["block_types"][block_type] = summary["block_types"].get(block_type, 0) + 1
+                block_types = cast(dict[Any, Any], summary["block_types"])
+                block_types[block_type] = block_types.get(block_type, 0) + 1
+                summary["block_types"] = block_types
 
         return summary
 
@@ -227,7 +237,6 @@ class FigmaAPI:
 
         return True
 
-    
     def collect_blocks(
         self,
         node: dict[str, str | int | float | bool | dict | list],
@@ -317,7 +326,7 @@ class FigmaAPI:
                     text_content = Extractor.get_node_property(node, "characters", None)
 
                 # Get comment from the pre-fetched comments map
-                comments = comments_map.get(str(node["id"]), "") if comments_map else ""
+                comments = [comments_map[str(node["id"])]] if comments_map and str(node["id"]) in comments_map else []
 
                 block = ExtractedBlock(
                     id=str(node["id"]),
@@ -334,13 +343,12 @@ class FigmaAPI:
                 )
                 if should_include(block, self.filter_config):
                     blocks.append(block)
-                    # logger.log_block_event(f"Added {sql_type} block: {name}")
+                    logger.info(f"Added {sql_type} block: {name}")
                     blur_value = styles.get("blur", 0)
                     blur_info = f" | Blur: {blur_value}px" if isinstance(blur_value, (int, float)) and blur_value > 0 else ""
-                    # logger.log_block_event(
-                    #     f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{blur_info}",
-                    #     level="debug",
-                    # )
+                    logger.debug(
+                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{blur_info}",
+                    )
         if Extractor.get_node_property(node, "children") and not (getattr(self.filter_config, "exclude_hidden", True) and Extractor.get_node_property(node, "visible") is False):
             for node_child in Extractor.get_node_property(node, "children"):
                 blocks.extend(

@@ -33,7 +33,7 @@ class FilterFigmaJson(APIView):
     """Filter data received from Figma and add it into database."""
 
     @logs(logger, on=True)
-    def get(self, request):
+    def get(self, request) -> Response:
         try:
             file_id = request.data["file_id"]
             logger.info(f"file_id: {file_id}")
@@ -44,7 +44,7 @@ class FilterFigmaJson(APIView):
             from .implemented import filter_figma_instance
 
             filter_type: str = request.data.get("filter").get("type", "")
-            filter_names: list[str] = request.data.get("filter").get("name", [])
+            filter_names: list[int | str] = request.data.get("filter").get("name", [])
 
             filter_figma_instance.file_id = file_id
             filter_figma_instance.filter_names = filter_names

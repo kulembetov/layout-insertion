@@ -83,7 +83,9 @@ class BlockBuilder:
         all_colors = []
         all_fonts = []
         sql_type: str = self.get("sql_type") or ""
-        for color_hex, objects in self.slide_config[sql_type].items():
+        config = self.slide_config or {}
+        sql_config = config.get(sql_type, {})
+        for color_hex, objects in sql_config.items():
             all_colors.extend([o.get("color") for o in objects if o.get("color")])
             all_fonts.extend([o.get(TYPES.FK_FONT_FAMILY) for o in objects if o.get(TYPES.FK_FONT_FAMILY)])
 
@@ -91,7 +93,7 @@ class BlockBuilder:
 
     def _fill_by_background(self) -> None:
         color_found = False
-        if safe_in(TYPES.BT_BACKGROUND, self.slide_config):
+        if self.slide_config and safe_in(TYPES.BT_BACKGROUND, self.slide_config):
             for color_hex, background_objects in self.slide_config[TYPES.BT_BACKGROUND].items():
                 if background_objects:
                     background_obj = background_objects[0]
@@ -109,7 +111,7 @@ class BlockBuilder:
         self.block_dict["figureName"] = clean_name
         if self.get("node_color"):
             self.block_dict["color"] = self.get("node_color")
-        elif safe_in("figure", self.slide_config):
+        elif self.slide_config and safe_in("figure", self.slide_config):
             all_colors, all_fonts = self.__get_colors_and_fonts()
             if all_colors:
                 self.block_dict["all_colors"] = list(set(all_colors))
@@ -166,7 +168,7 @@ class BlockBuilder:
             "fontFamily": self.get("fontFamily"),
         }
         # Optionally enrich with slide_config if available
-        if safe_in(TYPES.BT_FIGURE, self.slide_config):
+        if self.slide_config is not None and safe_in(TYPES.BT_FIGURE, self.slide_config):
             # Try to find matching color/font info
             for color_hex, figure_objects in self.slide_config[TYPES.BT_FIGURE].items():
                 for figure_obj in figure_objects:
@@ -278,7 +280,7 @@ def slide_to_dict(slide: ExtractedSlide, comments: dict) -> dict[str, Any]:
                 max_len = len(text_content)
     sentence_count = 1
     if max_text_block:
-        text_content: str = getattr(max_text_block, "text_content", "")
+        text_content = getattr(max_text_block, "text_content", "")
         sentence_count = count_sentences(text_content)
     if sentence_count == 0:
         sentence_count = 1

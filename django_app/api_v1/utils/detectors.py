@@ -26,10 +26,10 @@ def detect_block_type(node: dict) -> tuple[str, str]:
             if sql_type in BLOCKS.BLOCK_TYPES["block_layout_type_options"]:
                 return pattern, sql_type
 
-    type_mappings = {
+    type_mappings: dict[str, list[tuple[list[str], dict[str, str]]]] = {
         TYPES.FT_TEXT: [
             (["title", "heading", "header", "h1", "h2"], {"sql_type": "blockTitle"}),
-            (["slide", "main"], {"sql_type": "slideTitle"} if any(kw in clean_name for kw in ["title", "heading", "header", "h1", "h2"]) else None),
+            (["slide", "main"], {"sql_type": "slideTitle"} if any(kw in clean_name for kw in ["title", "heading", "header", "h1", "h2"]) else {}),
             (["subtitle", "sub", "subheading"], {"sql_type": "subTitle"}),
             (["number", "num", "count"], {"sql_type": "number"}),
             (["email", "@", "mail"], {"sql_type": "email"}),
@@ -43,7 +43,7 @@ def detect_block_type(node: dict) -> tuple[str, str]:
         TYPES.FT_GROUP: [(["table", "grid", "data"], {"sql_type": "table"}), (["chart", "graph"], {"sql_type": "table"}), (["infographic", "infographik", "visual"], {"sql_type": "infographik"}), (["watermark", "mark"], {"sql_type": "watermark"}), ([], {"sql_type": "figure"})],
     }
 
-    mappings_for_node = type_mappings.get(node_type, [])
+    mappings_for_node: list[tuple[list[str], dict[str, str]]] = type_mappings.get(node_type, [])
     for keywords, mapping in mappings_for_node:
         if not keywords or any(keyword in clean_name for keyword in keywords):
             mapped_sql_type: str = mapping.get("sql_type", "")

@@ -30,3 +30,4 @@ class ExtractedSlide:
     blocks: list[ExtractedBlock]
     frame_id: str
     dimensions: dict[str, int]
+    _figma_node: dict[str, Any] | None = field(default=None, repr=False)

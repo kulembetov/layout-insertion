@@ -30,6 +30,7 @@ class PresentationLayoutManager(BaseManager):
         except DBAPIError or Exception as exc:
             logger.error(f"Попытка добавить шаблон завершилась ошибкой: {exc}")
             session.rollback()
+            return None
 
         finally:
             session.close()
@@ -50,6 +51,7 @@ class PresentationLayoutManager(BaseManager):
         except DBAPIError or Exception as exc:
             logger.error(f"Попытка добавить шаблон завершилась ошибкой: {exc}")
             session.rollback()
+            return None
 
         finally:
             session.close()
@@ -75,6 +77,7 @@ class ColorSettingsManager(BaseManager):
         except DBAPIError or Exception as exc:
             logger.error(f"Попытка добавить шаблон завершилась ошибкой: {exc}")
             session.rollback()
+            return None
 
         finally:
             session.close()
@@ -86,7 +89,7 @@ class PresentationLayoutStylesManager(BaseManager):
     def __init__(self):
         super().__init__()
 
-    def insert_new_ids(self, presentation_layout_id: str, color_settings_id: str) -> str | None:
+    def insert_new_ids(self, presentation_layout_id: str | None, color_settings_id: str | None) -> str | None:
         """Inserts ColorSettingsID and PresentationLayoutID into PresentationLayoutStyles."""
 
         presentation_layout_styles_table, session = self.open_session("PresentationLayoutStyles")
@@ -102,6 +105,7 @@ class PresentationLayoutStylesManager(BaseManager):
         except DBAPIError or Exception as exc:
             logger.error(f"Попытка добавить шаблон завершилась ошибкой: {exc}")
             session.rollback()
+            return None
 
         finally:
             session.close()

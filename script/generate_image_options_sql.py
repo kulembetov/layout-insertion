@@ -150,7 +150,7 @@ class S3ImageScanner:
 class SQLGenerator:
     """Generates SQL statements for ImageOption insertion"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.sql_statements: list[str] = []
 
     def generate_image_option_sql(self, image_info: S3ImageInfo, source: str = DEFAULT_IMAGE_SOURCE) -> str:

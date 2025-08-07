@@ -1,10 +1,11 @@
+import math
 import re
 from typing import Any
-import math
 
 from django_app.api_v1.constants import CONSTANTS, TYPES
 from django_app.api_v1.utils.font import normalize_font_family, normalize_font_weight
-from log_utils import logs, setup_logger
+from log_utils import setup_logger
+
 logger = setup_logger(__name__)
 
 
@@ -118,7 +119,6 @@ class Extractor:
                     return blur_radius
 
         return 0
-    
 
     @staticmethod
     def extract_border_radius_from_node(node: dict) -> tuple[bool, list[int]]:
@@ -137,7 +137,7 @@ class Extractor:
                 has_border_radius = any(r > 0 for r in border_radius)
         return has_border_radius, border_radius
 
-
+    @staticmethod
     def extract_rotation(node: dict[str, str | int | float | bool | dict | list]) -> int:
         """Extract rotation from a Figma node"""
         # Check for rotation property
@@ -154,7 +154,8 @@ class Extractor:
 
         # Default rotation
         return 0
-    
+
+    @staticmethod
     def extract_opacity(node: dict[str, str | int | float | bool | dict | list]) -> int | float:
         """Extract opacity from a Figma node"""
         # Check for direct opacity property
@@ -177,7 +178,8 @@ class Extractor:
 
         # Default opacity
         return 1
-    
+
+    @staticmethod
     def extract_blur(node: dict[str, str | int | float | bool | dict | list]) -> int:
         """Extract layer blur radius from a Figma node, checking nested layers. Returns 0 if no blur."""
         # Check effects on current node
@@ -223,7 +225,7 @@ class Extractor:
         """
 
         fills = node.get("fills")
-        if fills and isinstance(fills, list): 
+        if fills and isinstance(fills, list):
 
             if len(fills) > 1:
                 fill = fills[1]
@@ -262,7 +264,8 @@ class Extractor:
                 elif "fillStyleId" in fill:
                     color_variable = fill["fillStyleId"]
                 return hex_or_gradient_color, color_variable
-            
+        return None, None
+
     @staticmethod
     def _create_gradient_css(fill: dict) -> str:
         """
@@ -317,7 +320,6 @@ class Extractor:
 
         return ""
 
-
     @staticmethod
     def _calculate_linear_angle(handle_positions: list) -> int:
         """
@@ -343,7 +345,6 @@ class Extractor:
         angle_deg = (angle_deg + 360) % 360
 
         return int(angle_deg)
-
 
     def extract_slide_config(slide_node):
         """
@@ -421,11 +422,11 @@ class Extractor:
                         for color_hex, obj_list in block_colors.items():
                             logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
         return config_dict, sorted(palette_colors)
-    
+
     @staticmethod
     def get_node_property(node: dict, key: str, default=None):
         return node.get(key, default)
-    
+
     @staticmethod
     def is_node_type(node: dict, node_type: str) -> bool:
         return node.get("type") == node_type
