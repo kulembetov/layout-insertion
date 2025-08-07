@@ -1,11 +1,8 @@
 from sqlalchemy import insert, select
 from sqlalchemy.exc import DBAPIError
 
-from db_work.database import BaseManager
-from db_work.utils import generate_uuid
-from log_utils import setup_logger
-
-logger = setup_logger(__name__)
+from database import BaseManager
+from utils import generate_uuid
 
 
 class PresentationLayoutManager(BaseManager):
@@ -14,12 +11,12 @@ class PresentationLayoutManager(BaseManager):
     def __init__(self):
         super().__init__()
 
-    def find_layout_by_name(self, name: str) -> bool | None:
+    def select_layout_by_name(self, name: str) -> bool | None:
         """Find a row in 'PresentationLayout' by name."""
 
         presentation_layout_table, session = self.open_session("PresentationLayout")
+        def logic():
 
-        try:
             query = select(presentation_layout_table).where(presentation_layout_table.c.name == name)
             result = session.execute(query).fetchone()
             if result:
@@ -27,34 +24,21 @@ class PresentationLayoutManager(BaseManager):
             else:
                 return False
 
-        except DBAPIError or Exception as exc:
-            logger.error(f"Попытка добавить шаблон завершилась ошибкой: {exc}")
-            session.rollback()
-            return None
-
-        finally:
-            session.close()
+        return super().execute(logic, session)
 
     def insert_new_layout(self, name: str) -> str | None:
         """Add new row in 'PresentationLayout'."""
 
         presentation_layout_table, session = self.open_session("PresentationLayout")
-        uid = generate_uuid()
-
-        try:
+        def logic():
+            uid = generate_uuid()
             values = {"id": uid, "name": name}
             query = insert(presentation_layout_table).values(values)
             session.execute(query)
             session.commit()
             return uid
 
-        except DBAPIError or Exception as exc:
-            logger.error(f"Попытка добавить шаблон завершилась ошибкой: {exc}")
-            session.rollback()
-            return None
-
-        finally:
-            session.close()
+        return super().execute(logic, session)
 
 
 class ColorSettingsManager(BaseManager):
@@ -63,25 +47,18 @@ class ColorSettingsManager(BaseManager):
     def __init__(self):
         super().__init__()
 
-    def insert_new_color_settings(self) -> str | None:
+    def select_color_id(self) -> str | None:
+        """Find color id."""
+
         color_settings_table, session = self.open_session("ColorSettings")
-        uid = generate_uuid()
+        def logic():
+            query = select(color_settings_table.c.id).where(color_settings_table.c.id is not None).limit(1)
+            result = session.execute(query).scalar_one_or_none()
+            if result:
+                return result
 
-        try:
-            values = {"id": uid, "count": 1, "lightenStep": 0.3, "darkenStep": 0.3, "saturationAdjust": 0.3}
-            query = insert(color_settings_table).values(values)
-            session.execute(query)
-            session.commit()
-            return uid
-
-        except DBAPIError or Exception as exc:
-            logger.error(f"Попытка добавить шаблон завершилась ошибкой: {exc}")
-            session.rollback()
-            return None
-
-        finally:
-            session.close()
-
+        return super().execute(logic, session)
+    
 
 class PresentationLayoutStylesManager(BaseManager):
     """Interacts With The PresentationLayoutStyles Table."""
@@ -93,30 +70,25 @@ class PresentationLayoutStylesManager(BaseManager):
         """Inserts ColorSettingsID and PresentationLayoutID into PresentationLayoutStyles."""
 
         presentation_layout_styles_table, session = self.open_session("PresentationLayoutStyles")
-        uid = generate_uuid()
-
-        try:
+        def logic():
+            uid = generate_uuid()
             values = {"id": uid, "colorSettingsId": color_settings_id, "presentationLayoutId": presentation_layout_id}
             query = insert(presentation_layout_styles_table).values(values)
             session.execute(query)
             session.commit()
             return uid
 
-        except DBAPIError or Exception as exc:
-            logger.error(f"Попытка добавить шаблон завершилась ошибкой: {exc}")
-            session.rollback()
-            return None
-
-        finally:
-            session.close()
+        return super().execute(logic, session)
 
 
-# if __name__ == '__main__':
-#     print(PresentationLayoutManager().select_an_entry_from_presentation_layout('classic'))
-#     print(PresentationLayoutManager().insert_an_entry_in_presentation_layout('test_name'))
-#     print(ColorSettingsManager().select_id_from_color_settings())
-#     print(PresentationLayoutStylesManager().insert_an_entry_in_presentation_layout_styles(id))
-#
-#     id = PresentationLayoutManager().insert_an_entry_in_presentation_layout('test_name')
-#     print(id)
-#     print(PresentationLayoutStylesManager().insert_an_entry_in_presentation_layout_styles(id))
+if __name__ == '__main__':
+    print(PresentationLayoutManager().select_layout_by_name('classic'))
+    # print(PresentationLayoutManager().insert_new_layout('test_12'))
+    # print(ColorSettingsManager().select_color_id())
+    # print(PresentationLayoutStylesManager().insert_new_ids(id))
+
+    # presentation_layout_id = PresentationLayoutManager().insert_new_layout('test_name')
+    # print(presentation_layout_id)
+    # color_settings_id = ColorSettingsManager().select_color_id()
+    # print(color_settings_id)
+    # print(PresentationLayoutStylesManager().insert_new_ids(presentation_layout_id, color_settings_id))
