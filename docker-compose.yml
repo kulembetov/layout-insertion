@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   bot:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: presentsimple_tg_bot
     restart: unless-stopped
     depends_on:
