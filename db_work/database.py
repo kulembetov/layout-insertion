@@ -1,18 +1,11 @@
 from sqlalchemy import MetaData, Table, create_engine
-from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import Session, sessionmaker
 
-import os
-from dotenv import load_dotenv
-load_dotenv()
+from log_utils import setup_logger
+from tg.settings import DATABASE_URL
 
-POSTGRES_USER = os.getenv("POSTGRES_USER")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-POSTGRES_DB = os.getenv("POSTGRES_DB")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-
-DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+logger = setup_logger(__name__)
 
 
 class BaseManager:
@@ -31,15 +24,17 @@ class BaseManager:
 
         return ps_table, session
 
-    def execute(self, logic, session):
+    @staticmethod
+    def execute(logic, session):
         """Make try and except."""
 
         try:
             return logic()
-        
+
         except (DBAPIError, Exception) as exc:
+            logger.error(f"Произошла ошибка: {exc}")
             session.rollback()
             return None
-    
+
         finally:
             session.close()
