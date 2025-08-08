@@ -54,7 +54,7 @@ class ColorSettingsManager(BaseManager):
         color_settings_table, session = self.open_session("ColorSettings")
 
         def logic():
-            query = select(color_settings_table.c.id).where(color_settings_table.c.id is not None).limit(1)
+            query = select(color_settings_table.c.id).where(color_settings_table.c.id.is_not(None)).limit(1)
             result = session.execute(query).scalar_one_or_none()
             return result if result else None
 

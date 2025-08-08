@@ -1,6 +1,10 @@
 from aiogram.fsm.state import State, StatesGroup
 
 
+class LayoutLoadingState(StatesGroup):
+    loading = State()
+
+
 class OptionState(StatesGroup):
     choosing = State()
 
