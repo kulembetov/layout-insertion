@@ -42,7 +42,7 @@ services:
       bash -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
 
   db:
-    image: postgres:17-alpine
+    image: postgres:17
     restart: always
     env_file:
       - .env
@@ -59,7 +59,7 @@ services:
       - backend
 
   redis:
-    image: redis:7-alpine
+    image: redis:7
     restart: always
     expose:
       - "6379"
