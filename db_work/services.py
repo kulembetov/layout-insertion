@@ -1,8 +1,11 @@
-from sqlalchemy import insert, select
+import os
+import json
+from sqlalchemy import insert, select, update
+from typing import List
 
 from db_work.database import BaseManager
 from db_work.utils import generate_uuid
-
+from redis_cache.utils import get_cached_request
 
 class PresentationLayoutManager(BaseManager):
     """Interacts With The PresentationLayout Table."""
@@ -49,14 +52,18 @@ class ColorSettingsManager(BaseManager):
         super().__init__()
 
     def select_color_id(self) -> str | None:
-        """Find color id."""
+        """Generate new color id."""
 
         color_settings_table, session = self.open_session("ColorSettings")
 
         def logic():
-            query = select(color_settings_table.c.id).where(color_settings_table.c.id.is_not(None)).limit(1)
-            result = session.execute(query).scalar_one_or_none()
-            return result if result else None
+            new_color_id = generate_uuid()
+            values = {"id": new_color_id, "count": 1, "lightenStep": 0.3, "darkenStep": 0.3, "saturationAdjust": 0.3}
+            query = insert(color_settings_table).values(values)
+            session.execute(query)
+            session.commit()
+
+            return new_color_id if new_color_id else None
 
         return super().execute(logic, session)
 
@@ -81,9 +88,81 @@ class PresentationLayoutStylesManager(BaseManager):
             return uid
 
         return super().execute(logic, session)
+    
+
+class SlideLayoutManager(BaseManager):
+
+    def __init__(self):
+        super().__init__()
+
+    def extract_frame_data(self, data):
+        results = []
+    
+        def recursive_extract(obj):
+            nonlocal results
+            
+            if isinstance(obj, dict):
+                if all(key in obj for key in ['slide_number', 'frame_name', 'imagesCount', 'sentences']):
+                    result_dict = {
+                        'number': obj.get('slide_number'),
+                        'name': obj.get('frame_name'),
+                        'imagesCount': obj.get('imagesCount'),
+                        'sentences': obj.get('sentences')
+                    }
+                    results.append(result_dict)
+                    
+                for value in obj.values():
+                    recursive_extract(value)
+                    
+            elif isinstance(obj, list):
+                for item in obj:
+                    recursive_extract(item)
+
+        recursive_extract(data)
+        return results
+
+    def get_slide_layout_data_from_cache(self) -> List[str] | None:
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(current_dir)
+        json_file_path = os.path.join(parent_dir, 'output.json')
+        with open(json_file_path, 'r', encoding='utf-8') as file:
+            cache = json.load(file)
+        # FIGMA_FILE_ID = os.getenv("FIGMA_FILE_ID")
+        # cache = get_cached_request(FIGMA_FILE_ID)
+        slide_layout_frame_data = self.extract_frame_data(cache)
+        for item in slide_layout_frame_data:
+            item.update({
+                "presentationLayoutId": "0197c55e-1c1b-7760-9525-f51752cf23e2",
+                "maxTokensPerBlock": 300,
+                "maxWordsPerSentence": 15,
+                "minWordsPerSentence": 10,
+                "isLast": False,
+                "forGeneration": True,
+                "isActive": True,
+                "presentationLayoutIndexColor": 0
+                })
+        
+        return slide_layout_frame_data
+    
+
+    def get_slide_layout_data_from_db(self, presentation_layout_id: str):
+        slide_layout_table, session = self.open_session("SlideLayout")
+
+        def logic():
+            # Get names from Slidelayout Tabel.
+            query = select(slide_layout_table).where(
+            slide_layout_table.c.presentationLayoutId == presentation_layout_id
+            )
+            result = session.execute(query)
+            slide_layout_data_from_db = result.mappings().all()
+
+            return slide_layout_data_from_db
+        
+        return super().execute(logic, session)
 
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
 #     print(PresentationLayoutManager().select_layout_by_name('classic'))
 #     print(PresentationLayoutManager().insert_new_layout('test_12'))
 #     print(ColorSettingsManager().select_color_id())
@@ -94,3 +173,14 @@ class PresentationLayoutStylesManager(BaseManager):
 #     color_settings_id = ColorSettingsManager().select_color_id()
 #     print(color_settings_id)
 #     print(PresentationLayoutStylesManager().insert_new_ids(presentation_layout_id, color_settings_id))
+
+    # print(SlideLayoutManager().get_slide_layout_data_from_cache())
+    print(SlideLayoutManager().get_slide_layout_data_from_db('0197c55e-1c1b-7760-9525-f51752cf23e2'))
+    # # classic
+    # '019006b0-03af-7b04-a66f-8d31b0a08769'
+    # # raif
+    # '0197c55e-1c1b-7760-9525-f51752cf23e2'
+
+
+
+# poetry run python -m db_work.services
