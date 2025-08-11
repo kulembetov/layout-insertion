@@ -104,13 +104,14 @@ class SlideLayoutManager(BaseManager):
             nonlocal results
             
             if isinstance(obj, dict):
-                if all(key in obj for key in ['slide_number', 'frame_name', 'imagesCount', 'sentences', 'forGeneration']):
+                if all(key in obj for key in ['slide_number', 'frame_name', 'imagesCount', 'sentences', 'forGeneration', 'slide_type']):
                     result_dict = {
                         'number': obj.get('slide_number'),
                         'name': obj.get('frame_name'),
                         'imagesCount': obj.get('imagesCount'),
                         'sentences': obj.get('sentences'),
-                        'forGeneration': obj.get('forGeneration')
+                        'forGeneration': obj.get('forGeneration'),
+                        'isLast': obj.get('slide_type'),
                     }
                     results.append(result_dict)
                     
@@ -136,18 +137,19 @@ class SlideLayoutManager(BaseManager):
         # cache = get_cached_request(FIGMA_FILE_ID)
         slide_layout_frame_data = self.extract_frame_data(cache)
         for item in slide_layout_frame_data:
+            if item['isLast'] == 'last':
+                item.update({"isLast": True,})
+            else:
+                item.update({"isLast": False,})
             item.update({
                 "presentationLayoutId": presentation_layout_id,
                 "maxTokensPerBlock": 300,
                 "maxWordsPerSentence": 15,
                 "minWordsPerSentence": 10,
-                "isLast": False,
                 "forGeneration": True, 
                 "isActive": True,
                 "presentationLayoutIndexColor": 0
                 })
-        # для новых isactive - true, для существующих - забирате у них
-        # Если слайд в группу last - то всей группе поставить last. Для всех остальнрых false
         return slide_layout_frame_data
     
 
@@ -179,7 +181,7 @@ class SlideLayoutManager(BaseManager):
                     first_row = matching_rows[0]
                     keys_to_compare = [
                         'number', 'imagesCount', 'maxTokensPerBlock', 'maxWordsPerSentence',
-                        'minWordsPerSentence', 'sentences', 'isLast', 'forGeneration', 'isActive',
+                        'minWordsPerSentence', 'sentences', 'isLast', 'forGeneration',
                         'presentationLayoutIndexColor'
                     ]
                     need_update = False
