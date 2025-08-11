@@ -2,6 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from db_work.database import BaseManager
 from django_app.api_v1.services.filters.filter_settings import FilterMode
 from django_app.api_v1.utils.helpers import json_dump
 from log_utils import logs, setup_logger
@@ -65,3 +66,21 @@ class FilterFigmaJson(APIView):
             return Response(data=data, status=status.HTTP_200_OK)
 
         return Response(data={"message": "Request doesn't contain 'filter'. Bad request."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ReceiveFigmaPresentationLayout(APIView):
+    """API endpoint to retrieve all presentation layout names from the database."""
+
+    @logs(logger, on=True)
+    def get(self, request) -> Response:
+        manager = BaseManager()
+
+        table, session = manager.open_session("PresentationLayout")
+
+        def logic():
+            query = session.query(table.c.name).all()
+            return [row[0] for row in query]
+
+        names = manager.execute(logic, session)
+
+        return Response(names if names is not None else [])

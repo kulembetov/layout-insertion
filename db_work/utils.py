@@ -8,7 +8,7 @@ def generate_uuid() -> str:
 
 # def extract_frame_names(data):
 #     results = []
-    
+
 #     if isinstance(data, dict):
 #         for key, value in data.items():
 #             if key == 'frame_name':
@@ -18,6 +18,5 @@ def generate_uuid() -> str:
 #     elif isinstance(data, list):
 #         for item in data:
 #             results.extend(extract_frame_names(item))
-            
-#     return results
 
+#     return results
