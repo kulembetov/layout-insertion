@@ -115,6 +115,7 @@ if CACHE_ENABLED:
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": os.getenv("CACHE_LOCATION"),
             "TIMEOUT": 60 * 60,
+            "KEY_PREFIX": "figma",
         }
     }
 

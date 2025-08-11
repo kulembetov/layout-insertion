@@ -4,7 +4,7 @@ from typing import Any
 
 from django_app.api_v1.constants import CONSTANTS, TYPES
 from django_app.api_v1.utils.font import normalize_font_family, normalize_font_weight
-from log_utils import setup_logger
+from log_utils import logs, setup_logger
 
 logger = setup_logger(__name__)
 
@@ -29,8 +29,10 @@ def _hex_and_color_var(fill: dict) -> tuple[str | None, str | None]:
     return hex_color, color_variable
 
 
+@logs(logger, on=False)
 class Extractor:
     @staticmethod
+    @logs(logger, on=True)
     def extract_base_figure_name(name: str | None) -> str:
         """Extract the base figure name from a block name (e.g., 'figure (logoRfs_0)' -> 'logoRfs')."""
         if not name:
@@ -44,6 +46,7 @@ class Extractor:
         return name
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_figure_index(name: str) -> str:
         """Extract the trailing index (e.g., '_2') from a figure name, or return ''."""
         if not name:
@@ -54,6 +57,7 @@ class Extractor:
         return ""
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_text_styles(node: dict[str, Any], sql_type: str) -> dict[str, Any]:
         """Extract text styling information with config defaults (no color)."""
         defaults = CONSTANTS.DEFAULT_STYLES.get(sql_type, CONSTANTS.DEFAULT_STYLES["default"])
@@ -99,6 +103,7 @@ class Extractor:
     #     return has_border_radius, border_radius
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_blur_from_node(node: dict) -> int:
         """Extract layer blur radius from a Figma node, checking nested layers. Returns 0 if no blur."""
         # Check effects on current node
@@ -121,6 +126,7 @@ class Extractor:
         return 0
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_border_radius_from_node(node: dict) -> tuple[bool, list[int]]:
         """Extract corner radius from a Figma node, map to border radius and returns (has_border_radius, [tl, tr, br, bl])"""
         border_radius = [0, 0, 0, 0]
@@ -138,6 +144,7 @@ class Extractor:
         return has_border_radius, border_radius
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_rotation(node: dict[str, str | int | float | bool | dict | list]) -> int:
         """Extract rotation from a Figma node"""
         # Check for rotation property
@@ -156,6 +163,7 @@ class Extractor:
         return 0
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_opacity(node: dict[str, str | int | float | bool | dict | list]) -> int | float:
         """Extract opacity from a Figma node"""
         # Check for direct opacity property
@@ -180,6 +188,7 @@ class Extractor:
         return 1
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_blur(node: dict[str, str | int | float | bool | dict | list]) -> int:
         """Extract layer blur radius from a Figma node, checking nested layers. Returns 0 if no blur."""
         # Check effects on current node
@@ -206,6 +215,7 @@ class Extractor:
         return 0
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_z_index(name: str) -> int:
         """Extract z-index from node name"""
         if "z-index" in name:
@@ -218,6 +228,7 @@ class Extractor:
         return 0
 
     @staticmethod
+    @logs(logger, on=True)
     def extract_color_info(node: dict) -> tuple[str | None, str | None]:
         """
         Extracts the first visible solid fill color and its variable/style from a Figma node.
@@ -267,6 +278,7 @@ class Extractor:
         return None, None
 
     @staticmethod
+    @logs(logger, on=True)
     def _create_gradient_css(fill: dict) -> str:
         """
         Creates CSS gradient string from Figma gradient fill.
@@ -321,6 +333,7 @@ class Extractor:
         return ""
 
     @staticmethod
+    @logs(logger, on=True)
     def _calculate_linear_angle(handle_positions: list) -> int:
         """
         Calculate the angle for linear gradient from handle positions.
@@ -346,6 +359,7 @@ class Extractor:
 
         return int(angle_deg)
 
+    @logs(logger, on=True)
     def extract_slide_config(slide_node):
         """
         Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer.
@@ -367,8 +381,7 @@ class Extractor:
             if not isinstance(node_child, dict):
                 continue
             if Extractor.get_node_property(node_child, "name") == "slideColors":
-                if logger:
-                    logger.info("[slideColors] Found slideColors table in slide")
+                logger.info("[slideColors] Found slideColors table in slide")
                 children_raw2 = Extractor.get_node_property(node_child, "children", [])
                 if not isinstance(children_raw2, list):
                     continue
@@ -376,8 +389,7 @@ class Extractor:
                     if not isinstance(node_block, dict):
                         continue
                     block_type = Extractor.get_node_property(node_block, "name")
-                    if logger:
-                        logger.info(f"[slideColors] Processing block type: {block_type}")
+                    logger.info(f"[slideColors] Processing block type: {block_type}")
                     block_colors = {}
                     children_raw3 = Extractor.get_node_property(node_block, "children", [])
                     if not isinstance(children_raw3, list):
@@ -389,8 +401,7 @@ class Extractor:
                         if color_hex:
                             color_hex = color_hex.lower()
                             palette_colors.add(color_hex)
-                        if logger:
-                            logger.info(f"[slideColors] Processing color group: {color_hex}")
+                        logger.info(f"[slideColors] Processing color group: {color_hex}")
                         block_objs = []
                         children_raw4 = Extractor.get_node_property(color_group, "children", [])
                         if not isinstance(children_raw4, list):
@@ -412,21 +423,21 @@ class Extractor:
                                 if block_type == "figure":
                                     idx = Extractor.get_node_property(text_child, "name", "").strip()
                                     text_obj["figureName"] = idx
-                                    if logger:
-                                        logger.info(f"[slideColors] Found figure in {color_hex}: name='{idx}', color={color_val}, font={font_family}")
+                                    logger.info(f"[slideColors] Found figure in {color_hex}: name='{idx}', color={color_val}, font={font_family}")
                                 block_objs.append(text_obj)
                         block_colors[color_hex] = block_objs
                     config_dict[block_type] = block_colors
-                    if logger:
-                        logger.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
-                        for color_hex, obj_list in block_colors.items():
-                            logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
+                    logger.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
+                    for color_hex, obj_list in block_colors.items():
+                        logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
         return config_dict, sorted(palette_colors)
 
     @staticmethod
+    @logs(logger, on=True)
     def get_node_property(node: dict, key: str, default=None):
         return node.get(key, default)
 
     @staticmethod
+    @logs(logger, on=True)
     def is_node_type(node: dict, node_type: str) -> bool:
         return node.get("type") == node_type

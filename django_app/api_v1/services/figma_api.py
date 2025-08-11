@@ -69,6 +69,7 @@ class FigmaAPI:
 
         figma_response = requests.get(f"https://api.figma.com/v1/files/{self.file_id}", headers=self.headers, timeout=180)
         figma_response.raise_for_status()
+
         response: list[dict] = figma_response.json()["document"][TYPES.FK_CHILDREN]
         set_cached_request(self.file_id, response)
 
@@ -111,14 +112,10 @@ class FigmaAPI:
     def _get_slides(self) -> list[ExtractedSlide]:
         data = get_cached_request(self.file_id)
 
-        if data:
-            pages = data
-        else:
+        if data is None:
             pages = self.fetch()
-
-        from django_app.api_v1.utils.helpers import json_dump
-
-        json_dump(data, "testbag")
+        else:
+            pages = data
 
         all_slides: list[ExtractedSlide] = []
         for page in pages:
@@ -272,11 +269,9 @@ class FigmaAPI:
             is_precompiled = "precompiled" in name_lower
             should_skip = sql_type == "image" and dimensions["x"] == 0 and dimensions["y"] == 0 and dimensions["w"] == CONSTANTS.FIGMA_CONFIG["TARGET_WIDTH"] and dimensions["h"] == CONSTANTS.FIGMA_CONFIG["TARGET_HEIGHT"] and not is_precompiled
             if should_skip:
-                # logger.log_block_event(
-                #     f"Skipping {sql_type} block {name} (full image {CONSTANTS.FIGMA_CONFIG['TARGET_WIDTH']}x{CONSTANTS.FIGMA_CONFIG['TARGET_HEIGHT']})",
-                #     level="debug",
-                # )
-                ...
+                logger.debug(
+                    f"Skipping {sql_type} block {name} (full image {CONSTANTS.FIGMA_CONFIG['TARGET_WIDTH']}x{CONSTANTS.FIGMA_CONFIG['TARGET_HEIGHT']})",
+                )
             else:
                 base_styles = Extractor.extract_text_styles(node, sql_type)
                 styles: dict[str, str | int | float | bool | list] = {}
