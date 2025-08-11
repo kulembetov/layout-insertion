@@ -1267,11 +1267,17 @@ class FigmaExtractor:
             # Build mapping from figure numbers to actual figure names and update slideConfig
             if "figure" in slide_config:
                 self._update_figure_config_with_names(slide_config, slide.blocks)
+
+        # Determine if slide should be saved for generation based on slide name
+        slide_name = slide.frame_name.lower()
+        for_generation = "upload" not in slide_name
+
         return {
             "slide_number": slide.number,
             "container_name": slide.container_name,
             "frame_name": slide.frame_name,
             "slide_type": slide.slide_type,
+            "forGeneration": for_generation,
             "sentences": sentence_count,
             "imagesCount": images_count,
             "frame_id": slide.frame_id,
@@ -1394,6 +1400,7 @@ class FigmaToSQLIntegrator:
                 "slide_layout_name": frame_name_raw,
                 "slide_layout_number": slide_number_raw,
                 "slide_type": slide_type_raw,
+                "forGeneration": slide_raw.get("forGeneration", True),
                 "presentation_layout_id": presentation_layout_id,
                 "is_last": is_last,
                 "folder_name": slide_raw.get("folder_name", "other"),
@@ -1605,6 +1612,7 @@ class FigmaToSQLIntegrator:
         lines.append(f"-- Slide Layout Name: {slide['slide_layout_name']}")
         lines.append(f"-- Slide Layout Number: {slide['slide_layout_number']}")
         lines.append(f"-- Slide Type: {slide['slide_type']}")
+        lines.append(f"-- Save For Generation: {slide.get('forGeneration', True)}")
         lines.append(f"-- Is Last: {slide['is_last']}")
         lines.append(f"-- Presentation Layout ID: {slide['presentation_layout_id']}")
         lines.append("")
@@ -1675,6 +1683,7 @@ class FigmaToSQLIntegrator:
             slide_type_str = str(slide_type_raw) if slide_type_raw is not None else "unknown"
             slide_type_info = config.SLIDE_LAYOUT_TYPES.get(slide_type_str, "unknown")
             instructions.append(f"- Slide Type: {slide_type_str} ({slide_type_info})")
+            instructions.append(f"- Save For Generation: {slide.get('forGeneration', True)}")
             instructions.append(f"- Is Last: {slide['is_last']}")
             instructions.append(f"- Folder: {slide.get('folder_name', 'other')}")
             blocks = slide.get("blocks", [])

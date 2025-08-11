@@ -1223,19 +1223,6 @@ class NumberBasedSlideTypeStrategy(SlideTypeStrategy):
         """Determine the slide type based on slide number"""
         number = slide_layout.number
 
-        # Determine if this slide should have forGeneration set to false
-        for_generation = True
-
-        # Check slide number-based logic (5cols, 6cols, 7cols)
-        if number in [7, 10, 11]:
-            for_generation = False
-            logger.info(f"Setting forGeneration to false for slide number {number} (5cols, 6cols, 7cols)")
-
-        # Check slide layout name-based logic
-        if slide_layout.name in self.config.config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
-            for_generation = False
-            logger.info(f"Setting forGeneration to false for slide layout name '{slide_layout.name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)")
-
         if slide_layout.is_last or number == -1:
             type_key = "last"
             logger.info("Slide type automatically set to 'last' because this is the last slide (number -1)")
@@ -1274,13 +1261,8 @@ class NumberBasedSlideTypeStrategy(SlideTypeStrategy):
             type_key = "classic"
             logger.info(f"Slide type automatically set to 'classic' (default for slide number {number})")
 
-        # If not for_generation, set type to 'other'
-        if not for_generation:
-            type_key = "other"
-            logger.info("for_generation is False, so type is set to 'other'")
-
         slide_type = self.config.get_slide_layout_type(type_key)
-        return type_key, slide_type, for_generation
+        return type_key, slide_type, slide_layout.for_generation
 
 
 class ContentBasedSlideTypeStrategy(SlideTypeStrategy):
@@ -1332,14 +1314,8 @@ class ContentBasedSlideTypeStrategy(SlideTypeStrategy):
                 slide_layout.for_generation,
             )
 
-        # Check if forGeneration should be set to false based on slide layout name
-        for_generation = slide_layout.for_generation
-        if slide_layout.name in self.config.config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
-            for_generation = False
-            logger.info(f"Setting forGeneration to false for slide layout name '{slide_layout.name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)")
-
         slide_type = self.config.get_slide_layout_type(type_key)
-        return type_key, slide_type, for_generation
+        return type_key, slide_type, slide_layout.for_generation
 
 
 # ================ Main SQL Generator ================
@@ -1591,14 +1567,6 @@ class SQLGenerator:
             self.config_manager.get_default_value("presentation_layout_id"),
         )
 
-        # Initialize with a default for_generation value (will be updated by the strategy)
-        for_generation = True
-
-        # Check if forGeneration should be set to false based on slide layout name
-        if slide_layout_name in config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
-            for_generation = False
-            logger.info(f"Setting forGeneration to false for slide layout name '{slide_layout_name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)")
-
         # Determine initial slide type based on number (camelCase)
         slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide_layout_number, "other")
         type_key = slide_type  # For now, type_key is the same as slide_type
@@ -1630,7 +1598,6 @@ class SQLGenerator:
             type_key=type_key,  # camelCase
             type=slide_type,  # camelCase
             icon_url=icon_url,
-            for_generation=for_generation,
         )
 
     def _auto_blocks(self, slide_layout) -> list:
@@ -1767,10 +1734,7 @@ class SQLGenerator:
         slide_layout.type_key = type_key  # camelCase
         slide_layout.type = slide_type  # camelCase
 
-        # Check if forGeneration should be set to false based on slide layout name
-        if slide_layout.name in config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
-            slide_layout.for_generation = False
-            logger.info(f"Setting forGeneration to false for slide layout name '{slide_layout.name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)")
+        logger.info(f"forGeneration value from input JSON: {slide_layout.for_generation} (not overridden by config)")
         skip_number_types = {config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]}
         miniature_folder = camel_to_snake(slide_type)
         if slide_type in skip_number_types:
@@ -1964,11 +1928,8 @@ def _process_figma_slide(slide: dict, generator: "SQLGenerator", output_dir: str
     # Always use camelCase for type
     slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide["slide_layout_number"], "other")
 
-    # Determine forGeneration based on slide layout name
-    for_generation = True
-    if clean_slide_layout_name in config.SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE:
-        for_generation = False
-        logger.info(f"Setting forGeneration to false for slide layout name '{clean_slide_layout_name}' (found in SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE)")
+    for_generation = slide.get("forGeneration", True)
+    logger.info(f"Using forGeneration value from input JSON: {for_generation}")
 
     slide_layout = SlideLayout(
         id=slide_layout_id,
