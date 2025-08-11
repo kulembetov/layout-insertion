@@ -994,8 +994,8 @@ class SlideLayoutAdditionalInfoCommand(SQLCommand):
     def execute(self) -> str:
         """Generate SlideLayoutAdditionalInfo SQL"""
         additional_info = self.config.get_slide_layout_additional_info()
-        # Always use camelCase for type
-        slide_type_camel = config.SLIDE_NUMBER_TO_TYPE.get(self.slide_layout.number, self.slide_layout.type)
+        # Use slide_type from input data instead of determining from config
+        slide_type_camel = self.slide_layout.type
 
         # Count actual percentage blocks
         percentes_count = 0
@@ -1221,48 +1221,9 @@ class NumberBasedSlideTypeStrategy(SlideTypeStrategy):
 
     def determine_slide_type(self, slide_layout: SlideLayout, blocks: list[Block]) -> tuple[str, str, bool]:
         """Determine the slide type based on slide number"""
-        number = slide_layout.number
-
-        if slide_layout.is_last or number == -1:
-            type_key = "last"
-            logger.info("Slide type automatically set to 'last' because this is the last slide (number -1)")
-        elif number == 1:
-            type_key = "title"
-            logger.info("Slide type automatically set to 'title' because this is slide number 1")
-        elif number == 2:
-            type_key = "few_text"
-            logger.info("Slide type automatically set to 'few_text' because this is slide number 2")
-        elif number == 3:
-            type_key = "optimal_text"
-            logger.info("Slide type automatically set to 'optimal_text' because this is slide number 3")
-        elif number == 4:
-            type_key = "many_text"
-            logger.info("Slide type automatically set to 'many_text' because this is slide number 4")
-        elif number == 5:
-            type_key = "infographics"
-            logger.info("Slide type automatically set to 'infographics' because this is slide number 5")
-        elif number == 6:
-            type_key = "extra_text"
-            logger.info("Slide type automatically set to 'extra_text' because this is slide number 6")
-        elif number == 7:
-            type_key = "other"
-            logger.info("Slide type automatically set to 'other' because this is slide number 7")
-        elif number == 8:
-            type_key = "table"
-            logger.info("Slide type automatically set to 'table' because this is slide number 8")
-        elif number == 10:
-            type_key = "other"
-            logger.info("Slide type automatically set to 'other' because this is slide number 10")
-        elif number == 14:
-            type_key = "chart"
-            logger.info("Slide type automatically set to 'chart' because this is slide number 14")
-        else:
-            # Default to classic for other slide numbers
-            type_key = "classic"
-            logger.info(f"Slide type automatically set to 'classic' (default for slide number {number})")
-
-        slide_type = self.config.get_slide_layout_type(type_key)
-        return type_key, slide_type, slide_layout.for_generation
+        logger.info(f"Using slide_type from input data: {slide_layout.type} (not overridden by config-based strategy)")
+        # Return the existing slide type from input data
+        return slide_layout.type_key, slide_layout.type, slide_layout.for_generation
 
 
 class ContentBasedSlideTypeStrategy(SlideTypeStrategy):
@@ -1282,40 +1243,8 @@ class ContentBasedSlideTypeStrategy(SlideTypeStrategy):
 
     def determine_slide_type(self, slide_layout: SlideLayout, blocks: list[Block]) -> tuple[str, str, bool]:
         """Determine the slide type based on content blocks"""
-        # If last slide, don't change the type
-        if slide_layout.is_last:
-            return (
-                slide_layout.type_key,
-                self.config.get_slide_layout_type(slide_layout.type_key),
-                slide_layout.for_generation,
-            )
-
-        # Check for special block types
-        has_table_block = any(block.type == self.BLOCK_TYPE_TABLE for block in blocks)
-        has_infographik_block = any(block.type == self.BLOCK_TYPE_INFOGRAPHIK for block in blocks)
-        has_chart_block = any(block.type == self.BLOCK_TYPE_CHART for block in blocks)
-
-        old_type_key = slide_layout.type_key
-
-        if has_table_block:
-            type_key = "table"
-            logger.info(f"Slide type changed from '{old_type_key}' to 'table' because this slide contains a table block")
-        elif has_chart_block:
-            type_key = "chart"
-            logger.info(f"Slide type changed from '{old_type_key}' to 'chart' because this slide contains a chart block")
-        elif has_infographik_block:
-            type_key = "infographics"
-            logger.info(f"Slide type changed from '{old_type_key}' to 'infographics' because this slide contains an infographik block")
-        else:
-            # No need to change
-            return (
-                old_type_key,
-                self.config.get_slide_layout_type(old_type_key),
-                slide_layout.for_generation,
-            )
-
-        slide_type = self.config.get_slide_layout_type(type_key)
-        return type_key, slide_type, slide_layout.for_generation
+        logger.info(f"Using slide_type from input data: {slide_layout.type} (not overridden by config-based strategy)")
+        return slide_layout.type_key, slide_layout.type, slide_layout.for_generation
 
 
 # ================ Main SQL Generator ================
@@ -1567,9 +1496,9 @@ class SQLGenerator:
             self.config_manager.get_default_value("presentation_layout_id"),
         )
 
-        # Determine initial slide type based on number (camelCase)
-        slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide_layout_number, "other")
-        type_key = slide_type  # For now, type_key is the same as slide_type
+        # Ask user for slide type instead of determining from config
+        slide_type = self.user_input.get_input("Slide type (e.g., classic, optimalText, infographics, table, chart, etc.)", "classic")
+        type_key = slide_type
 
         # Use SLIDE_NUMBER_TO_NUMBER for icon url, but skip number for certain types
         skip_number_types = {config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]}
@@ -1728,22 +1657,21 @@ class SQLGenerator:
 
     def _update_slide_type(self, slide_layout, blocks):
         """Update slide layout type and icon_url based on content analysis."""
-        # Use content-based strategy to determine type (camelCase)
-        slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide_layout.number, "other")
-        type_key = slide_type
-        slide_layout.type_key = type_key  # camelCase
-        slide_layout.type = slide_type  # camelCase
+        # Keep the slide_type from input data, don't override from config
+        # slide_layout.type and slide_layout.type_key are already set from input data
 
         logger.info(f"forGeneration value from input JSON: {slide_layout.for_generation} (not overridden by config)")
+        logger.info(f"slide_type from input data: {slide_layout.type} (not overridden by config)")
+
         skip_number_types = {config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]}
-        miniature_folder = camel_to_snake(slide_type)
-        if slide_type in skip_number_types:
+        miniature_folder = camel_to_snake(slide_layout.type)
+        if slide_layout.type in skip_number_types:
             slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{slide_layout.name}{config.MINIATURE_EXTENSION}"
-            logger.info(f"[MiniaturePath] Skipped number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout.number})")
+            logger.info(f"[MiniaturePath] Skipped number: icon_url={slide_layout.icon_url} (slide_type={slide_layout.type}, slide_layout_number={slide_layout.number})")
         else:
             number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(slide_layout.number, slide_layout.number)
             slide_layout.icon_url = f"{self.config_manager.get_miniatures_base_path()}/{miniature_folder}/{number_for_icon}_{slide_layout.name}{config.MINIATURE_EXTENSION}"
-            logger.info(f"[MiniaturePath] With number: icon_url={slide_layout.icon_url} (slide_type={slide_type}, slide_layout_number={slide_layout.number}, number_for_icon={number_for_icon})")
+            logger.info(f"[MiniaturePath] With number: icon_url={slide_layout.icon_url} (slide_type={slide_layout.type}, slide_layout_number={slide_layout.number}, number_for_icon={number_for_icon})")
 
     def _generate_sql_queries(
         self,
@@ -1895,7 +1823,7 @@ def auto_generate_sql_from_figma(json_path: str, output_dir: str | None = None) 
         def strip_zindex(name: str) -> str:
             # Remove 'background_N' and ' z-index N' (case-insensitive, with or without leading/trailing spaces)
             name = re.sub(r"\s*background_\d+", "", name, flags=re.IGNORECASE)
-            name = re.sub(r"\s*z-index\s*\d+\s*$", "", name, flags=re.IGNORECASE)
+            name = re.sub(r"\s*z-index\s*\d+.*", "", name, flags=re.IGNORECASE)
             # Clean up any extra spaces
             return name.strip()
 
@@ -1925,8 +1853,8 @@ def _process_figma_slide(slide: dict, generator: "SQLGenerator", output_dir: str
     slide_layout_id = generate_uuid()
     # Strip z-index from slide layout name
     clean_slide_layout_name = strip_zindex(slide["slide_layout_name"])
-    # Always use camelCase for type
-    slide_type = config.SLIDE_NUMBER_TO_TYPE.get(slide["slide_layout_number"], "other")
+    # Use slide_type from input data instead of determining from config
+    slide_type = slide.get("slide_type", "classic")
 
     for_generation = slide.get("forGeneration", True)
     logger.info(f"Using forGeneration value from input JSON: {for_generation}")
@@ -1937,14 +1865,13 @@ def _process_figma_slide(slide: dict, generator: "SQLGenerator", output_dir: str
         number=slide["slide_layout_number"],
         presentation_layout_id=slide["presentation_layout_id"],
         is_last=slide["is_last"],
-        type_key=slide_type,  # camelCase
-        type=slide_type,  # camelCase
-        icon_url="",  # Will be set below
+        type_key=slide_type,
+        type=slide_type,
+        icon_url="",
         for_generation=for_generation,
         imagesCount=slide.get("imagesCount", 0),
     )
     logger.info(f"Created SlideLayout: {slide_layout}")
-    # Set icon_url using config and slide info (same as manual mode)
     miniatures_base_path = config.MINIATURES_BASE_PATH
     slide_layout_name = slide_layout.name
     slide_layout_number = slide_layout.number

@@ -1077,6 +1077,27 @@ class FigmaExtractor:
                 clean_name = re.sub(r"_(\d+)$", "", fig_info["base_name"])
                 block_logger.info(f"[figureConfig] Block '{fig_info['base_name']}' -> looking for '{clean_name}' in slideColors")
 
+    def extract_slide_type_from_name(self, frame_name: str) -> str:
+        """Extract slide type from the frame name.
+        Example: 'one_square_outline_icon_shield_image_right background_0 z-index 0 upload optimalText' -> 'optimalText'
+        """
+        if not frame_name:
+            return "classic"
+
+        # Split by spaces and get the last meaningful word
+        parts = frame_name.strip().split()
+
+        # Skip common words and patterns from the end
+        skip_patterns = ["upload", "z-index", "background"]
+
+        for part in reversed(parts):
+            # Skip if part starts with any skip pattern or is a digit
+            if not any(part.startswith(pattern) for pattern in skip_patterns) and not part.isdigit():
+                if len(part) <= 20 and "_" not in part:
+                    return part
+
+        return "classic"
+
     def traverse_and_extract(
         self,
         node: dict[str, str | int | float | bool | dict | list],
@@ -1272,11 +1293,14 @@ class FigmaExtractor:
         slide_name = slide.frame_name.lower()
         for_generation = "upload" not in slide_name
 
+        # Extract slide type from frame name instead of using the existing slide_type
+        extracted_slide_type = self.extract_slide_type_from_name(slide.frame_name)
+
         return {
             "slide_number": slide.number,
             "container_name": slide.container_name,
             "frame_name": slide.frame_name,
-            "slide_type": slide.slide_type,
+            "slide_type": extracted_slide_type,
             "forGeneration": for_generation,
             "sentences": sentence_count,
             "imagesCount": images_count,

@@ -36,7 +36,7 @@ load_dotenv()
 # Configuration Constants
 YANDEX_ENDPOINT_URL: Final[str] = "https://storage.yandexcloud.net"
 IMAGE_EXTENSIONS: Final[set[str]] = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".svg"}
-DEFAULT_IMAGE_SOURCE: Final[str] = "brand"
+DEFAULT_IMAGE_SOURCE: Final[str] = "raiffeisen"
 LOGS_DIR: Final[Path] = Path("logs")
 
 # Global logger - will be initialized in main()
@@ -69,7 +69,7 @@ class Config:
     def from_env(cls) -> "Config":
         """Create config from environment variables."""
         return cls(
-            s3_prefix=os.getenv("S3_PREFIX", "layouts/raiffeisen/miniatures/"),
+            s3_prefix=os.getenv("S3_PREFIX", "layouts/raiffeisen/library/"),
             image_source=os.getenv("IMAGE_SOURCE", DEFAULT_IMAGE_SOURCE),
             output_file=os.getenv("OUTPUT_FILE", "insert_image_options.sql"),
             bucket_name=os.getenv("YANDEX_BUCKET_NAME", ""),
@@ -231,7 +231,7 @@ class SQLGenerator:
     @staticmethod
     def _validate_image_source(source: str) -> str:
         """Validate image source enum value."""
-        valid_sources = {"brand", "stock", "user", "unsplash", "freepik"}
+        valid_sources = {"brand", "stock", "user", "unsplash", "freepik", "raiffeisen"}
         if source not in valid_sources:
             raise ValueError(f"Invalid image source: {source}. Must be one of {valid_sources}")
         return source
