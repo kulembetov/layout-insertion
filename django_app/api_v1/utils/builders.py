@@ -293,6 +293,8 @@ def slide_to_dict(slide: ExtractedSlide, comments: dict) -> dict[str, Any]:
         # Build mapping from figure numbers to actual figure names and update slideConfig
         if TYPES.BT_FIGURE in slide_config:
             _update_figure_config_with_names(slide_config, slide.blocks)
+    slide_name = slide.frame_name.lower()
+    for_generation = "upload" not in slide_name
     return {
         "slide_number": slide.number,
         "container_name": slide.container_name,
@@ -301,6 +303,7 @@ def slide_to_dict(slide: ExtractedSlide, comments: dict) -> dict[str, Any]:
         "sentences": sentence_count,
         "imagesCount": _get_imagesCount(slide),
         "frame_id": slide.frame_id,
+        "forGeneration": for_generation,
         "dimensions": slide.dimensions,
         "folder_name": SLIDES.SLIDE_NUMBER_TO_FOLDER.get(slide.number, "other"),
         "blocks": [block_to_dict(block, comments, slide_config) for block in slide.blocks],

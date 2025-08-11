@@ -104,12 +104,13 @@ class SlideLayoutManager(BaseManager):
             nonlocal results
             
             if isinstance(obj, dict):
-                if all(key in obj for key in ['slide_number', 'frame_name', 'imagesCount', 'sentences']):
+                if all(key in obj for key in ['slide_number', 'frame_name', 'imagesCount', 'sentences', 'forGeneration']):
                     result_dict = {
                         'number': obj.get('slide_number'),
                         'name': obj.get('frame_name'),
                         'imagesCount': obj.get('imagesCount'),
-                        'sentences': obj.get('sentences')
+                        'sentences': obj.get('sentences'),
+                        'forGeneration': obj.get('forGeneration')
                     }
                     results.append(result_dict)
                     
@@ -145,7 +146,6 @@ class SlideLayoutManager(BaseManager):
                 "isActive": True,
                 "presentationLayoutIndexColor": 0
                 })
-        # for generation - из фигмы
         # для новых isactive - true, для существующих - забирате у них
         # Если слайд в группу last - то всей группе поставить last. Для всех остальнрых false
         return slide_layout_frame_data
