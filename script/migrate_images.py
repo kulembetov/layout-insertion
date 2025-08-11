@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
 Clean script to download images from Google Drive and upload to Yandex Cloud Object Storage
-Supports both individual images and folders containing images
+Supports both scenarios:
+- Direct images in the main folder (uploaded to root of target path)
+- Subfolders containing images (uploaded with subfolder structure preserved)
+- Mixed scenarios (both direct images and subfolders)
 """
 
 import io
@@ -368,37 +371,35 @@ def main():
         logger.info("Fetching subfolders from Google Drive...")
         subfolders = gdrive.list_folders_in_folder(folder_id)
 
-        if not subfolders:
-            logger.warning("No subfolders found in Google Drive folder")
-            return
+        # Get direct images from the main folder
+        logger.info("Fetching direct images from Google Drive...")
+        direct_images = gdrive.list_files_in_folder(folder_id)
+        direct_image_files = [
+            {
+                "id": file["id"],
+                "name": file["name"],
+                "mimeType": file.get("mimeType", ""),
+                "size": file.get("size"),
+                "path": file["name"],  # No subfolder prefix for direct images
+            }
+            for file in direct_images
+            if gdrive.is_image_file(file["name"], file.get("mimeType", ""))
+        ]
 
-        logger.info(f"Found {len(subfolders)} subfolders to process")
-
-        # Process each subfolder
         total_successful = 0
         total_failed = 0
 
-        for subfolder in subfolders:
-            subfolder_name = subfolder["name"]
-            logger.info(f"Processing subfolder: {subfolder_name}")
+        # Process direct images first (if any)
+        if direct_image_files:
+            logger.info(f"Found {len(direct_image_files)} direct images in main folder")
 
-            # Get images from this subfolder
-            images = gdrive.get_images_from_subfolder(subfolder["id"], subfolder_name)
-
-            if not images:
-                logger.warning(f"No images found in subfolder: {subfolder_name}")
-                continue
-
-            logger.info(f"Found {len(images)} images in {subfolder_name}")
-
-            # Process images in this subfolder
             successful_uploads = 0
             failed_uploads = 0
 
-            for i, image_info in enumerate(images, 1):
+            for i, image_info in enumerate(direct_image_files, 1):
                 filename = image_info["name"]
                 image_path = image_info["path"]
-                logger.info(f"Processing {i}/{len(images)}: {image_path}")
+                logger.info(f"Processing direct image {i}/{len(direct_image_files)}: {image_path}")
 
                 # Download
                 file_data = gdrive.download_file(image_info["id"], filename)
@@ -406,7 +407,7 @@ def main():
                     failed_uploads += 1
                     continue
 
-                # Upload inside the specified folder
+                # Upload directly to the specified folder (no subfolder)
                 yandex_key = f"{folder_path}{image_path}"
                 if yandex.upload_file(file_data, yandex_key, image_info.get("mimeType")):
                     successful_uploads += 1
@@ -416,7 +417,58 @@ def main():
             total_successful += successful_uploads
             total_failed += failed_uploads
 
-            logger.info(f"Completed {subfolder_name}: {successful_uploads} successful, {failed_uploads} failed")
+            logger.info(f"Completed direct images: {successful_uploads} successful, {failed_uploads} failed")
+
+        # Process subfolders (if any)
+        if subfolders:
+            logger.info(f"Found {len(subfolders)} subfolders to process")
+
+            for subfolder in subfolders:
+                subfolder_name = subfolder["name"]
+                logger.info(f"Processing subfolder: {subfolder_name}")
+
+                # Get images from this subfolder
+                images = gdrive.get_images_from_subfolder(subfolder["id"], subfolder_name)
+
+                if not images:
+                    logger.warning(f"No images found in subfolder: {subfolder_name}")
+                    continue
+
+                logger.info(f"Found {len(images)} images in {subfolder_name}")
+
+                # Process images in this subfolder
+                successful_uploads = 0
+                failed_uploads = 0
+
+                for i, image_info in enumerate(images, 1):
+                    filename = image_info["name"]
+                    image_path = image_info["path"]
+                    logger.info(f"Processing {i}/{len(images)}: {image_path}")
+
+                    # Download
+                    file_data = gdrive.download_file(image_info["id"], filename)
+                    if not file_data:
+                        failed_uploads += 1
+                        continue
+
+                    # Upload inside the specified folder
+                    yandex_key = f"{folder_path}{image_path}"
+                    if yandex.upload_file(file_data, yandex_key, image_info.get("mimeType")):
+                        successful_uploads += 1
+                    else:
+                        failed_uploads += 1
+
+                total_successful += successful_uploads
+                total_failed += failed_uploads
+
+                logger.info(f"Completed {subfolder_name}: {successful_uploads} successful, {failed_uploads} failed")
+        else:
+            logger.info("No subfolders found in Google Drive folder")
+
+        # Check if no images were found at all
+        if not direct_image_files and not subfolders:
+            logger.warning("No images or subfolders found in Google Drive folder")
+            return
 
         # Summary
         logger.info("Migration completed!")

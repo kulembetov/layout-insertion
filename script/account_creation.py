@@ -385,10 +385,7 @@ VALUES (%s, %s, %s, %s)"""
 VALUES (%s, %s, %s)"""  # nosec
                         cursor.execute(password_query, (user_id, hashed_password, salt))
 
-                    # Create Balance record
-                    balance_query = """INSERT INTO "Balance" ("userId", symbols, "subscriptionSymbols")
-VALUES (%s, %s, %s)"""
-                    cursor.execute(balance_query, (user_id, 0, 0))
+                        # Balance record will be created only if subscription is created
 
                 if self.db.connection is not None:
                     self.db.connection.commit()
@@ -434,9 +431,7 @@ VALUES (%s, %s, %s)"""  # nosec
                         (user_id, hashed_password, salt),
                     )
 
-                balance_query = """INSERT INTO "Balance" ("userId", symbols, "subscriptionSymbols")
-VALUES (%s, %s, %s)"""
-                self.add_sql_statement("Create Balance record", balance_query, (user_id, 0, 0))
+                    # Balance record will be created only if subscription is created
 
             if self.db.mode == ExecutionMode.AUTO:
                 print("User account created successfully!")
@@ -501,13 +496,18 @@ VALUES (%s, %s, %s)"""
     def get_available_plans(self) -> list[dict]:
         """Fetch all available plans from the database."""
         print("Fetching active plans...")
-        query = """
-            SELECT id, name, symbols, price, "subscriptionType", "isReccuring", description
-            FROM "Plan"
-            WHERE "isActive" = TRUE
-            ORDER BY price ASC
-        """
-        return self.db.execute_query_all(query)
+        try:
+            query = """
+                SELECT id, name, symbols, price, "subscriptionType", "isReccuring", description
+                FROM "Plan"
+                WHERE "isActive" = TRUE
+                ORDER BY price ASC
+            """
+            return self.db.execute_query_all(query)
+        except Exception as e:
+            print(f"Warning: Could not fetch plans from database: {e}")
+            print("Plan table may not exist in this database.")
+            return []
 
     def get_subscription_input(self, plans: list[dict]) -> dict | None:
         """Get subscription information from user input."""
@@ -679,11 +679,16 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
 VALUES (%s, %s)"""
                     cursor.execute(subscription_payment_query, (subscription_id, payment_id))
 
+                    # Create Balance record (only when subscription is created)
+                    balance_query = """INSERT INTO "Balance" ("userId", symbols, "subscriptionSymbols")
+VALUES (%s, %s, %s)"""
+                    cursor.execute(balance_query, (user_id, 0, 0))
+
                     # Update user's balance if payment succeeded
                     if payment_status == PaymentStatus.SUCCEEDED.value:
                         balance_update_query = """UPDATE "Balance"
-SET "subscriptionSymbols" = "subscriptionSymbols" + %s
-WHERE "userId" = %s"""
+ SET "subscriptionSymbols" = "subscriptionSymbols" + %s
+ WHERE "userId" = %s"""
                         cursor.execute(balance_update_query, (plan["symbols"], user_id))
 
                 if self.db.connection is not None:
@@ -747,6 +752,11 @@ VALUES (%s, %s)"""
                     subscription_payment_query,
                     (subscription_id, payment_id),
                 )
+
+                # Create Balance record (only when subscription is created)
+                balance_query = """INSERT INTO "Balance" ("userId", symbols, "subscriptionSymbols")
+VALUES (%s, %s, %s)"""
+                self.add_sql_statement("Create Balance record", balance_query, (user_id, 0, 0))
 
                 if payment_status == PaymentStatus.SUCCEEDED.value:
                     balance_update_query = """UPDATE "Balance"
