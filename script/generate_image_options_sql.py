@@ -15,6 +15,7 @@ import logging
 import mimetypes
 import os
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Final
 
@@ -55,12 +56,18 @@ class S3ImageInfo:
     folder_path: str
 
 
+class SOURCE(Enum):
+    """Image source enum."""
+
+    RAIFFEISEN = "raiffeisen"
+
+
 @dataclass(frozen=True)
 class Config:
     """Configuration data class."""
 
     s3_prefix: str
-    image_source: str
+    image_source: SOURCE
     output_file: str
     bucket_name: str
     presentation_layout_id: str
@@ -70,7 +77,7 @@ class Config:
         """Create config from environment variables."""
         return cls(
             s3_prefix=os.getenv("S3_PREFIX", "layouts/raiffeisen/library/"),
-            image_source=os.getenv("IMAGE_SOURCE", DEFAULT_IMAGE_SOURCE),
+            image_source=SOURCE(os.getenv("IMAGE_SOURCE", DEFAULT_IMAGE_SOURCE)),
             output_file=os.getenv("OUTPUT_FILE", "insert_image_options.sql"),
             bucket_name=os.getenv("YANDEX_BUCKET_NAME", ""),
             presentation_layout_id=str(DEFAULT_VALUES.get("presentation_layout_id", "")),
@@ -231,7 +238,7 @@ class SQLGenerator:
     @staticmethod
     def _validate_image_source(source: str) -> str:
         """Validate image source enum value."""
-        valid_sources = {"brand", "stock", "user", "unsplash", "freepik", "raiffeisen"}
+        valid_sources = [source.value for source in SOURCE]
         if source not in valid_sources:
             raise ValueError(f"Invalid image source: {source}. Must be one of {valid_sources}")
         return source
@@ -287,7 +294,7 @@ INSERT INTO "ImageOption" (
 );"""  # nosec B608
 
     def generate_batch_sql(self, images: list[S3ImageInfo], presentation_layout_id: str, source: str) -> tuple[str, list[str]]:
-        """Generate batch SQL for multiple ImageOptions and PresentationLayoutImageOption records.
+        """Generate batch SQL for multiple ImageOptions and PresentationLayoutImageOption records using bulk INSERT.
 
         Returns:
             tuple: (sql_string, list_of_generated_image_option_ids)
@@ -295,22 +302,58 @@ INSERT INTO "ImageOption" (
         if not images:
             return "", []
 
-        sql_parts = ["-- Batch insert ImageOptions and PresentationLayoutImageOption records", "BEGIN;", "", "-- ImageOption INSERT statements"]
+        sql_parts = ["-- Batch insert ImageOptions and PresentationLayoutImageOption records", "BEGIN;", "", "-- ImageOption bulk INSERT statement"]
 
-        # Generate all ImageOption INSERTs and collect IDs
+        # Generate all ImageOption VALUES and collect IDs
         image_option_ids = []
-        for image_info in images:
-            image_sql, image_id = self.generate_image_option_sql(image_info, source)
-            sql_parts.append(image_sql)
+        values_parts = []
+
+        for i, image_info in enumerate(images):
+            image_id = generate_uuid()
+            validated_id = self._validate_uuid(image_id)
+            validated_source = self._validate_image_source(source)
+            escaped_filename = self._escape_sql_string(image_info.filename)
+            escaped_url = self._escape_sql_string(image_info.url)
+            escaped_key = self._escape_sql_string(image_info.key)
+
+            # Add comma for all entries except the last one
+            comma = "," if i < len(images) - 1 else ""
+            values_parts.append(f"    ('{validated_id}', '{validated_source}'::\"ImageSource\", '{escaped_url}', '{escaped_key}', NULL, NULL, NULL, NULL, NULL){comma} -- {escaped_filename}")
             image_option_ids.append(image_id)
 
-        sql_parts.extend(["", "-- PresentationLayoutImageOption INSERT statements"])
+        # Create single bulk INSERT for ImageOption
+        image_option_sql = f"""INSERT INTO "ImageOption" (
+    "id",
+    "source",
+    "url",
+    "downloadLocation",
+    "authorName",
+    "authorImage",
+    "authorLink",
+    "referalLink",
+    "imageSourceId"
+) VALUES
+{chr(10).join(values_parts)};"""  # nosec B608
 
-        # Generate all junction table INSERTs
+        sql_parts.append(image_option_sql)
+        sql_parts.extend(["", "-- PresentationLayoutImageOption bulk INSERT statement"])
+
+        # Generate bulk INSERT for junction table
         if presentation_layout_id:
-            for image_option_id in image_option_ids:
-                junction_sql = self.generate_junction_sql(image_option_id, presentation_layout_id)
-                sql_parts.append(junction_sql)
+            validated_layout_id = self._validate_uuid(presentation_layout_id)
+            junction_values = []
+            for i, image_option_id in enumerate(image_option_ids):
+                validated_image_id = self._validate_uuid(image_option_id)
+                comma = "," if i < len(image_option_ids) - 1 else ""
+                junction_values.append(f"    ('{validated_image_id}', '{validated_layout_id}'){comma}")
+
+            junction_sql = f"""INSERT INTO "PresentationLayoutImageOption" (
+    "imageOptionId",
+    "presentationLayoutId"
+) VALUES
+{chr(10).join(junction_values)};"""  # nosec B608
+
+            sql_parts.append(junction_sql)
 
         sql_parts.extend(["", "COMMIT;"])
         return "\n".join(sql_parts), image_option_ids
@@ -324,7 +367,18 @@ INSERT INTO "ImageOption" (
         validated_ids = [self._validate_uuid(id_) for id_ in image_option_ids]
 
         # Create comma-separated list of validated IDs for WHERE IN clause
-        ids_in_clause = ", ".join([f"'{id_}'" for id_ in validated_ids])
+        # Split into multiple lines for better readability if there are many IDs
+        if len(validated_ids) > 10:
+            # Format with multiple lines for readability
+            ids_formatted = []
+            for i, id_ in enumerate(validated_ids):
+                if i % 10 == 0 and i > 0:
+                    ids_formatted.append(f"\n        '{id_}'")
+                else:
+                    ids_formatted.append(f"'{id_}'")
+            ids_in_clause = ", ".join(ids_formatted)
+        else:
+            ids_in_clause = ", ".join([f"'{id_}'" for id_ in validated_ids])
 
         sql_parts = [
             "-- Batch delete ImageOptions and related PresentationLayoutImageOption records by IDs",
@@ -462,24 +516,20 @@ def main() -> None:
         # Group images by folder for better organization
         images_by_folder = group_images_by_folder(images)
 
-        # Generate SQL
+        # Generate single large INSERT transaction for all images
         all_insert_sql_parts = ["-- Generated ImageOption INSERT statements", f"-- Source: s3://{config.bucket_name}/{config.s3_prefix}", f"-- Total images: {len(images)}", ""]
 
         all_delete_sql_parts = ["-- Generated ImageOption DELETE statements", f"-- Source: s3://{config.bucket_name}/{config.s3_prefix}", f"-- Total images: {len(images)}", ""]
 
-        all_generated_ids = []
-
+        # Add folder organization comments
         for folder, folder_images in images_by_folder.items():
-            logger.info(f"Processing folder: {folder} ({len(folder_images)} images)")
-
-            # Generate INSERT SQL for this folder
             all_insert_sql_parts.extend([f"-- Folder: {folder}", f"-- Images: {len(folder_images)}", ""])
 
-            folder_insert_sql, folder_ids = sql_generator.generate_batch_sql(folder_images, config.presentation_layout_id, config.image_source)
-            all_insert_sql_parts.extend([folder_insert_sql, ""])
-            all_generated_ids.extend(folder_ids)
+        logger.info(f"Generating single large INSERT transaction for {len(images)} images")
 
-            logger.info(f"Generated SQL for folder: {folder} ({len(folder_images)} images)")
+        # Generate one large transaction for all images
+        single_insert_sql, all_generated_ids = sql_generator.generate_batch_sql(images, config.presentation_layout_id, config.image_source.value)
+        all_insert_sql_parts.append(single_insert_sql)
 
         # Generate single DELETE SQL using all generated IDs
         logger.info(f"Generating single DELETE transaction for {len(all_generated_ids)} ImageOption IDs")
