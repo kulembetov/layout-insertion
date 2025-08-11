@@ -21,4 +21,4 @@ if ADMIN_LIST_RAW:
     ADMIN_LIST = list(map(int, ADMIN_LIST_RAW.split(",")))
 
 # Redis
-CACHE_LOCATION = os.getenv("CACHE_LOCATION")
+BOT_REDIS_URL = os.getenv("BOT_REDIS_URL")
