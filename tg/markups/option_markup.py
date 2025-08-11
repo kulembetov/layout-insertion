@@ -3,16 +3,14 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 def get():
-    """Creating an inline keyboard of the base menu."""
+    """Creating an inline keyboard with available options."""
     builder = InlineKeyboardBuilder()
 
-    insert_btn = InlineKeyboardButton(text="Добавить шаблон", callback_data="insert")
-    update_btn = InlineKeyboardButton(text="Обновить шаблон", callback_data="update")
+    load_btn = InlineKeyboardButton(text="Загрузить шаблон", callback_data="load")
     delete_btn = InlineKeyboardButton(text="Удалить шаблон", callback_data="delete")
 
     builder.row(
-        insert_btn,
-        update_btn,
+        load_btn,
         delete_btn,
     )
     builder.adjust(1)

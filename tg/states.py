@@ -1,7 +1,7 @@
 from aiogram.fsm.state import State, StatesGroup
 
 
-class LayoutLoadingState(StatesGroup):
+class FigmaLayoutState(StatesGroup):
     loading = State()
 
 
@@ -9,13 +9,16 @@ class OptionState(StatesGroup):
     choosing = State()
 
 
-class InsertingState(StatesGroup):
+class StartingProcessState(StatesGroup):
+    inserting = State()
+    updating = State()
+
+
+class LoadingProcessState(StatesGroup):
     name = State()
+    updating = State()
+    inserting = State()
 
 
-class UpdatingState(StatesGroup):
-    name = State()
-
-
-class DeletingState(StatesGroup):
-    name = State()
+class DeletingProcessState(StatesGroup):
+    choosing = State()
