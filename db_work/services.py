@@ -7,6 +7,7 @@ from db_work.database import BaseManager
 from db_work.utils import generate_uuid
 from redis_cache.utils import get_cached_request
 
+
 class PresentationLayoutManager(BaseManager):
     """Interacts With The PresentationLayout Table."""
 
@@ -96,6 +97,7 @@ class SlideLayoutManager(BaseManager):
         super().__init__()
 
     def extract_frame_data(self, data):
+        """Recursive extraction from cache."""
         results = []
     
         def recursive_extract(obj):
@@ -121,7 +123,8 @@ class SlideLayoutManager(BaseManager):
         recursive_extract(data)
         return results
 
-    def get_slide_layout_data_from_cache(self) -> List[str] | None:
+    def get_slide_layout_data_from_cache(self, presentation_layout_id: str) -> List[str] | None:
+        """Get slide layout data from cahce and add extra fields."""
 
         current_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(current_dir)
@@ -133,32 +136,81 @@ class SlideLayoutManager(BaseManager):
         slide_layout_frame_data = self.extract_frame_data(cache)
         for item in slide_layout_frame_data:
             item.update({
-                "presentationLayoutId": "0197c55e-1c1b-7760-9525-f51752cf23e2",
+                "presentationLayoutId": presentation_layout_id,
                 "maxTokensPerBlock": 300,
                 "maxWordsPerSentence": 15,
                 "minWordsPerSentence": 10,
                 "isLast": False,
-                "forGeneration": True,
+                "forGeneration": True, 
                 "isActive": True,
                 "presentationLayoutIndexColor": 0
                 })
-        
+        # for generation - из фигмы
+        # для новых isactive - true, для существующих - забирате у них
+        # Если слайд в группу last - то всей группе поставить last. Для всех остальнрых false
         return slide_layout_frame_data
     
 
-    def get_slide_layout_data_from_db(self, presentation_layout_id: str):
+    def update_slide_layout_data(self, presentation_layout_id: str):
+        """Create or update fieds in SliedeLayout table."""
+
         slide_layout_table, session = self.open_session("SlideLayout")
 
         def logic():
-            # Get names from Slidelayout Tabel.
             query = select(slide_layout_table).where(
-            slide_layout_table.c.presentationLayoutId == presentation_layout_id
+                slide_layout_table.c.presentationLayoutId == presentation_layout_id
             )
             result = session.execute(query)
-            slide_layout_data_from_db = result.mappings().all()
+            existing_data = result.fetchall()
 
-            return slide_layout_data_from_db
-        
+            cached_data = self.get_slide_layout_data_from_cache(presentation_layout_id)
+
+            for data_item in cached_data:
+                uuid_data_item = {
+                    k: v if k != 'id' else generate_uuid()
+                    for k, v in data_item.items()
+                }
+
+                matching_rows = [
+                    row for row in existing_data if row.name == uuid_data_item['name']
+                ]
+
+                if len(matching_rows) > 0:
+                    first_row = matching_rows[0]
+                    keys_to_compare = [
+                        'number', 'imagesCount', 'maxTokensPerBlock', 'maxWordsPerSentence',
+                        'minWordsPerSentence', 'sentences', 'isLast', 'forGeneration', 'isActive',
+                        'presentationLayoutIndexColor'
+                    ]
+                    need_update = False
+
+                    for key in keys_to_compare:
+                        if getattr(first_row, key) != uuid_data_item[key]:
+                            need_update = True
+                            break
+
+                    if need_update:
+                        stmt = (
+                            update(slide_layout_table).
+                            where(slide_layout_table.c.id == first_row.id).
+                            values(**uuid_data_item)
+                        )
+                        session.execute(stmt)
+                        session.commit()
+
+                else:
+                    new_entry = dict(uuid_data_item)
+                    new_entry['id'] = generate_uuid()
+                    stmt = insert(slide_layout_table).values(**new_entry)
+                    session.execute(stmt)
+                    session.commit()
+
+            updated_query = select(slide_layout_table).where(
+                slide_layout_table.c.presentationLayoutId == presentation_layout_id
+            )
+            final_result = session.execute(updated_query)
+            return final_result.fetchall()
+
         return super().execute(logic, session)
 
 
@@ -174,8 +226,9 @@ if __name__ == '__main__':
 #     print(color_settings_id)
 #     print(PresentationLayoutStylesManager().insert_new_ids(presentation_layout_id, color_settings_id))
 
-    # print(SlideLayoutManager().get_slide_layout_data_from_cache())
-    print(SlideLayoutManager().get_slide_layout_data_from_db('0197c55e-1c1b-7760-9525-f51752cf23e2'))
+    # print(SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2'))
+    # SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2')
+    print(SlideLayoutManager().update_slide_layout_data('0197c55e-1c1b-7760-9525-f51752cf23e2'))
     # # classic
     # '019006b0-03af-7b04-a66f-8d31b0a08769'
     # # raif
