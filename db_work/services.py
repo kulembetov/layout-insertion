@@ -5,6 +5,7 @@ from sqlalchemy import insert, select, update
 
 from db_work.database import BaseManager
 from db_work.utils import generate_uuid
+from typing import List
 
 
 class PresentationLayoutManager(BaseManager):
@@ -117,7 +118,7 @@ class SlideLayoutManager(BaseManager):
                 if all(key in obj for key in ["slide_number", "frame_name", "imagesCount", "sentences", "forGeneration", "slide_type"]):
                     result_dict = {
                         "number": obj.get("slide_number"),
-                        "name": obj.get("frame_name"),
+                        "name": obj.get("frame_name").split()[0],
                         "imagesCount": obj.get("imagesCount"),
                         "sentences": obj.get("sentences"),
                         "forGeneration": obj.get("forGeneration"),
@@ -162,37 +163,42 @@ class SlideLayoutManager(BaseManager):
             item.update({"presentationLayoutId": presentation_layout_id, "maxTokensPerBlock": 300, "maxWordsPerSentence": 15, "minWordsPerSentence": 10, "forGeneration": True, "isActive": True, "presentationLayoutIndexColor": 0})
         return slide_layout_frame_data
 
-    def update_slide_layout_data(self, presentation_layout_id: str):
+    def update_slide_layout_data(self, presentation_layout_id: str) -> List[str]:
         """Create or update fieds in SliedeLayout table."""
 
         slide_layout_table, session = self.open_session("SlideLayout")
+        added_slides = []
+        updated_slides = []
 
         def logic():
+            nonlocal added_slides, updated_slides
+
             query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
             result = session.execute(query)
-            existing_data = result.fetchall()
+            postgres_data = result.fetchall()
 
             cached_data = self.get_slide_layout_data_from_cache(presentation_layout_id)
 
             for data_item in cached_data:
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
 
-                matching_rows = [row for row in existing_data if row.name == uuid_data_item["name"]]
+                matching_row = [row for row in postgres_data if row.name == uuid_data_item["name"]]
 
-                if len(matching_rows) > 0:
-                    first_row = matching_rows[0]
+                if len(matching_row) > 0:
+                    compared_row = matching_row[0]
                     keys_to_compare = ["number", "imagesCount", "maxTokensPerBlock", "maxWordsPerSentence", "minWordsPerSentence", "sentences", "isLast", "forGeneration", "presentationLayoutIndexColor"]
                     need_update = False
 
                     for key in keys_to_compare:
-                        if getattr(first_row, key) != uuid_data_item[key]:
+                        if getattr(compared_row, key) != uuid_data_item[key]:
                             need_update = True
                             break
 
                     if need_update:
-                        stmt = update(slide_layout_table).where(slide_layout_table.c.id == first_row.id).values(**uuid_data_item)
+                        stmt = update(slide_layout_table).where(slide_layout_table.c.id == compared_row.id).values(**uuid_data_item)
                         session.execute(stmt)
                         session.commit()
+                        updated_slides.append((compared_row.name, compared_row.id))
 
                 else:
                     new_entry = dict(uuid_data_item)
@@ -200,10 +206,17 @@ class SlideLayoutManager(BaseManager):
                     stmt = insert(slide_layout_table).values(**new_entry)
                     session.execute(stmt)
                     session.commit()
+                    added_slides.append((new_entry["name"], new_entry["id"]))
 
             updated_query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
-            final_result = session.execute(updated_query)
-            return final_result.fetchall()
+            session.execute(updated_query)
+
+            changes = []
+            for name, id_ in added_slides + updated_slides:
+                action = 'Added' if (name, id_) in added_slides else 'Updated'
+                changes.append(f"{action}: {name} {id_}")
+
+            return changes
 
         return super().execute(logic, session)
 
