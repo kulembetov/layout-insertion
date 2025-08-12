@@ -22,7 +22,7 @@ async def start(message: Message, state: FSMContext) -> None:
     if has_access(message.from_user.id):
         from tg.markups import option_markup
 
-        logger.info(f"Пользователь {str_user} нажал '/start'.")
+        logger.info(f"Пользователь {str_user} нажал /start.")
 
         await message.answer("Выберите опцию:", reply_markup=option_markup.get())
         await state.set_state(OptionState.choosing)

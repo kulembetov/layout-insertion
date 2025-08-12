@@ -26,14 +26,14 @@ async def layout_loading(message: Message, state: FSMContext) -> None:
             # call request to django app
 
             str_user = to_str_user(message.from_user)
-            logger.info(f"Пользователь {str_user} якобы загрузил шаблон '{figma_url}'.")
+            logger.info(f"Пользователь {str_user} загрузил шаблон <{figma_url}>.")
 
-            await message.answer("Шаблон успешно загружен. Нажмите 'Начать' для добавления шаблона.", reply_markup=start_process_markup.get())
+            await message.answer("Шаблон успешно загружен. Нажмите *__Начать__* для добавления шаблона.", reply_markup=start_process_markup.get())
             await state.set_state(StartingProcessState.inserting)
 
         else:
             logger.error(f"file_id={file_id}, raw_url={figma_url}")
-            await message.answer("Некорректный 'file_id'. Попробуйте загрузить ссылку еще раз.")
+            await message.answer("Некорректный `file_id`. Попробуйте загрузить ссылку еще раз.")
             await state.set_state(FigmaLayoutState.loading)
     else:
         await message.answer("Неверная ссылка. Попробуйте загрузить ссылку еще раз.")

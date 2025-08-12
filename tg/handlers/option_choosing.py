@@ -15,13 +15,13 @@ logger = setup_logger(__name__)
 async def option_callback(query: CallbackQuery, state: FSMContext) -> None:
     cb_data = query.data
     str_user = to_str_user(query.from_user)
-    logger.info(f"Пользователь {str_user} выбрал опцию '{cb_data}'.")
+    logger.info(f"Пользователь {str_user} выбрал опцию <{cb_data}>.")
 
     match cb_data:
         case "load":
-            await query.message.edit_text("Выбрана опция: 'Загрузить шаблон'", reply_markup=None)
+            await query.message.edit_text("Выбрана опция: *Загрузить шаблон*", reply_markup=None)
 
-            await query.message.answer("Введите имя шаблона.\nПример: sber_marketing")
+            await query.message.answer("Введите имя шаблона.\n_Пример: sber_marketing_")
             await state.set_state(LoadingProcessState.name)
 
             await query.answer()
@@ -29,7 +29,7 @@ async def option_callback(query: CallbackQuery, state: FSMContext) -> None:
         case "delete":
             from tg.markups import layouts_markup
 
-            await query.message.edit_text("Выбрана опция: 'Удалить шаблон'", reply_markup=None)
+            await query.message.edit_text("Выбрана опция: *Удалить шаблон*", reply_markup=None)
 
             await query.message.answer("Это список-заглушка, не отображающий реальные шаблоны:", reply_markup=layouts_markup.get())
             await state.set_state(DeletingProcessState.choosing)
