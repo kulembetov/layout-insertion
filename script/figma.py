@@ -319,10 +319,7 @@ class ColorUtils:
 
         fills = node.get("fills")
         if fills and isinstance(fills, list):
-            if len(fills) > 1:
-                fill = fills[1]
-            else:
-                fill = fills[0]
+            fill = fills[0]
 
             fill_type = fill.get("type")
 
@@ -911,6 +908,7 @@ class FigmaExtractor:
         """Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer."""
         config_dict = {}
         palette_colors = set()
+
         if not slide_node or not BlockUtils.get_node_property(slide_node, "children"):
             return config_dict, []
 
@@ -921,61 +919,105 @@ class FigmaExtractor:
         for node_child in children_raw:
             if not isinstance(node_child, dict):
                 continue
+
             if BlockUtils.get_node_property(node_child, "name") == "slideColors":
                 if block_logger:
                     block_logger.info("[slideColors] Found slideColors table in slide")
+
                 children_raw2 = BlockUtils.get_node_property(node_child, "children", [])
                 if not isinstance(children_raw2, list):
                     continue
+
                 for node_block in children_raw2:
                     if not isinstance(node_block, dict):
                         continue
+
                     block_type = BlockUtils.get_node_property(node_block, "name")
+                    if not block_type:
+                        continue
+
                     if block_logger:
                         block_logger.info(f"[slideColors] Processing block type: {block_type}")
+
                     block_colors = {}
                     children_raw3 = BlockUtils.get_node_property(node_block, "children", [])
                     if not isinstance(children_raw3, list):
                         continue
+
                     for color_group in children_raw3:
                         if not isinstance(color_group, dict):
                             continue
+
                         color_hex = BlockUtils.get_node_property(color_group, "name")
-                        if color_hex:
-                            color_hex = color_hex.lower()
-                            palette_colors.add(color_hex)
+                        if not color_hex:
+                            continue
+
+                        color_hex = color_hex.lower().strip()
+                        palette_colors.add(color_hex)
+
                         if block_logger:
                             block_logger.info(f"[slideColors] Processing color group: {color_hex}")
+
                         block_objs = []
                         children_raw4 = BlockUtils.get_node_property(color_group, "children", [])
                         if not isinstance(children_raw4, list):
                             continue
+
                         for text_child in children_raw4:
                             if not isinstance(text_child, dict):
                                 continue
+
                             if BlockUtils.is_node_type(text_child, "TEXT"):
                                 text_obj = {}
+
+                                # Extract color with improved variable detection
                                 color_val, color_var = ColorUtils.extract_color_info(text_child)
                                 text_obj["color"] = color_val
-                                if color_var:
+
+                                # Only add color_variable if it exists and is not empty
+                                if color_var and color_var.strip():
                                     text_obj["color_variable"] = color_var
+                                    if block_logger:
+                                        block_logger.info(f"[slideColors] Found color variable: {color_var} for color: {color_val}")
+
+                                # Extract font family
                                 font_family = None
                                 style_raw = text_child.get("style")
                                 if isinstance(style_raw, dict) and "fontFamily" in style_raw:
                                     font_family = style_raw["fontFamily"]
-                                text_obj["fontFamily"] = FontUtils.normalize_font_family(font_family)
+
+                                normalized_font = FontUtils.normalize_font_family(font_family)
+                                if normalized_font:
+                                    text_obj["fontFamily"] = normalized_font
+
+                                # Special handling for figure blocks
                                 if block_type == "figure":
-                                    idx = BlockUtils.get_node_property(text_child, "name", "").strip()
-                                    text_obj["figureName"] = idx
+                                    figure_name = BlockUtils.get_node_property(text_child, "name", "").strip()
+                                    # Set figureName to null if empty, otherwise use the name
+                                    text_obj["figureName"] = None if not figure_name else figure_name
                                     if block_logger:
-                                        block_logger.info(f"[slideColors] Found figure in {color_hex}: name='{idx}', color={color_val}, font={font_family}")
-                                block_objs.append(text_obj)
-                        block_colors[color_hex] = block_objs
-                    config_dict[block_type] = block_colors
-                    if block_logger:
-                        block_logger.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
-                        for color_hex, obj_list in block_colors.items():
-                            block_logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
+                                        block_logger.info(f"[slideColors] Found figure in {color_hex}: name='{figure_name}', color={color_val}, color_var={color_var}, font={font_family}")
+
+                                # Only add the text object if it has meaningful content
+                                if color_val or color_var or normalized_font or text_obj.get("figureName"):
+                                    block_objs.append(text_obj)
+
+                        # Only add color group if it has objects
+                        if block_objs:
+                            block_colors[color_hex] = block_objs
+
+                    # Only add block type if it has color groups
+                    if block_colors:
+                        config_dict[block_type] = block_colors
+                        if block_logger:
+                            block_logger.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
+                            for color_hex, obj_list in block_colors.items():
+                                block_logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
+                                # Log first object details for debugging
+                                if obj_list and block_logger:
+                                    first_obj = obj_list[0]
+                                    block_logger.info(f"[slideConfig]     Sample object: {first_obj}")
+
         return config_dict, sorted(palette_colors)
 
     def _update_figure_config_with_names(self, slide_config, blocks):
@@ -1055,7 +1097,7 @@ class FigmaExtractor:
                     figure_obj = {
                         "color": fill,
                         "fontFamily": font_family,
-                        "figureName": clean_figure_name,
+                        "figureName": None if not figure_blocks_info else clean_figure_name,
                     }
                     figure_objects.append(figure_obj)
 

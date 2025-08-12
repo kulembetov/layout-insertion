@@ -36,6 +36,7 @@ idna = "3.10"
 urllib3 = "2.5.0"
 six = "1.17.0"
 defusedxml = "^0.7.1"
+psycopg2-binary = "^2.9.10"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "4.2.0"

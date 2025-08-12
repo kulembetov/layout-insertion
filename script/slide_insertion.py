@@ -98,7 +98,7 @@ logger = logging.getLogger(__name__)
 # ================ Helper Functions ================
 
 
-def create_uuid() -> str:
+def generate_uuid() -> str:
     """Generate a UUID7 string for database use."""
     return str(uuid.uuid7())
 
@@ -286,7 +286,7 @@ class BlockFactory:
 
     def create_background_block(self, bg_config):
         """Create a background block with specified config"""
-        bg_id = create_uuid()
+        bg_id = generate_uuid()
         bg_dims = bg_config["dimensions"]
 
         return Block(
@@ -324,7 +324,7 @@ class BlockFactory:
         data = dict(block_dict)  # shallow copy
         extra = extra or {}
         # Use provided or generate id
-        block_id = extra.get("id") or data.get("id") or create_uuid()
+        block_id = extra.get("id") or data.get("id") or generate_uuid()
         # Normalize/clean name
         name = extra.get("name") or data.get("name") or ""
         name = BlockNameUtils.normalize_name(name)
@@ -754,7 +754,7 @@ class FigureCommand(SQLCommand):
         """Format the values for Figure SQL, extracting and storing the index from names like 'text_1'"""
         values = []
         for figure in self.figure_blocks:
-            figure_id = create_uuid()
+            figure_id = generate_uuid()
             name = figure["name"]
             index = BlockNameUtils.extract_index(name, "figure")
             if index is not None:
@@ -790,7 +790,7 @@ class PrecompiledImageCommand(SQLCommand):
         """Format the values for PrecompiledImage SQL"""
         values = []
         for precompiled_image in self.precompiled_image_blocks:
-            precompiled_image_id = create_uuid()
+            precompiled_image_id = generate_uuid()
             color_value = f"'{precompiled_image['color']}'" if precompiled_image["color"] else "null"
             values.append(f"    ('{precompiled_image_id}', '{precompiled_image['block_layout_id']}', '{precompiled_image['url']}', {color_value})")
         return ",\n".join(values)
@@ -915,7 +915,7 @@ class BlockLayoutIndexConfigCommand(SQLCommand):
 
                 for slideConfigColor in self.slide_config[block.type]:
                     # Generate a UUID for the record
-                    block_layout_index_config_id = create_uuid()
+                    block_layout_index_config_id = generate_uuid()
 
                     block_style = self.slide_config[block.type][slideConfigColor][block.index]
 
@@ -1003,7 +1003,7 @@ class SlideLayoutIndexConfigCommand(SQLCommand):
                 slide_layout_id = self.slide_layout.id
 
                 for index, config_item in enumerate(slide_layout_index_config_mapping):
-                    slide_layout_index_config_id = create_uuid()
+                    slide_layout_index_config_id = generate_uuid()
 
                     presentation_palette_id = config_item.presentation_palette_id
 
@@ -1101,7 +1101,7 @@ class SQLGenerator:
                             logger.info(f"Using existing presentation_palette_id {palette_id} for color {color_hex_lc}")
                         else:
                             # Generate a new UUID if no matching config is found
-                            palette_id = create_uuid()
+                            palette_id = generate_uuid()
                             logger.warning(f"No matching config found for color {color_hex_lc}, generating new palette_id {palette_id}")
 
                         color_sql_lines.append(f"INSERT INTO \"PresentationPalette\" (id, presentationLayoutId, color) VALUES ('{palette_id}', '{slide_layout.presentation_layout_id}', '{color_hex_lc}') ON CONFLICT DO NOTHING;")  # nosec
@@ -1152,9 +1152,6 @@ class SQLGenerator:
 
     def _set_slide_icon_url(self, slide_layout, blocks):
         """Set slide layout icon URL based on slide type and number."""
-        # Keep the slide_type from input data, don't override from config
-        # slide_layout.type and slide_layout.type_key are already set from input data
-
         logger.info(f"forGeneration value from input JSON: {slide_layout.for_generation} (not overridden by config)")
         logger.info(f"slide_type from input data: {slide_layout.type} (not overridden by config)")
 
@@ -1188,26 +1185,18 @@ class SQLGenerator:
         block_layout_index_config_sql = block_layout_index_config_cmd.execute()
         block_id_to_index_config_id = block_layout_index_config_cmd.block_id_to_index_config_id
 
-        commands = [
-            # 1. SlideLayout
+        commands: list[SQLCommand] = [
             SlideLayoutCommand(self.config_manager, slide_layout, current_time),
-            # 2. BlockLayout
             BlockLayoutCommand(self.config_manager, blocks, slide_layout.id),
-            # 3. BlockLayoutStyles
             BlockStylesCommand(self.config_manager, blocks, BlockTypes.IMAGE),
-            # 4. BlockLayoutDimensions
             BlockDimensionsCommand(self.config_manager, blocks),
-            # 5. BlockLayoutLimit
             BlockLayoutLimitCommand(self.config_manager, blocks),
         ]
 
-        # 6. Figure records (optional)
         if figure_blocks:
             commands.append(FigureCommand(self.config_manager, self.id_generator, figure_blocks))
-        # 7. PrecompiledImage records (optional)
         if precompiled_image_blocks:
             commands.append(PrecompiledImageCommand(self.config_manager, self.id_generator, precompiled_image_blocks))
-        # 8-10. Additional slide layout info
         commands.extend(
             [
                 SlideLayoutAdditionalInfoCommand(self.config_manager, slide_layout, blocks),
@@ -1215,10 +1204,9 @@ class SQLGenerator:
                 SlideLayoutStylesCommand(self.config_manager, slide_layout),
             ]
         )
-        # Execute all remaining commands and collect SQL
         for command in commands:
             sql = command.execute()
-            if sql:  # Only add non-empty SQL
+            if sql:
                 sql_queries.append(sql)
         # Join all SQL queries
 
@@ -1324,7 +1312,7 @@ def _generate_slide_sql(slide: dict, generator: "SQLGenerator", output_dir: str,
     """Process a single slide from Figma JSON and generate SQL."""
 
     # Generate a UUID for the SlideLayout
-    slide_layout_id = create_uuid()
+    slide_layout_id = generate_uuid()
     # Strip z-index from slide layout name
     clean_slide_layout_name = strip_zindex(slide["slide_layout_name"])
     # Use slide_type from input data instead of determining from config
@@ -1347,8 +1335,6 @@ def _generate_slide_sql(slide: dict, generator: "SQLGenerator", output_dir: str,
     )
     logger.info(f"Created SlideLayout: {slide_layout}")
     miniatures_base_path = config.MINIATURES_BASE_PATH
-    slide_layout.name
-    slide_layout.number
     slide_layout.icon_url = build_slide_icon_url(slide_type, slide_layout.name, slide_layout.number, miniatures_base_path)
     # Build Block objects with generated UUIDs
     blocks, precompiled_images, figure_blocks, slide_config = _create_blocks_from_slide(slide, generator, strip_zindex)
@@ -1389,7 +1375,7 @@ def _create_blocks_from_slide(slide: dict, generator: "SQLGenerator", strip_zind
     logger.info(f"Extracted {len(font_family_map)} font family mappings from slideConfig")
 
     for block in slide["blocks"]:
-        block_uuid = create_uuid()
+        block_uuid = generate_uuid()
         block_id_map[block["id"]] = block_uuid
         styles = dict(block["styles"]) if block.get("styles") else {}
         color = None
