@@ -54,3 +54,19 @@ def extract_file_id(url: str) -> str | None:
     m = re.search(r"/design/([^/]+)(?=/|$)", u.path)
     file_id = m.group(1) if m else None
     return file_id
+
+
+# Экранирует текст для MarkdownV2 (общий случай: обычный текст, заголовки, внутри *...*, и т.п.)
+_MDv2_PATTERN = re.compile(r"([_\*\[\]\(\)~`>#+\-=\|{}\.!])")
+
+
+def r_text(text: str) -> str:
+    return _MDv2_PATTERN.sub(r"\\\1", text)
+
+
+# Экранирует URL для MarkdownV2 (внутри круглых скобок ссылки) — тут важно экранировать ')' и '\'
+_MDv2_URL_PATTERN = re.compile(r"([)\\])")
+
+
+def r_url(url: str) -> str:
+    return _MDv2_URL_PATTERN.sub(r"\\\1", url)

@@ -2,9 +2,10 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
+from db_work.implemented import presentation_layout_manager
 from log_utils import setup_logger
 from tg.states import DeletingProcessState, LoadingProcessState, OptionState
-from tg.utils import to_str_user
+from tg.utils import r_text, to_str_user
 
 option_router = Router()
 
@@ -21,7 +22,8 @@ async def option_callback(query: CallbackQuery, state: FSMContext) -> None:
         case "load":
             await query.message.edit_text("Выбрана опция: *Загрузить шаблон*", reply_markup=None)
 
-            await query.message.answer("Введите имя шаблона.\n_Пример: sber_marketing_")
+            escaped_sample = r_text("sber_marketing")
+            await query.message.answer(f"Введите имя шаблона\\.\n_Пример: {escaped_sample}_")
             await state.set_state(LoadingProcessState.name)
 
             await query.answer()
@@ -31,7 +33,7 @@ async def option_callback(query: CallbackQuery, state: FSMContext) -> None:
 
             await query.message.edit_text("Выбрана опция: *Удалить шаблон*", reply_markup=None)
 
-            await query.message.answer("Это список-заглушка, не отображающий реальные шаблоны:", reply_markup=layouts_markup.get())
+            await query.message.answer("Список всех шаблонов:", reply_markup=layouts_markup.get(presentation_layout_manager.get_all_presentation_layout_names()))
             await state.set_state(DeletingProcessState.choosing)
 
             await query.answer()

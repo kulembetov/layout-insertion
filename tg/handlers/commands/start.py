@@ -29,4 +29,4 @@ async def start(message: Message, state: FSMContext) -> None:
 
     else:
         logger.warning(f"Пользователь {str_user} пытался воспользоваться ботом.")
-        await message.answer("У Вас нет доступа пользоваться данным ботом.")
+        await message.answer("У Вас нет доступа пользоваться данным ботом\\.")
