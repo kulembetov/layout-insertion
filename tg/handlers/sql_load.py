@@ -16,15 +16,17 @@ logger = setup_logger(__name__)
 async def define_layout_name(message: Message, state: FSMContext):
     from tg.markups import yes_or_no_markup
 
-    layout = presentation_layout_manager.select_layout_by_name(message.text)
-    await state.update_data(layout=layout)
+    layout_name = message.text
+    layout = presentation_layout_manager.select_layout_by_name(layout_name)
     if layout:
+        await state.update_data(layout_name=layout.name, layout_id=str(layout.id))
+
         await message.answer(f"Нашелся шаблон *{r_text(layout.name)}* в базе данных\\. Хотите обновить шаблон?", reply_markup=yes_or_no_markup.get())
         await state.set_state(LoadingProcessState.updating)
 
     else:
         await message.answer(
-            f"Шаблон *{r_text(layout.name)}* не был найден в базе данных\\. Хотите добавить шаблон?",
+            f"Шаблон *{r_text(layout_name)}* не был найден в базе данных\\. Хотите добавить шаблон?",
             reply_markup=yes_or_no_markup.get(),
         )
         await state.set_state(LoadingProcessState.inserting)
@@ -98,11 +100,11 @@ async def update_choice(query: CallbackQuery, state: FSMContext):
 async def insert_logic(query: CallbackQuery, state: FSMContext):
     await query.message.edit_text(r_text("Шаблон загружен. Идет процесс добавления..."), reply_markup=None)
 
-    layout = await state.get_value("layout")
+    layout_name = await state.get_value("layout_name")
     str_user = to_str_user(query.from_user)
 
-    pl_uid = presentation_layout_manager.insert_new_layout(layout.name)
-    logger.info(f"Пользователь {str_user} добавил шаблон с именем <{layout.name}> в PresentationLayout.")
+    pl_uid = presentation_layout_manager.insert_new_layout(layout_name)
+    logger.info(f"Пользователь {str_user} добавил шаблон с именем <{layout_name}> в PresentationLayout.")
 
     cs_uid = color_settings_manager.select_color_id()
     logger.info(f"Пользователь {str_user} добавил настройки в ColorSettings.")
@@ -110,8 +112,8 @@ async def insert_logic(query: CallbackQuery, state: FSMContext):
     pls_uid = presentation_layout_styles_manager.insert_new_ids(pl_uid, cs_uid)
     logger.info(f"Пользователь {str_user} добавил новые ID в PresentationLayoutStyles. " f"presentationLayoutId: {pl_uid}, colorSettingsId: {cs_uid}, presentationLayoutStyleId: {pls_uid}")
 
-    await query.message.answer(f"Шаблон *{r_text(layout.name)}* успешно добавлен\\.")
-    await query.message.answer(f"Шаблон *{r_text(layout.name)}* успешно добавлен\\.")
+    await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно добавлен\\.")
+    await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно добавлен\\.")
 
     await state.clear()
     await query.answer()
@@ -126,7 +128,7 @@ async def update_logic(query: CallbackQuery, state: FSMContext):
     res = slide_layout_manager.update_slide_layout_data(layout_id)
 
     await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно обновлен\\.")
-    await query.message.answer(f"Результаты обновления: {res}")
+    await query.message.answer(f"Результаты обновления: {r_text(str(res))}")
 
     await state.clear()
     await query.answer()
