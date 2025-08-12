@@ -84,3 +84,35 @@ class ReceiveFigmaPresentationLayout(APIView):
         names = manager.execute(logic, session)
 
         return Response(names if names is not None else [])
+
+
+class ReceiveFigmaPresentationLayoutSlides(APIView):
+    """API endpoint to retrieve slides for a specific presentation layout by ID."""
+
+    @logs(logger, on=True)
+    def get(self, request, id=None) -> Response:
+        if not id:
+            return Response(data={"message": "Presentation layout ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Retrieving slides for presentation layout ID: {id}")
+
+        manager = BaseManager()
+        table, session = manager.open_session("SlideLayout")
+
+        def logic():
+            query = (
+                session.query(
+                    table.c.id,
+                    table.c.name,
+                    table.c.presentationLayoutId,
+                )
+                .filter(table.c.presentationLayoutId == str(id))
+                .order_by(table.c.number)
+            )
+
+            result = query.all()
+
+            return [{"id": row.id, "name": row.name, "presentationLayoutId": row.presentationLayoutId} for row in result]
+
+        slides = manager.execute(logic, session)
+        return Response(slides if slides is not None else [])
