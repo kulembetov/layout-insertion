@@ -176,10 +176,19 @@ class SlideLayoutManager(BaseManager):
 
             cached_data = self.get_slide_layout_data_from_cache(presentation_layout_id)
 
+            # Duplicated name logic
+            # from collections import Counter
+            # names_count = Counter(data_item['name'] for data_item in cached_data)
+            # duplicated_names = [data_item for data_item in cached_data if names_count[data_item['name']] > 1]
+            # print(duplicated_names)
+
+
+
+            # Main logic
             for data_item in cached_data:
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
 
-                matching_row = [row for row in postgres_data if row.name == uuid_data_item["name"]]
+                matching_row = [row for row in postgres_data if row.name == uuid_data_item["name"] and row.number == uuid_data_item["number"]]
 
                 if len(matching_row) > 0:
                     compared_row = matching_row[0]
@@ -241,7 +250,7 @@ class SlideLayoutManager(BaseManager):
 
 
 if __name__ == "__main__":
-    print(PresentationLayoutManager().select_layout_by_name('classic'))
+    # print(PresentationLayoutManager().select_layout_by_name('classic'))
     #     print(PresentationLayoutManager().insert_new_layout('test_12'))
     #     print(ColorSettingsManager().select_color_id())
     #     print(PresentationLayoutStylesManager().insert_new_ids(id))
