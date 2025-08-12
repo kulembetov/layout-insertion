@@ -141,6 +141,7 @@ class SlideLayoutManager(BaseManager):
         json_file_path = os.path.join(parent_dir, "output.json")
         with open(json_file_path, encoding="utf-8") as file:
             cache = json.load(file)
+
         # FIGMA_FILE_ID = os.getenv("FIGMA_FILE_ID")
         # cache = get_cached_request(FIGMA_FILE_ID)
         slide_layout_frame_data = self.extract_frame_data(cache)
@@ -219,7 +220,7 @@ class SlideLayoutManager(BaseManager):
 
             changes = []
             for name, id_ in added_slides + updated_slides:
-                action = 'Added' if (name, id_) in added_slides else 'Updated'
+                action = "Added" if (name, id_) in added_slides else "Updated"
                 changes.append(f"{action}: {name} {id_}")
 
             return changes
