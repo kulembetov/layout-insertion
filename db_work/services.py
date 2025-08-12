@@ -2,10 +2,10 @@ import json
 import os
 
 from sqlalchemy import insert, select, update
+from sqlalchemy.engine.row import Row
 
 from db_work.database import BaseManager
 from db_work.utils import generate_uuid
-from typing import List
 
 
 class PresentationLayoutManager(BaseManager):
@@ -14,7 +14,7 @@ class PresentationLayoutManager(BaseManager):
     def __init__(self):
         super().__init__()
 
-    def select_layout_by_name(self, name: str) -> bool | None:
+    def select_layout_by_name(self, name: str) -> Row | None:
         """Find a row in 'PresentationLayout' by name."""
 
         presentation_layout_table, session = self.open_session("PresentationLayout")
@@ -23,10 +23,7 @@ class PresentationLayoutManager(BaseManager):
 
             query = select(presentation_layout_table).where(presentation_layout_table.c.name == name)
             result = session.execute(query).fetchone()
-            if result:
-                return True
-            else:
-                return False
+            return result
 
         return super().execute(logic, session)
 
@@ -163,7 +160,7 @@ class SlideLayoutManager(BaseManager):
             item.update({"presentationLayoutId": presentation_layout_id, "maxTokensPerBlock": 300, "maxWordsPerSentence": 15, "minWordsPerSentence": 10, "forGeneration": True, "isActive": True, "presentationLayoutIndexColor": 0})
         return slide_layout_frame_data
 
-    def update_slide_layout_data(self, presentation_layout_id: str) -> List[str]:
+    def update_slide_layout_data(self, presentation_layout_id: str) -> list[str]:
         """Create or update fieds in SliedeLayout table."""
 
         slide_layout_table, session = self.open_session("SlideLayout")
@@ -244,7 +241,7 @@ class SlideLayoutManager(BaseManager):
 
 
 if __name__ == "__main__":
-    #     print(PresentationLayoutManager().select_layout_by_name('classic'))
+    print(PresentationLayoutManager().select_layout_by_name('classic'))
     #     print(PresentationLayoutManager().insert_new_layout('test_12'))
     #     print(ColorSettingsManager().select_color_id())
     #     print(PresentationLayoutStylesManager().insert_new_ids(id))
