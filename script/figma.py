@@ -17,7 +17,18 @@ from enum import Enum
 import config
 import requests
 
-# Set up block logger dynamically based on output directory
+TEXT_BLOCK_TYPES = [
+    "text",
+    "blockTitle",
+    "slideTitle",
+    "subTitle",
+    "number",
+    "email",
+    "date",
+    "name",
+    "percentage",
+]
+
 block_logger = None
 block_log_handler = None
 
@@ -29,14 +40,10 @@ def setup_block_logger(output_dir):
     block_logger = logging.getLogger("block_processing")
     block_logger.setLevel(logging.INFO)
     log_path = os.path.join(output_dir, "figma.log")
-    # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
     block_log_handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
     block_log_handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
     block_logger.addHandler(block_log_handler)
-
-
-# ================ Data Classes and Enums ================
 
 
 class FilterMode(Enum):
@@ -55,7 +62,7 @@ class FilterConfig:
     require_z_index: bool = True
     min_area: int = 0
     exclude_hidden: bool = True
-    ready_to_dev_marker: str | None = None  # marker for 'ready to dev' (e.g., '[ready]')
+    ready_to_dev_marker: str | None = None
 
 
 @dataclass
@@ -87,7 +94,6 @@ class ExtractedSlide:
     _figma_node: dict | None = None
 
 
-# Place BlockTypeUtils before FigmaExtractor so it is always in scope
 class BlockTypeUtils:
     @staticmethod
     def detect_block_type(node: dict) -> tuple[str, str]:
@@ -95,7 +101,6 @@ class BlockTypeUtils:
         name = node.get("name", "")
         node_type = node.get("type", "")
         clean_name = re.sub(r"\s*z-index.*$", "", name)
-        # Check for explicit mappings first, prioritize longer patterns
         sorted_patterns = sorted(
             config.FIGMA_TO_SQL_BLOCK_MAPPING.items(),
             key=lambda x: len(x[0]),
@@ -105,38 +110,30 @@ class BlockTypeUtils:
             if pattern in clean_name.lower():
                 if sql_type in config.BLOCK_TYPES["block_layout_type_options"]:
                     return pattern, sql_type
-        # Infer from Figma node type with helpers
         if node_type == "TEXT":
             sql_type = BlockTypeUtils._detect_text_block_type(clean_name)
             if sql_type in config.BLOCK_TYPES["block_layout_type_options"]:
                 return sql_type, sql_type
-        # For RECTANGLE, FRAME, and GROUP nodes, use the same pattern matching
         elif node_type in ["RECTANGLE", "FRAME", "GROUP"]:
             sql_type = BlockTypeUtils._detect_text_block_type(clean_name)
             if sql_type in config.BLOCK_TYPES["block_layout_type_options"]:
                 return sql_type, sql_type
-        # Default fallback
         return "text", "text"
 
     @staticmethod
     def _normalize_type_name(name: str) -> str:
-        # Lowercase, replace underscores/hyphens/spaces, split camelCase
-        name = re.sub(r"([a-z])([A-Z])", r"\1_\2", name)  # camelCase to snake_case
+        name = re.sub(r"([a-z])([A-Z])", r"\1_\2", name)
         name = name.replace("-", "_").replace(" ", "_").lower()
         return name
 
     @staticmethod
     def _detect_text_block_type(name: str) -> str:
-        # Use config mapping for canonical types
         norm = BlockTypeUtils._normalize_type_name(name)
         norm_flat = norm.replace("_", "")
         for pattern, sql_type in config.FIGMA_TO_SQL_BLOCK_MAPPING.items():
             if pattern in norm_flat:
                 return sql_type
         return "text"
-
-
-# ================ Text Utils ================
 
 
 class TextUtils:
@@ -155,9 +152,6 @@ class TextUtils:
         return n if n > 0 else 1
 
 
-# ================ Figure Utils ================
-
-
 class FigureUtils:
     @staticmethod
     def extract_base_figure_name(name: str) -> str:
@@ -167,7 +161,6 @@ class FigureUtils:
         name_match = re.search(r"\(([^)]+)\)", name)
         if name_match:
             base_name = name_match.group(1)
-            # Remove trailing _<number> if present
             base_name = re.sub(r"_(\d+)$", "", base_name)
             return base_name
         return name
@@ -181,9 +174,6 @@ class FigureUtils:
         if index_match:
             return index_match.group(1)
         return ""
-
-
-# ================ Block Utils ================
 
 
 class BlockUtils:
@@ -211,13 +201,10 @@ class BlockUtils:
             "comment": get("comment"),
         }
         text_content = get("text_content")
-        # Use existing 'words' if present in dict, else recalculate
         if isinstance(block, dict) and "words" in block and block["words"] is not None:
             block_dict["words"] = block["words"]
         else:
             block_dict["words"] = TextUtils.count_words(text_content)
-        # No color/fontFamily in block_dict for any type
-        # Always add figure_info and precompiled_image_info for consistency
         block_dict["figure_info"] = BlockUtils.extract_figure_info(block, slide_config)
         block_dict["precompiled_image_info"] = BlockUtils.extract_precompiled_image_info(block, slide_config)
         return block_dict
@@ -267,7 +254,6 @@ class BlockUtils:
     @staticmethod
     def extract_blur_from_node(node: dict) -> int:
         """Extract layer blur radius from a Figma node, checking nested layers. Returns 0 if no blur."""
-        # Check effects on current node
         effects = node.get("effects")
         if effects and isinstance(effects, list):
             for effect in effects:
@@ -276,7 +262,6 @@ class BlockUtils:
                     if isinstance(radius, (int, float)) and radius > 0:
                         return int(radius)
 
-        # Check nested children recursively
         children = node.get("children")
         if children and isinstance(children, list):
             for child in children:
@@ -295,7 +280,6 @@ class BlockUtils:
         return node.get("type") == node_type
 
 
-# Place ColorUtils before FigmaExtractor so it is always in scope
 class ColorUtils:
     @staticmethod
     def extract_color_info(node: dict) -> tuple[str | None, str | None]:
@@ -306,14 +290,10 @@ class ColorUtils:
 
         fills = node.get("fills")
         if fills and isinstance(fills, list):
-            if len(fills) > 1:
-                fill = fills[1]
-            else:
-                fill = fills[0]
+            fill = fills[0]
 
             fill_type = fill.get("type")
 
-            # Handle SOLID fills
             if fill_type == "SOLID" and fill.get("visible", True) and "color" in fill:
                 c = fill["color"]
                 r = int(round(c.get("r", 0) * 255))
@@ -324,7 +304,6 @@ class ColorUtils:
                     hex_or_gradient_color = f"#{r:02x}{g:02x}{b:02x}{int(a * 255):02x}"
                 else:
                     hex_or_gradient_color = f"#{r:02x}{g:02x}{b:02x}"
-                # Extract variable/style if present
                 color_variable = None
                 if "boundVariables" in fill and "color" in fill["boundVariables"]:
                     color_variable = fill["boundVariables"]["color"].get("id")
@@ -332,10 +311,8 @@ class ColorUtils:
                     color_variable = fill["fillStyleId"]
                 return hex_or_gradient_color, color_variable
 
-            # Handle gradient fills
             elif fill.get("visible", True) and fill_type in ["GRADIENT_LINEAR", "GRADIENT_RADIAL", "GRADIENT_ANGULAR", "GRADIENT_DIAMOND"]:
                 hex_or_gradient_color = ColorUtils._create_gradient_css(fill)
-                # Extract variable/style if present
                 color_variable = None
 
                 if "boundVariables" in fill and "color" in fill["boundVariables"]:
@@ -344,7 +321,6 @@ class ColorUtils:
                     color_variable = fill["fillStyleId"]
                 return hex_or_gradient_color, color_variable
 
-        # Fallback: check for direct color field
         color = node.get("color")
         if color and isinstance(color, str):
             return color.lower(), None
@@ -362,13 +338,11 @@ class ColorUtils:
         if not gradient_stops:
             return ""
 
-        # Convert gradient stops to CSS format
         css_stops = []
         for stop in gradient_stops:
             color = stop.get("color", {})
             position = stop.get("position", 0)
 
-            # Convert color to hex
             r = int(round(color.get("r", 0) * 255))
             g = int(round(color.get("g", 0) * 255))
             b = int(round(color.get("b", 0) * 255))
@@ -379,27 +353,20 @@ class ColorUtils:
             else:
                 hex_color = f"#{r:02x}{g:02x}{b:02x}"
 
-            # Convert position to percentage
             percentage = int(position * 100)
             css_stops.append(f"{hex_color} {percentage}%")
 
-        # Create gradient based on type
         if gradient_type == "GRADIENT_LINEAR":
-            # Calculate angle from handle positions
             angle = ColorUtils._calculate_linear_angle(gradient_handle_positions)
             return f"linear-gradient({angle}deg\\, {'\\, '.join(css_stops)})"
 
         elif gradient_type == "GRADIENT_RADIAL":
-            # For radial gradients, we'll use a simple radial format
-            # Figma's radial gradients are more complex, but this is a good approximation
             return f"radial-gradient(circle\\, {'\\, '.join(css_stops)})"
 
         elif gradient_type == "GRADIENT_ANGULAR":
-            # Angular gradients in CSS are conic gradients
             return f"conic-gradient({'\\, '.join(css_stops)})"
 
         elif gradient_type == "GRADIENT_DIAMOND":
-            # Diamond gradients can be approximated with radial gradients
             return f"radial-gradient(ellipse at center\\, {'\\, '.join(css_stops)})"
 
         return ""
@@ -413,25 +380,18 @@ class ColorUtils:
         if len(handle_positions) < 2:
             return 0
 
-        # Get start and end positions
         start = handle_positions[0]
         end = handle_positions[1]
 
-        # Calculate vector
         dx = end.get("x", 0) - start.get("x", 0)
         dy = end.get("y", 0) - start.get("y", 0)
 
-        # Calculate angle in radians
         angle_rad = math.atan2(dy, dx)
 
-        # Convert to degrees and normalize to 0-360
         angle_deg = math.degrees(angle_rad)
         angle_deg = (angle_deg + 360) % 360
 
         return int(angle_deg)
-
-
-# ================ Font Utils ================
 
 
 class FontUtils:
@@ -446,9 +406,6 @@ class FontUtils:
         )
 
 
-# ================ Block Filter Utils ================
-
-
 class BlockFilterUtils:
     @staticmethod
     def should_include_node_or_block(node_or_block, filter_config) -> bool:
@@ -457,23 +414,18 @@ class BlockFilterUtils:
         Handles z-index, marker, visibility, and filter mode.
         Accepts either a Figma node (dict) or an ExtractedBlock/dict.
         """
-        # Handle both node and block
         get = (lambda k: node_or_block.get(k, None)) if isinstance(node_or_block, dict) else (lambda k: getattr(node_or_block, k, None))
-        # Exclude hidden
         if getattr(filter_config, "exclude_hidden", True) and get("visible") is False:
             return False
-        # Marker check
         marker = getattr(filter_config, "ready_to_dev_marker", None)
         if marker:
             name = get("name") or ""
             if marker.lower() not in name.lower():
                 return False
-        # Z-index requirement
         if getattr(filter_config, "require_z_index", True):
             name = get("name") or ""
             if "z-index" not in name:
                 return False
-        # Filter mode logic
         mode = getattr(filter_config, "mode", None)
         if mode == FilterMode.ALL:
             return True
@@ -492,7 +444,6 @@ class BlockFilterUtils:
         return True
 
 
-# ================ Logging Utility ================
 class LogUtils:
     @staticmethod
     def log_block_event(message, level="info"):
@@ -507,7 +458,6 @@ class LogUtils:
             print(message)
 
 
-# ================ Figma Extractor Class ================
 class FigmaExtractor:
     def __init__(self, file_id: str, token: str, filter_config: FilterConfig | None = None):
         """Initialize the Figma extractor with file ID, access token and optional filter config.
@@ -544,20 +494,19 @@ class FigmaExtractor:
     def normalize_font_weight(self, weight: int | float | str | None) -> int:
         """Normalize font weight to valid values from config"""
         if weight is None:
-            return config.VALID_FONT_WEIGHTS[1]  # 400 as default
+            return config.VALID_FONT_WEIGHTS[1]
 
         try:
             weight_num = int(weight)
         except (ValueError, TypeError):
-            return config.VALID_FONT_WEIGHTS[1]  # 400 as default
+            return config.VALID_FONT_WEIGHTS[1]
 
-        # Map font weights to nearest valid value
         if weight_num <= 350:
-            return config.VALID_FONT_WEIGHTS[0]  # 300
+            return config.VALID_FONT_WEIGHTS[0]
         elif weight_num <= 550:
-            return config.VALID_FONT_WEIGHTS[1]  # 400
+            return config.VALID_FONT_WEIGHTS[1]
         else:
-            return config.VALID_FONT_WEIGHTS[2]  # 700
+            return config.VALID_FONT_WEIGHTS[2]
 
     def extract_text_styles(self, node: dict[str, str | int | float | bool | dict | list], sql_type: str) -> dict[str, str | int | float | bool | list]:
         """Extract text styling information with config defaults (no color)."""
@@ -571,7 +520,6 @@ class FigmaExtractor:
         }
         style_raw = node.get("style", {})
         if isinstance(style_raw, dict):
-            # Prefer Figma's actual values if present
             text_align_vertical_raw = style_raw.get("textAlignVertical", "")
             if isinstance(text_align_vertical_raw, str):
                 text_align_vertical = text_align_vertical_raw.lower()
@@ -580,7 +528,6 @@ class FigmaExtractor:
                 elif text_align_vertical == "center":
                     styles["textVertical"] = "middle"
 
-            # Figma's textAlignHorizontal: 'LEFT', 'CENTER', 'RIGHT' (case-insensitive)
             text_align_horizontal_raw = style_raw.get("textAlignHorizontal", "")
             if isinstance(text_align_horizontal_raw, str):
                 text_align_horizontal = text_align_horizontal_raw.lower()
@@ -596,28 +543,24 @@ class FigmaExtractor:
                 font_weight_raw = style_raw["fontWeight"]
                 styles["weight"] = self.normalize_font_weight(font_weight_raw)
 
-        # Extract blur information
         styles["blur"] = self.extract_blur(node)
 
-        # Ensure all values are of the expected types
         result: dict[str, str | int | float | bool | list] = {}
         for key, value in styles.items():
             if isinstance(value, (str, int, float, bool, list)):
                 result[key] = value
             else:
-                result[key] = str(value)  # Convert to string as fallback
+                result[key] = str(value)
 
         return result
 
     def extract_opacity(self, node: dict[str, str | int | float | bool | dict | list]) -> int | float:
         """Extract opacity from a Figma node"""
-        # Check for direct opacity property
         if "opacity" in node:
             opacity = node["opacity"]
             if isinstance(opacity, (int, float)):
                 return int(opacity) if opacity == 1.0 else float(opacity)
 
-        # Check for opacity in fills
         fills_raw = node.get("fills")
         if isinstance(fills_raw, list):
             for fill in fills_raw:
@@ -629,54 +572,24 @@ class FigmaExtractor:
                         if isinstance(opacity_raw, (int, float)):
                             return int(opacity_raw) if opacity_raw == 1.0 else float(opacity_raw)
 
-        # Default opacity
         return 1
 
     def extract_rotation(self, node: dict[str, str | int | float | bool | dict | list]) -> int:
         """Extract rotation from a Figma node"""
-        # Check for rotation property
         if "rotation" in node:
             rotation = node["rotation"]
             if isinstance(rotation, (int, float)):
                 return int(rotation)
 
-        # Check for rotation in absoluteTransform
         if "absoluteTransform" in node:
             transform_raw = node["absoluteTransform"]
             if isinstance(transform_raw, list) and len(transform_raw) >= 2:
                 return 0
 
-        # Default rotation
         return 0
-
-    def extract_border_radius(self, node: dict[str, str | int | float | bool | dict | list]) -> tuple[bool, list[int]]:
-        """Extract border radius information"""
-        border_radius = [0, 0, 0, 0]  # Default: all corners 0
-        has_border_radius = False
-
-        # Check for cornerRadius property
-        if "cornerRadius" in node:
-            radius = node["cornerRadius"]
-            if isinstance(radius, (int, float)) and radius > 0:
-                border_radius = [int(radius)] * 4
-                has_border_radius = True
-
-        # Check for individual corner radii
-        if "rectangleCornerRadii" in node:
-            radii_raw = node["rectangleCornerRadii"]
-            if isinstance(radii_raw, list) and len(radii_raw) == 4:
-                try:
-                    border_radius = [int(r) for r in radii_raw if isinstance(r, (int, float))]
-                    if len(border_radius) == 4:
-                        has_border_radius = any(r > 0 for r in border_radius)
-                except (ValueError, TypeError):
-                    pass  # Keep default values if conversion fails
-
-        return has_border_radius, border_radius
 
     def extract_blur(self, node: dict[str, str | int | float | bool | dict | list]) -> int:
         """Extract layer blur radius from a Figma node, checking nested layers. Returns 0 if no blur."""
-        # Check effects on current node
         effects_raw = node.get("effects")
         if isinstance(effects_raw, list):
             for effect in effects_raw:
@@ -688,7 +601,6 @@ class FigmaExtractor:
                         if isinstance(radius_raw, (int, float)) and radius_raw > 0:
                             return int(radius_raw)
 
-        # Check nested children recursively
         children_raw = node.get("children")
         if isinstance(children_raw, list):
             for child in children_raw:
@@ -703,22 +615,18 @@ class FigmaExtractor:
         """Check if node is a target frame, now supports 'ready to dev' marker"""
         if not BlockUtils.get_node_property(node, "absoluteBoundingBox"):
             return False
-        # Check for 'ready to dev' marker if set
         marker = getattr(self.filter_config, "ready_to_dev_marker", None)
         if marker:
             name = BlockUtils.get_node_property(node, "name", "").lower()
             if marker.lower() not in name:
                 return False
-        # Check z-index requirement
         if self.filter_config.require_z_index and not self.has_z_index_in_name(BlockUtils.get_node_property(node, "name", "")):
             return False
         abs_box = BlockUtils.get_node_property(node, "absoluteBoundingBox")
-        # Check dimensions
         width_match = abs(abs_box["width"] - config.FIGMA_CONFIG["TARGET_WIDTH"]) < 1
         height_match = abs(abs_box["height"] - config.FIGMA_CONFIG["TARGET_HEIGHT"]) < 1
         if not (width_match and height_match):
             return False
-        # Check minimum area
         area = abs_box["width"] * abs_box["height"]
         if area < self.filter_config.min_area:
             return False
@@ -730,10 +638,8 @@ class FigmaExtractor:
 
     def detect_slide_type(self, container_name: str, slide_number: int) -> str:
         """Detect slide type using only config.py as the source of truth."""
-        # Use config mapping for container name to slide number
         key = container_name.strip().lower()
         number = config.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, slide_number)
-        # Use config mapping for slide number to type
         return config.SLIDE_NUMBER_TO_TYPE.get(number, "classic")
 
     def get_slide_number(self, parent_name: str) -> int:
@@ -741,11 +647,10 @@ class FigmaExtractor:
         key = parent_name.strip().lower()
         result = config.CONTAINER_NAME_TO_SLIDE_NUMBER.get(key, None)
         if result is None:
-            return 1  # Default slide number
+            return 1
         return result
 
     def extract_color_from_fills(self, node: dict) -> tuple[str | None, str | None]:
-        # Replaced by ColorUtils.extract_color_info
         return ColorUtils.extract_color_info(node)
 
     def fetch_all_comments(self) -> dict[str, str]:
@@ -763,7 +668,6 @@ class FigmaExtractor:
 
             LogUtils.log_block_event(f"Comments API response keys: {list(comments_data.keys())}")
 
-            # Log the raw response for debugging
             if "comments" in comments_data:
                 LogUtils.log_block_event(f"Total comments in response: {len(comments_data['comments'])}")
                 for i, comment in enumerate(comments_data["comments"][:3]):
@@ -771,7 +675,6 @@ class FigmaExtractor:
             else:
                 LogUtils.log_block_event(f"No 'comments' key found in response. Available keys: {list(comments_data.keys())}")
 
-            # Create a mapping of node_id to first comment message
             for comment in comments_data.get("comments", []):
                 client_meta = comment.get("client_meta", {})
                 node_id = client_meta.get("node_id")
@@ -790,6 +693,62 @@ class FigmaExtractor:
             LogUtils.log_block_event(f"Error fetching comments: {e}", level="debug")
             return {}
 
+    def _should_skip_full_image_block(self, sql_type: str, dimensions: dict[str, int], name: str) -> bool:
+        """Check if an image block should be skipped (full-size background images)."""
+        name_lower = name.lower()
+        is_precompiled = "precompiled" in name_lower
+        return sql_type == "image" and dimensions["x"] == 0 and dimensions["y"] == 0 and dimensions["w"] == config.FIGMA_CONFIG["TARGET_WIDTH"] and dimensions["h"] == config.FIGMA_CONFIG["TARGET_HEIGHT"] and not is_precompiled
+
+    def _extract_block_styles(self, node: dict, sql_type: str, name: str) -> dict:
+        """Extract and compile all styles for a block."""
+        base_styles = self.extract_text_styles(node, sql_type)
+        styles: dict[str, str | int | float | bool | list] = {}
+
+        for key, value in base_styles.items():
+            if isinstance(value, (str, int, float, bool, list)):
+                styles[key] = value
+            else:
+                styles[key] = str(value)
+
+        z_index = self.extract_z_index(name)
+        if z_index == 0:
+            z_index = config.Z_INDEX_DEFAULTS.get(sql_type, config.Z_INDEX_DEFAULTS["default"])
+        styles["zIndex"] = z_index
+
+        has_border_radius, border_radius = BlockUtils.extract_border_radius_from_node(node)
+        styles["borderRadius"] = border_radius
+
+        styles["opacity"] = self.extract_opacity(node)
+
+        if sql_type not in TEXT_BLOCK_TYPES:
+            styles["blur"] = self.extract_blur(node)
+
+        return styles
+
+    def _extract_text_content(self, node: dict, sql_type: str) -> str | None:
+        """Extract text content if the block is a text type."""
+        if sql_type in TEXT_BLOCK_TYPES and BlockUtils.is_node_type(node, "TEXT"):
+            return BlockUtils.get_node_property(node, "characters", None)
+        return None
+
+    def _create_extracted_block(self, node: dict, figma_type: str, sql_type: str, name: str, dimensions: dict, styles: dict, slide_number: int, parent_container: str, text_content: str | None, comments_map: dict[str, str] | None) -> ExtractedBlock:
+        """Create an ExtractedBlock instance with all required data."""
+        comment = comments_map.get(str(node["id"]), "") if comments_map else ""
+
+        return ExtractedBlock(
+            id=str(node["id"]),
+            figma_type=figma_type,
+            sql_type=sql_type,
+            name=name,
+            dimensions=dimensions,
+            styles=styles,
+            slide_number=slide_number,
+            parent_container=parent_container,
+            is_target=True,
+            text_content=text_content,
+            comment=comment,
+        )
+
     def collect_blocks(
         self,
         node: dict[str, str | int | float | bool | dict | list],
@@ -800,125 +759,61 @@ class FigmaExtractor:
     ) -> list[ExtractedBlock]:
         """Recursively collect blocks from a Figma node, filtering and normalizing as needed."""
         blocks: list[ExtractedBlock] = []
+
         if not BlockUtils.get_node_property(node, "absoluteBoundingBox"):
             return blocks
         if not BlockFilterUtils.should_include_node_or_block(node, self.filter_config):
             return blocks
+
         name = BlockUtils.get_node_property(node, "name", "")
         has_z = self.has_z_index_in_name(name)
+
         if has_z:
             figma_type, sql_type = BlockTypeUtils.detect_block_type(node)
             abs_box = BlockUtils.get_node_property(node, "absoluteBoundingBox")
-            left = abs_box["x"] - frame_origin["x"]
-            top = abs_box["y"] - frame_origin["y"]
-            # Extract rotation
             rotation = self.extract_rotation(node)
 
             dimensions = {
-                "x": round(left),
-                "y": round(top),
+                "x": round(abs_box["x"] - frame_origin["x"]),
+                "y": round(abs_box["y"] - frame_origin["y"]),
                 "w": round(abs_box["width"]),
                 "h": round(abs_box["height"]),
                 "rotation": rotation,
             }
-            name_lower = name.lower()
-            is_precompiled = "precompiled" in name_lower
-            should_skip = sql_type == "image" and dimensions["x"] == 0 and dimensions["y"] == 0 and dimensions["w"] == config.FIGMA_CONFIG["TARGET_WIDTH"] and dimensions["h"] == config.FIGMA_CONFIG["TARGET_HEIGHT"] and not is_precompiled
-            if should_skip:
+
+            if self._should_skip_full_image_block(sql_type, dimensions, name):
                 LogUtils.log_block_event(
                     f"Skipping {sql_type} block {name} (full image {config.FIGMA_CONFIG['TARGET_WIDTH']}x{config.FIGMA_CONFIG['TARGET_HEIGHT']})",
                     level="debug",
                 )
             else:
-                base_styles = self.extract_text_styles(node, sql_type)
-                styles: dict[str, str | int | float | bool | list] = {}
-                for key, value in base_styles.items():
-                    if isinstance(value, (str, int, float, bool, list)):
-                        styles[key] = value
-                    else:
-                        styles[key] = str(value)  # Convert to string as fallback
-                z_index = self.extract_z_index(name)
-                if z_index == 0:
-                    z_index = config.Z_INDEX_DEFAULTS.get(sql_type, config.Z_INDEX_DEFAULTS["default"])
-                styles["zIndex"] = z_index
+                styles = self._extract_block_styles(node, sql_type, name)
+                text_content = self._extract_text_content(node, sql_type)
 
-                # Extract border radius and add to styles (always include, even if 0)
-                has_border_radius, border_radius = BlockUtils.extract_border_radius_from_node(node)
-                styles["borderRadius"] = border_radius
+                block = self._create_extracted_block(node, figma_type, sql_type, name, dimensions, styles, slide_number, parent_container, text_content, comments_map)
 
-                opacity = self.extract_opacity(node)
-                styles["opacity"] = opacity
-
-                # Extract blur for non-text blocks (text blocks already have blur from extract_text_styles)
-                if sql_type not in [
-                    "text",
-                    "blockTitle",
-                    "slideTitle",
-                    "subTitle",
-                    "number",
-                    "email",
-                    "date",
-                    "name",
-                    "percentage",
-                ]:
-                    styles["blur"] = self.extract_blur(node)
-
-                text_content = None
-                if sql_type in [
-                    "text",
-                    "blockTitle",
-                    "slideTitle",
-                    "subTitle",
-                    "number",
-                    "email",
-                    "date",
-                    "name",
-                    "percentage",
-                ] and BlockUtils.is_node_type(node, "TEXT"):
-                    text_content = BlockUtils.get_node_property(node, "characters", None)
-
-                # Get comment from the pre-fetched comments map
-                comment = comments_map.get(str(node["id"]), "") if comments_map else ""
-
-                block = ExtractedBlock(
-                    id=str(node["id"]),
-                    figma_type=figma_type,
-                    sql_type=sql_type,
-                    name=name,
-                    dimensions=dimensions,
-                    styles=styles,
-                    slide_number=slide_number,
-                    parent_container=parent_container,
-                    is_target=True,
-                    text_content=text_content,
-                    comment=comment,
-                )
                 if BlockFilterUtils.should_include_node_or_block(block, self.filter_config):
                     blocks.append(block)
                     LogUtils.log_block_event(f"Added {sql_type} block: {name}")
+
                     blur_value = styles.get("blur", 0)
                     blur_info = f" | Blur: {blur_value}px" if isinstance(blur_value, (int, float)) and blur_value > 0 else ""
                     LogUtils.log_block_event(
                         f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{blur_info}",
                         level="debug",
                     )
+
         if BlockUtils.get_node_property(node, "children") and not (getattr(self.filter_config, "exclude_hidden", True) and BlockUtils.get_node_property(node, "visible") is False):
             for node_child in BlockUtils.get_node_property(node, "children"):
-                blocks.extend(
-                    self.collect_blocks(
-                        node_child,
-                        frame_origin,
-                        slide_number,
-                        parent_container,
-                        comments_map,
-                    )
-                )
+                blocks.extend(self.collect_blocks(node_child, frame_origin, slide_number, parent_container, comments_map))
+
         return blocks
 
     def _extract_slide_config(self, slide_node):
         """Extract slideConfig from the hidden slideColors table in the slide node, including color and fontFamily for each color layer."""
         config_dict = {}
         palette_colors = set()
+
         if not slide_node or not BlockUtils.get_node_property(slide_node, "children"):
             return config_dict, []
 
@@ -929,65 +824,99 @@ class FigmaExtractor:
         for node_child in children_raw:
             if not isinstance(node_child, dict):
                 continue
+
             if BlockUtils.get_node_property(node_child, "name") == "slideColors":
                 if block_logger:
                     block_logger.info("[slideColors] Found slideColors table in slide")
+
                 children_raw2 = BlockUtils.get_node_property(node_child, "children", [])
                 if not isinstance(children_raw2, list):
                     continue
+
                 for node_block in children_raw2:
                     if not isinstance(node_block, dict):
                         continue
+
                     block_type = BlockUtils.get_node_property(node_block, "name")
+                    if not block_type:
+                        continue
+
                     if block_logger:
                         block_logger.info(f"[slideColors] Processing block type: {block_type}")
+
                     block_colors = {}
                     children_raw3 = BlockUtils.get_node_property(node_block, "children", [])
                     if not isinstance(children_raw3, list):
                         continue
+
                     for color_group in children_raw3:
                         if not isinstance(color_group, dict):
                             continue
+
                         color_hex = BlockUtils.get_node_property(color_group, "name")
-                        if color_hex:
-                            color_hex = color_hex.lower()
-                            palette_colors.add(color_hex)
+                        if not color_hex:
+                            continue
+
+                        color_hex = color_hex.lower().strip()
+                        palette_colors.add(color_hex)
+
                         if block_logger:
                             block_logger.info(f"[slideColors] Processing color group: {color_hex}")
+
                         block_objs = []
                         children_raw4 = BlockUtils.get_node_property(color_group, "children", [])
                         if not isinstance(children_raw4, list):
                             continue
+
                         for text_child in children_raw4:
                             if not isinstance(text_child, dict):
                                 continue
+
                             if BlockUtils.is_node_type(text_child, "TEXT"):
                                 text_obj = {}
+
                                 color_val, color_var = ColorUtils.extract_color_info(text_child)
                                 text_obj["color"] = color_val
-                                if color_var:
+
+                                if color_var and color_var.strip():
                                     text_obj["color_variable"] = color_var
+                                    if block_logger:
+                                        block_logger.info(f"[slideColors] Found color variable: {color_var} for color: {color_val}")
+
                                 font_family = None
                                 style_raw = text_child.get("style")
                                 if isinstance(style_raw, dict) and "fontFamily" in style_raw:
                                     font_family = style_raw["fontFamily"]
-                                text_obj["fontFamily"] = FontUtils.normalize_font_family(font_family)
+
+                                normalized_font = FontUtils.normalize_font_family(font_family)
+                                if normalized_font:
+                                    text_obj["fontFamily"] = normalized_font
+
                                 if block_type == "figure":
-                                    idx = BlockUtils.get_node_property(text_child, "name", "").strip()
-                                    text_obj["figureName"] = idx
+                                    figure_name = BlockUtils.get_node_property(text_child, "name", "").strip()
+                                    text_obj["figureName"] = None if not figure_name else figure_name
                                     if block_logger:
-                                        block_logger.info(f"[slideColors] Found figure in {color_hex}: name='{idx}', color={color_val}, font={font_family}")
-                                block_objs.append(text_obj)
-                        block_colors[color_hex] = block_objs
-                    config_dict[block_type] = block_colors
-                    if block_logger:
-                        block_logger.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
-                        for color_hex, obj_list in block_colors.items():
-                            block_logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
+                                        block_logger.info(f"[slideColors] Found figure in {color_hex}: name='{figure_name}', color={color_val}, color_var={color_var}, font={font_family}")
+
+                                if color_val or color_var or normalized_font or text_obj.get("figureName"):
+                                    block_objs.append(text_obj)
+
+                        if block_objs:
+                            block_colors[color_hex] = block_objs
+
+                    if block_colors:
+                        config_dict[block_type] = block_colors
+                        if block_logger:
+                            block_logger.info(f"[slideConfig] Block type '{block_type}': Found {len(block_colors)} color groups")
+                            for color_hex, obj_list in block_colors.items():
+                                block_logger.info(f"[slideConfig]   Color '{color_hex}': {len(obj_list)} objects")
+                                if obj_list and block_logger:
+                                    first_obj = obj_list[0]
+                                    block_logger.info(f"[slideConfig]     Sample object: {first_obj}")
+
         return config_dict, sorted(palette_colors)
 
     def _update_figure_config_with_names(self, slide_config, blocks):
-        # Collect all figure blocks with their info
         figure_blocks_info = []
         for block in blocks:
             if block.sql_type == "figure":
@@ -999,11 +928,9 @@ class FigmaExtractor:
         for color_hex, obj_list in slide_config["figure"].items():
             figure_objects = []
 
-            # Process ALL figure entries from slideColors, not just the ones that have corresponding blocks
             for obj in obj_list:
                 figure_name = obj.get("figureName", "")
                 if figure_name:
-                    # Try to find a matching block in the main structure
                     matching_block = None
                     for fig in figure_blocks_info:
                         base_name = fig["base_name"]
@@ -1012,32 +939,26 @@ class FigmaExtractor:
                             matching_block = fig["block"]
                             break
 
-                    # Create figure object for this entry
                     font_family = obj.get("fontFamily")
                     font_family = FontUtils.normalize_font_family(font_family)
                     fill = obj.get("color")
 
-                    # Always try to extract the proper figure name from the figure blocks
-                    clean_figure_name = figure_name  # Default to slideColors name
+                    clean_figure_name = figure_name
 
-                    # Try to find a matching block to get the proper name
                     found_match = False
                     for fig in figure_blocks_info:
                         base_name = fig["base_name"]
                         index_match = re.search(r"_(\d+)$", base_name)
                         if index_match and index_match.group(1) == figure_name:
-                            # Found matching block, extract proper name
                             clean_figure_name = re.sub(r"_(\d+)$", "", base_name)
                             if block_logger:
                                 block_logger.info(f"[figureConfig] Found exact index match for '{figure_name}', using name: '{clean_figure_name}'")
                             found_match = True
                             break
 
-                    # If no exact match, try to find by z-index or other patterns
                     if not found_match:
                         for fig in figure_blocks_info:
                             base_name = fig["base_name"]
-                            # Try to match by z-index if available
                             z_index_match = re.search(r"z-index\s*(\d+)", fig["block"].name)
                             if z_index_match and z_index_match.group(1) == figure_name:
                                 clean_figure_name = re.sub(r"_(\d+)$", "", base_name)
@@ -1046,9 +967,7 @@ class FigmaExtractor:
                                 found_match = True
                                 break
 
-                    # If still no match, try to find by position in the list (assuming order matters)
                     if not found_match and len(figure_blocks_info) > 0:
-                        # Use the first available block name as fallback
                         first_block = figure_blocks_info[0]
                         clean_figure_name = re.sub(r"_(\d+)$", "", first_block["base_name"])
                         if block_logger:
@@ -1063,19 +982,36 @@ class FigmaExtractor:
                     figure_obj = {
                         "color": fill,
                         "fontFamily": font_family,
-                        "figureName": clean_figure_name,
+                        "figureName": None if not figure_blocks_info else clean_figure_name,
                     }
                     figure_objects.append(figure_obj)
 
             new_figure_config[color_hex] = figure_objects
         slide_config["figure"] = new_figure_config
 
-        # Summary logging
         if block_logger:
             block_logger.info(f"[figureConfig] SUMMARY: Processed {len(figure_blocks_info)} figure blocks")
             for fig_info in figure_blocks_info:
                 clean_name = re.sub(r"_(\d+)$", "", fig_info["base_name"])
                 block_logger.info(f"[figureConfig] Block '{fig_info['base_name']}' -> looking for '{clean_name}' in slideColors")
+
+    def extract_slide_type_from_name(self, frame_name: str) -> str:
+        """Extract slide type from the frame name.
+        Example: 'one_square_outline_icon_shield_image_right background_0 z-index 0 upload optimalText' -> 'optimalText'
+        """
+        if not frame_name:
+            return "classic"
+
+        parts = frame_name.strip().split()
+
+        skip_patterns = ["upload", "z-index", "background"]
+
+        for part in reversed(parts):
+            if not any(part.startswith(pattern) for pattern in skip_patterns) and not part.isdigit():
+                if len(part) <= 20 and "_" not in part:
+                    return part
+
+        return "classic"
 
     def traverse_and_extract(
         self,
@@ -1106,13 +1042,11 @@ class FigmaExtractor:
 
             slide_number = self.get_slide_number(parent_name)
 
-            # Skip if not in target slides (when filtering by specific slides)
             if self.filter_config.mode == FilterMode.SPECIFIC_SLIDES and slide_number not in self.filter_config.target_slides:
                 return slides
 
             slide_type = self.detect_slide_type(parent_name, slide_number)
 
-            # Calculate dimensions with proper type checking
             target_width_raw = config.FIGMA_CONFIG["TARGET_WIDTH"]
             target_height_raw = config.FIGMA_CONFIG["TARGET_HEIGHT"]
             if isinstance(target_width_raw, (int, float)) and isinstance(target_height_raw, (int, float)):
@@ -1121,7 +1055,7 @@ class FigmaExtractor:
                     "h": int(target_height_raw),
                 }
             else:
-                dimensions = {"w": 1200, "h": 675}  # Default dimensions
+                dimensions = {"w": 1200, "h": 675}
 
             blocks = self.collect_blocks(node, frame_origin, slide_number, parent_name, comments_map)
 
@@ -1135,14 +1069,12 @@ class FigmaExtractor:
                     frame_id=str(node["id"]),
                     dimensions=dimensions,
                 )
-                # Attach the original node for color extraction
                 slide._figma_node = node
                 slides.append(slide)
                 LogUtils.log_block_event(f"Slide {slide_number} ({slide_type}) with {len(blocks)} blocks")
 
             return slides
 
-        # Continue traversing children
         children_raw = node.get("children")
         if isinstance(children_raw, list):
             for child in children_raw:
@@ -1161,7 +1093,6 @@ class FigmaExtractor:
             response.raise_for_status()
             data = response.json()
 
-            # Fetch all comments in a single API call for efficiency
             comments_map = self.fetch_all_comments()
 
             pages = BlockUtils.get_node_property(data["document"], config.FIGMA_KEY_CHILDREN, [])
@@ -1172,7 +1103,6 @@ class FigmaExtractor:
                 page_slides = self.traverse_and_extract(page, "", comments_map)
                 all_slides.extend(page_slides)
 
-            # Generate summary
             summary: dict[str, str | int | dict] = {
                 "total_slides": len(all_slides),
                 "total_blocks": sum(len(slide.blocks) for slide in all_slides),
@@ -1238,7 +1168,6 @@ class FigmaExtractor:
 
     def _slide_to_dict(self, slide: ExtractedSlide) -> dict[str, str | int | dict | list | bool]:
         """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs. Add slideColors extraction."""
-        # Find the text block with the longest text_content
         max_text_block = None
         max_len = 0
         for block in slide.blocks:
@@ -1255,23 +1184,27 @@ class FigmaExtractor:
         if sentence_count == 0:
             sentence_count = 1
 
-        # Count images in the slide
         images_count = sum(1 for block in slide.blocks if block.sql_type == "image")
 
-        # Extract slideConfig and palette colors if available
         slide_config = {}
         presentation_palette_colors = []
         figma_node = getattr(slide, "_figma_node", None)
         if figma_node:
             slide_config, presentation_palette_colors = self._extract_slide_config(figma_node)
-            # Build mapping from figure numbers to actual figure names and update slideConfig
             if "figure" in slide_config:
                 self._update_figure_config_with_names(slide_config, slide.blocks)
+
+        slide_name = slide.frame_name.lower()
+        for_generation = "upload" not in slide_name
+
+        extracted_slide_type = self.extract_slide_type_from_name(slide.frame_name)
+
         return {
             "slide_number": slide.number,
             "container_name": slide.container_name,
             "frame_name": slide.frame_name,
-            "slide_type": slide.slide_type,
+            "slide_type": extracted_slide_type,
+            "forGeneration": for_generation,
             "sentences": sentence_count,
             "imagesCount": images_count,
             "frame_id": slide.frame_id,
@@ -1284,7 +1217,6 @@ class FigmaExtractor:
         }
 
     def _block_to_dict(self, block: ExtractedBlock, slide_config=None) -> dict[str, str | int | dict | list | bool]:
-        # Now just call build_block_dict for all block dict construction
         return BlockUtils.build_block_dict(block, slide_config)
 
     def save_results(self, data: dict[str, str | dict | list | int], output_file: str | None = None) -> str:
@@ -1308,7 +1240,6 @@ class FigmaExtractor:
 
         LogUtils.log_block_event(f"\nData saved: {output_file}")
 
-        # Print detailed summary
         if isinstance(data, dict):
             metadata = data.get("metadata", {})
             if isinstance(metadata, dict):
@@ -1322,9 +1253,6 @@ class FigmaExtractor:
                     LogUtils.log_block_event(f"   Distribution: {summary.get('slide_distribution', {})}")
 
         return output_file
-
-
-# ================ Integration Classes ================
 
 
 class FigmaToSQLIntegrator:
@@ -1366,7 +1294,6 @@ class FigmaToSQLIntegrator:
         """Convert Figma data to format suitable for SQL Generator with config compatibility. Now includes slideConfig and presentationPaletteColors for each slide."""
         sql_input: list[dict[str, str | int | dict | list | bool]] = []
 
-        # Robust type checking for figma_data
         if not isinstance(figma_data, dict):
             return sql_input
 
@@ -1394,6 +1321,7 @@ class FigmaToSQLIntegrator:
                 "slide_layout_name": frame_name_raw,
                 "slide_layout_number": slide_number_raw,
                 "slide_type": slide_type_raw,
+                "forGeneration": slide_raw.get("forGeneration", True),
                 "presentation_layout_id": presentation_layout_id,
                 "is_last": is_last,
                 "folder_name": slide_raw.get("folder_name", "other"),
@@ -1402,7 +1330,6 @@ class FigmaToSQLIntegrator:
                 "auto_blocks": self._get_auto_blocks_for_slide(slide_raw, is_last),
                 "sql_config": {
                     "needs_background": config.AUTO_BLOCKS.get("add_background", True),
-                    "needs_watermark": config.AUTO_BLOCKS.get("add_watermark", False) or is_last,
                     "default_color": config.DEFAULT_COLOR,
                     "color_settings_id": config.DEFAULT_COLOR_SETTINGS_ID,
                 },
@@ -1415,7 +1342,6 @@ class FigmaToSQLIntegrator:
                 continue
 
             for block_raw in blocks_raw:
-                # Always use build_block_dict for block dict construction
                 if not isinstance(block_raw, dict):
                     continue
                 block_dict = BlockUtils.build_block_dict(block_raw, slide_config)
@@ -1433,7 +1359,6 @@ class FigmaToSQLIntegrator:
                     "figure_info": block_dict.get("figure_info"),
                     "precompiled_image_info": block_dict.get("precompiled_image_info"),
                 }
-                # Do NOT add color/fontFamily to block_input["styles"]
                 slide_input["blocks"].append(block_input)
             sql_input.append(slide_input)
         return sql_input
@@ -1442,7 +1367,6 @@ class FigmaToSQLIntegrator:
         """Get automatic blocks configuration for a slide"""
         auto_blocks: dict[str, str | dict] = {}
 
-        # Background block
         add_background = config.AUTO_BLOCKS.get("add_background", True)
         if add_background:
             background_config = config.AUTO_BLOCKS.get("background", {})
@@ -1455,39 +1379,125 @@ class FigmaToSQLIntegrator:
                     "dimensions": dimensions,
                 }
 
-        # Watermark blocks
-        if is_last:
-            last_slide_config = config.AUTO_BLOCKS.get("last_slide", {})
-            if isinstance(last_slide_config, dict):
-                watermark1_config = last_slide_config.get("watermark1", {})
-                if isinstance(watermark1_config, dict):
-                    dimensions = watermark1_config.get("dimensions", {})
-                    auto_blocks["watermark"] = {
-                        "type": "watermark",
-                        "dimensions": dimensions,
-                    }
-        else:
-            add_watermark = config.AUTO_BLOCKS.get("add_watermark", False)
-            if add_watermark:
-                watermark_config = config.AUTO_BLOCKS.get("watermark", {})
-                if isinstance(watermark_config, dict):
-                    dimensions = watermark_config.get("dimensions", {})
-                    auto_blocks["watermark"] = {
-                        "type": "watermark",
-                        "dimensions": dimensions,
-                    }
-
         return auto_blocks
+
+    def _generate_instruction_header(self) -> list[str]:
+        """Generate the header section of SQL instructions."""
+        return [
+            "# SQL Generator Instructions",
+            "Based on extracted Figma data with full config.py compatibility",
+            "=" * 60,
+            "",
+            "## Quick Start",
+            "1. Import the config module into your SQL Generator",
+            "2. Use the data from sql_generator_input.json",
+            f"3. All font weights are normalized to valid values {config.VALID_FONT_WEIGHTS}",
+            "4. All block types are validated against config.VALID_BLOCK_TYPES",
+            "",
+        ]
+
+    def _generate_config_summary(self) -> list[str]:
+        """Generate the configuration summary section."""
+        return [
+            "## Configuration Summary",
+            f"- Default Color: {config.DEFAULT_COLOR}",
+            f"- Color Settings ID: {config.DEFAULT_COLOR_SETTINGS_ID}",
+            f"- Miniatures Base Path: {config.MINIATURES_BASE_PATH}",
+            f"- Add Background: {config.AUTO_BLOCKS.get('add_background', True)}",
+            "",
+        ]
+
+    def _generate_slide_instructions(self, slide: dict, slide_index: int) -> list[str]:
+        """Generate instruction section for a single slide."""
+        instructions = []
+        instructions.append(f"## Slide {slide_index + 1}: {slide['slide_layout_name']}")
+        instructions.append("**Configuration:**")
+
+        instructions.append(f"- Slide Number: {slide['slide_layout_number']}")
+        slide_type_raw = slide.get("slide_type", "unknown")
+        slide_type_str = str(slide_type_raw) if slide_type_raw is not None else "unknown"
+        slide_type_info = config.SLIDE_LAYOUT_TYPES.get(slide_type_str, "unknown")
+        instructions.append(f"- Slide Type: {slide_type_str} ({slide_type_info})")
+        instructions.append(f"- Save For Generation: {slide.get('forGeneration', True)}")
+        instructions.append(f"- Is Last: {slide['is_last']}")
+        instructions.append(f"- Folder: {slide.get('folder_name', 'other')}")
+
+        blocks = slide.get("blocks", [])
+        block_count = len(blocks) if isinstance(blocks, list) else 0
+        instructions.append(f"- Total Blocks: {block_count}")
+
+        auto_blocks = slide.get("auto_blocks")
+        if isinstance(auto_blocks, dict):
+            instructions.append("**Auto Blocks:**")
+            for block_name, block_info in auto_blocks.items():
+                instructions.append(f"- {block_name.title()}: {block_info['type']}")
+
+        instructions.append("**User Blocks:**")
+        if isinstance(blocks, list):
+            for j, block in enumerate(blocks):
+                instructions.extend(self._generate_block_instructions(block, j + 1))
+
+        instructions.append("")
+        return instructions
+
+    def _generate_block_instructions(self, block: dict, block_index: int) -> list[str]:
+        """Generate instruction lines for a single block."""
+        instructions = []
+        instructions.append(f"  {block_index}. **{block['type']}** - {block['name']}")
+        instructions.append(f"     - Dimensions: {block['dimensions']}")
+        instructions.append(f"     - Z-Index: {block['styles'].get('zIndex', 'N/A')}")
+        instructions.append(f"     - Null Styles: {block['needs_null_styles']}")
+
+        if not block["needs_null_styles"]:
+            styles = block["styles"]
+            font_size = styles.get("fontSize") or styles.get("font_size") or "-"
+            weight = styles.get("weight") or "-"
+            instructions.append(f"     - Font: {font_size}px, weight {weight}")
+            instructions.append(f"     - Alignment: {styles.get('textVertical', '-')} / {styles.get('textHorizontal', '-')}")
+
+        if block.get("border_radius"):
+            instructions.append(f"     - Border Radius: {block['border_radius']}")
+
+        blur_radius = block["styles"].get("blur", 0)
+        if blur_radius > 0:
+            instructions.append(f"- Blur: {blur_radius}px")
+
+        instructions.append("")
+        return instructions
+
+    def _generate_command_examples(self) -> list[str]:
+        """Generate SQL Generator command examples."""
+        return [
+            "## SQL Generator Commands",
+            "Run these commands in your SQL Generator:",
+            "```python",
+            "import config",
+            "from sql_generator import SQLGenerator",
+            "",
+            "generator = SQLGenerator(config)",
+            "# Use the extracted data to populate the generator",
+            "generator.run()",
+            "```",
+            "",
+        ]
+
+    def _generate_files_summary(self) -> list[str]:
+        """Generate summary of generated files."""
+        return [
+            "## Files Generated",
+            "- `figma_extract.json`: Raw Figma extraction data",
+            "- `sql_generator_input.json`: Processed data ready for SQL Generator",
+            "- `sql_files/`: Individual SQL configuration files for each slide",
+            "- `sql_instructions.md`: This instruction file",
+        ]
 
     def _convert_styles_for_sql(self, figma_styles: dict[str, str | int | float | bool], block_type: str) -> dict[str, str | int]:
         """Convert Figma styles to SQL Generator format with config defaults"""
-        # Use config defaults as base
         defaults_raw = config.DEFAULT_STYLES.get(block_type, config.DEFAULT_STYLES["default"])
         if not isinstance(defaults_raw, dict):
             defaults_raw = config.DEFAULT_STYLES["default"]
         defaults = defaults_raw
 
-        # Ensure font weight is valid from config
         weight_raw = figma_styles.get("weight")
         default_weight_raw = defaults.get("weight", 400)
         if isinstance(weight_raw, (int, float)):
@@ -1501,19 +1511,17 @@ class FigmaToSQLIntegrator:
         if isinstance(valid_weights, list) and len(valid_weights) >= 3:
             if weight not in valid_weights:
                 if weight <= 350:
-                    weight = valid_weights[0]  # 300
+                    weight = valid_weights[0]
                 elif weight <= 550:
-                    weight = valid_weights[1]  # 400
+                    weight = valid_weights[1]
                 else:
-                    weight = valid_weights[2]  # 700
+                    weight = valid_weights[2]
 
-        # Ensure all values are of the correct types
         text_vertical = figma_styles.get("textVertical", defaults.get("text_vertical", "top"))
         text_horizontal = figma_styles.get("textHorizontal", defaults.get("text_horizontal", "left"))
         font_size_raw = figma_styles.get("fontSize", defaults.get("font_size", 16))
         text_transform = figma_styles.get("textTransform", defaults.get("text_transform", "none"))
 
-        # Convert font_size to int if it's a float
         if isinstance(font_size_raw, float):
             font_size = int(font_size_raw)
         elif isinstance(font_size_raw, int):
@@ -1536,39 +1544,30 @@ class FigmaToSQLIntegrator:
     ):
         """Complete pipeline: extract from Figma and generate SQL with config compatibility"""
         LogUtils.log_block_event(f"Extracting slides {slide_numbers} from Figma...")
-        # Remove output directory if it exists
         if os.path.exists(output_dir):
             LogUtils.log_block_event(f"Removing existing output directory: {output_dir}")
             shutil.rmtree(output_dir)
             LogUtils.log_block_event(f"Removed output directory: {output_dir}")
         os.makedirs(output_dir, exist_ok=True)
         LogUtils.log_block_event(f"Created output directory: {output_dir}")
-        # Set up block logger in the output directory
         setup_block_logger(output_dir)
-        # Extract from Figma
         figma_data = self.extract_specific_slides(slide_numbers)
         if not figma_data:
             LogUtils.log_block_event("Failed to extract data from Figma")
             return
-        # Print how many slides were extracted
         slides_raw = figma_data.get("slides", []) if isinstance(figma_data, dict) else []
         slides_count = len(slides_raw) if isinstance(slides_raw, list) else 0
         print(f"Extracted {slides_count} slides from Figma.")
-        # Save extracted data
         with open(f"{output_dir}/figma_extract.json", "w") as f:
             json.dump(figma_data, f, indent=2)
-        # Prepare for SQL Generator
         sql_input = self.prepare_sql_generator_input(figma_data)
-        # Save SQL input format
         with open(f"{output_dir}/sql_generator_input.json", "w") as f:
             json.dump(sql_input, f, indent=2)
-        # Generate ready-to-use SQL files for each slide
         self._generate_sql_files(sql_input, output_dir)
         LogUtils.log_block_event("\nProcessing complete!")
         LogUtils.log_block_event(f"   Extracted {slides_count} slides")
         LogUtils.log_block_event(f"   Generated {len(sql_input)} SQL-ready configurations")
         LogUtils.log_block_event(f"   Files saved to {output_dir}/")
-        # Generate instructions for SQL Generator
         self._generate_sql_instructions(sql_input, output_dir)
 
     def _generate_sql_files(
@@ -1600,16 +1599,15 @@ class FigmaToSQLIntegrator:
         lines.append("-- Generated from Figma extraction")
         lines.append("")
 
-        # Add configuration comments
         lines.append("-- CONFIGURATION FOR SQL GENERATOR:")
         lines.append(f"-- Slide Layout Name: {slide['slide_layout_name']}")
         lines.append(f"-- Slide Layout Number: {slide['slide_layout_number']}")
         lines.append(f"-- Slide Type: {slide['slide_type']}")
+        lines.append(f"-- Save For Generation: {slide.get('forGeneration', True)}")
         lines.append(f"-- Is Last: {slide['is_last']}")
         lines.append(f"-- Presentation Layout ID: {slide['presentation_layout_id']}")
         lines.append("")
 
-        # Add auto blocks info
         auto_blocks = slide.get("auto_blocks")
         if isinstance(auto_blocks, dict):
             lines.append("-- AUTO BLOCKS:")
@@ -1617,7 +1615,6 @@ class FigmaToSQLIntegrator:
                 lines.append(f"--   {block_name}: {block_config}")
             lines.append("")
 
-        # Add blocks info
         lines.append("-- BLOCKS TO CREATE:")
         blocks = slide.get("blocks", [])
         if isinstance(blocks, list):
@@ -1629,7 +1626,6 @@ class FigmaToSQLIntegrator:
                 lines.append(f"--   Styles: {block['styles']}")
                 if block.get("border_radius"):
                     lines.append(f"--   Border Radius: {block['border_radius']}")
-                # Add blur information if present
                 blur_radius = block["styles"].get("blur", 0)
                 if blur_radius > 0:
                     lines.append(f"--   Blur: {blur_radius}px")
@@ -1646,146 +1642,57 @@ class FigmaToSQLIntegrator:
     ):
         """Generate comprehensive instructions for using with SQL Generator"""
         instructions = []
-        instructions.append("# SQL Generator Instructions")
-        instructions.append("Based on extracted Figma data with full config.py compatibility")
-        instructions.append("=" * 60)
-        instructions.append("")
 
-        instructions.append("## Quick Start")
-        instructions.append("1. Import the config module into your SQL Generator")
-        instructions.append("2. Use the data from sql_generator_input.json")
-        instructions.append(f"3. All font weights are normalized to valid values {config.VALID_FONT_WEIGHTS}")
-        instructions.append("4. All block types are validated against config.VALID_BLOCK_TYPES")
-        instructions.append("")
+        instructions.extend(self._generate_instruction_header())
+        instructions.extend(self._generate_config_summary())
 
-        instructions.append("## Configuration Summary")
-        instructions.append(f"- Default Color: {config.DEFAULT_COLOR}")
-        instructions.append(f"- Color Settings ID: {config.DEFAULT_COLOR_SETTINGS_ID}")
-        instructions.append(f"- Miniatures Base Path: {config.MINIATURES_BASE_PATH}")
-        instructions.append(f"- Add Background: {config.AUTO_BLOCKS.get('add_background', True)}")
-        instructions.append(f"- Add Watermark: {config.AUTO_BLOCKS.get('add_watermark', False)}")
-        instructions.append("")
-
-        # Generate per-slide instructions
         for i, slide in enumerate(sql_input):
-            instructions.append(f"## Slide {i+1}: {slide['slide_layout_name']}")
-            instructions.append("**Configuration:**")
-            instructions.append(f"- Slide Number: {slide['slide_layout_number']}")
-            slide_type_raw = slide.get("slide_type", "unknown")
-            slide_type_str = str(slide_type_raw) if slide_type_raw is not None else "unknown"
-            slide_type_info = config.SLIDE_LAYOUT_TYPES.get(slide_type_str, "unknown")
-            instructions.append(f"- Slide Type: {slide_type_str} ({slide_type_info})")
-            instructions.append(f"- Is Last: {slide['is_last']}")
-            instructions.append(f"- Folder: {slide.get('folder_name', 'other')}")
-            blocks = slide.get("blocks", [])
-            if isinstance(blocks, list):
-                instructions.append(f"- Total Blocks: {len(blocks)}")
-            else:
-                instructions.append("- Total Blocks: 0")
+            instructions.extend(self._generate_slide_instructions(slide, i))
 
-            # Auto blocks
-            auto_blocks = slide.get("auto_blocks")
-            if isinstance(auto_blocks, dict):
-                instructions.append("**Auto Blocks:**")
-                for block_name, block_info in auto_blocks.items():
-                    instructions.append(f"- {block_name.title()}: {block_info['type']}")
-
-            instructions.append("**User Blocks:**")
-            if isinstance(blocks, list):
-                for j, block in enumerate(blocks):
-                    instructions.append(f"  {j+1}. **{block['type']}** - {block['name']}")
-                    instructions.append(f"     - Dimensions: {block['dimensions']}")
-                    instructions.append(f"     - Z-Index: {block['styles'].get('zIndex', 'N/A')}")
-                    instructions.append(f"     - Null Styles: {block['needs_null_styles']}")
-
-                    if not block["needs_null_styles"]:
-                        styles = block["styles"]
-                        font_size = styles.get("fontSize") or styles.get("font_size") or "-"
-                        weight = styles.get("weight") or "-"
-                        instructions.append(f"     - Font: {font_size}px, weight {weight}")
-                        instructions.append(f"     - Alignment: {styles.get('textVertical', '-')} / {styles.get('textHorizontal', '-')}")
-
-                    if block.get("border_radius"):
-                        instructions.append(f"     - Border Radius: {block['border_radius']}")
-
-                    # Add blur information if present
-                    blur_radius = block["styles"].get("blur", 0)
-                    if blur_radius > 0:
-                        instructions.append(f"     - Blur: {blur_radius}px")
-                    instructions.append("")
-
-            instructions.append("")
-
-        # Add SQL Generator command examples
-        instructions.append("## SQL Generator Commands")
-        instructions.append("Run these commands in your SQL Generator:")
-        instructions.append("```python")
-        instructions.append("import config")
-        instructions.append("from sql_generator import SQLGenerator")
-        instructions.append("")
-        instructions.append("generator = SQLGenerator(config)")
-        instructions.append("# Use the extracted data to populate the generator")
-        instructions.append("generator.run()")
-        instructions.append("```")
-        instructions.append("")
-
-        instructions.append("## Files Generated")
-        instructions.append("- `figma_extract.json`: Raw Figma extraction data")
-        instructions.append("- `sql_generator_input.json`: Processed data ready for SQL Generator")
-        instructions.append("- `sql_files/`: Individual SQL configuration files for each slide")
-        instructions.append("- `sql_instructions.md`: This instruction file")
+        instructions.extend(self._generate_command_examples())
+        instructions.extend(self._generate_files_summary())
 
         with open(f"{output_dir}/sql_instructions.md", "w") as f:
             f.write("\n".join(instructions))
 
 
-# Usage Examples
 def example_usage():
     """Examples of how to use the integration with config compatibility"""
 
-    # Initialize integrator
-    integrator = FigmaToSQLIntegrator(figma_file_id="YOUR_FIGMA_FILE_ID", figma_token="YOUR_FIGMA_TOKEN")  # nosec
+    integrator = FigmaToSQLIntegrator(figma_file_id="<your-figma-file-id>", figma_token="<your-figma-access-token>")
 
-    # Example 1: Extract specific slides with full SQL generation
     LogUtils.log_block_event("Example 1: Extract slides 1, 3, and 5 with SQL generation")
     integrator.generate_sql_for_slides([1, 3, 5], "output/hero_and_cols")
 
-    # Example 2: Extract slides with tables (will be automatically typed as 'table')
     LogUtils.log_block_event("\nExample 2: Extract slides containing tables")
     table_data = integrator.extract_by_block_types(["table"])
     if table_data:
         sql_input = integrator.prepare_sql_generator_input(table_data)
         LogUtils.log_block_event(f"Found {len(sql_input)} slides with tables, ready for SQL Generator")
 
-        # Save for SQL Generator
         os.makedirs("output/tables", exist_ok=True)
         with open("output/tables/table_slides_config.json", "w") as f:
             json.dump(sql_input, f, indent=2)
 
-    # Example 3: Extract hero and infographics slides
     LogUtils.log_block_event("\nExample 3: Extract from hero and infographics containers")
     container_data = integrator.extract_by_containers(["hero", "infographics"])
     if container_data:
         sql_input = integrator.prepare_sql_generator_input(container_data)
         LogUtils.log_block_event(f"Found {len(sql_input)} slides from specified containers")
 
-        # Show configuration details
         for slide in sql_input:
             LogUtils.log_block_event(f"  Slide {slide['slide_layout_number']}: {slide['slide_layout_name']}")
             LogUtils.log_block_event(f"    Type: {slide['slide_type']}, Blocks: {len(slide['blocks'])}")
             LogUtils.log_block_event(f"    Auto blocks: {list(slide['auto_blocks'].keys())}")
 
-    # Example 4: Extract all slides and generate comprehensive SQL package
     LogUtils.log_block_event("\nExample 4: Extract all slides for full presentation")
-    all_data = integrator.extract_specific_slides(list(range(1, 15)) + [-1])  # All slides including last
+    all_data = integrator.extract_specific_slides(list(range(1, 15)) + [-1])
     if all_data:
         sql_input = integrator.prepare_sql_generator_input(all_data)
 
-        # Generate complete SQL package
         output_dir = "output/complete_presentation"
         os.makedirs(output_dir, exist_ok=True)
 
-        # Save by slide type for organization
         by_type = {}
         for slide in sql_input:
             slide_type = slide["slide_type"]
@@ -1800,9 +1707,8 @@ def example_usage():
                 json.dump(slides, f, indent=2)
             LogUtils.log_block_event(f"  • {slide_type}: {len(slides)} slides saved to {type_dir}/")
 
-    # Example 5: Validate extraction against config
     LogUtils.log_block_event("\nExample 5: Config validation")
-    validation_data = integrator.extract_specific_slides([1, 5, 8, 14])  # Different types
+    validation_data = integrator.extract_specific_slides([1, 5, 8, 14])
     if validation_data:
         LogUtils.log_block_event("Config Validation Results:")
         for slide in validation_data["slides"]:
@@ -1813,7 +1719,6 @@ def example_usage():
                 LogUtils.log_block_event(f"    • {block['sql_type']}: Type OK: {is_valid_type}, Weight OK: {is_valid_weight}")
 
 
-# Advanced integration class for batch processing
 class BatchFigmaProcessor:
     """Process multiple Figma files or large sets of slides"""
 
@@ -1824,11 +1729,10 @@ class BatchFigmaProcessor:
         """Process a presentation by extracting different slide types separately"""
         integrator = FigmaToSQLIntegrator(file_id, self.figma_token)
 
-        # Define slide type groups based on config
         type_groups = {
-            "title_and_last": [-1, 1],  # Special slides
-            "text_layouts": [2, 3, 4, 6, 7, 9, 10, 11, 12, 13],  # Text-based
-            "special_content": [5, 8, 14],  # Infographics, tables, charts
+            "title_and_last": [-1, 1],
+            "text_layouts": [2, 3, 4, 6, 7, 9, 10, 11, 12, 13],
+            "special_content": [5, 8, 14],
         }
 
         results = {}
@@ -1839,7 +1743,6 @@ class BatchFigmaProcessor:
                 sql_input = integrator.prepare_sql_generator_input(data)
                 results[group_name] = sql_input
 
-                # Save to organized folders
                 group_dir = f"{output_base}/{group_name}"
                 os.makedirs(group_dir, exist_ok=True)
                 with open(f"{group_dir}/figma_extract.json", "w") as f:
@@ -1859,7 +1762,6 @@ class BatchFigmaProcessor:
         if not all_data:
             return {"error": "Failed to extract data"}
 
-        # Robust type checking for all_data
         if not isinstance(all_data, dict):
             return {"error": "Invalid data format"}
 
@@ -1886,7 +1788,6 @@ class BatchFigmaProcessor:
                 if not isinstance(block, dict):
                     continue
 
-                # Robust type checking for weight_analysis operations
                 total_blocks_raw = weight_analysis.get("total_blocks", 0)
                 if isinstance(total_blocks_raw, int):
                     weight_analysis["total_blocks"] = total_blocks_raw + 1
@@ -1925,7 +1826,6 @@ class BatchFigmaProcessor:
         return weight_analysis
 
 
-# Command-line interface for integration
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Figma to SQL Generator Integration (Config Compatible)")
@@ -1953,7 +1853,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Use config values if not provided
     file_id = args.file_id or getattr(config, "FIGMA_FILE_ID", None)
     token = args.token or getattr(config, "FIGMA_TOKEN", None)
 
@@ -2000,7 +1899,6 @@ if __name__ == "__main__":
 
         LogUtils.log_block_event("Validation Results:")
 
-        # Robust type checking for validation
         if not isinstance(validation, dict):
             LogUtils.log_block_event("   Error: Invalid validation data format")
         else:
@@ -2015,7 +1913,7 @@ if __name__ == "__main__":
         invalid_raw = validation.get("invalid_weights_found", [])
         if isinstance(invalid_raw, list) and invalid_raw:
             LogUtils.log_block_event(f"   Found {len(invalid_raw)} blocks with invalid font weights:")
-            for item in invalid_raw[:5]:  # Show first 5
+            for item in invalid_raw[:5]:
                 if isinstance(item, dict):
                     slide = item.get("slide", "unknown")
                     block = item.get("block", "unknown")
@@ -2034,23 +1932,3 @@ if __name__ == "__main__":
         print("  python integration.py --file-id ID --token TOKEN --mode containers --containers hero infographics")
         print("  python integration.py --file-id ID --token TOKEN --mode batch")
         print("  python integration.py --file-id ID --token TOKEN --mode validate")
-
-# Usage Examples with Config Compatibility:
-#
-# 1. Extract specific slides with full SQL generation:
-#    python integration.py --file-id YOUR_ID --token YOUR_TOKEN --mode slides --slides 1 3 5
-#
-# 2. Extract slides with specific block types:
-#    python integration.py --file-id YOUR_ID --token YOUR_TOKEN --mode blocks --block-types table chart slideTitle
-#
-# 3. Extract from specific containers:
-#    python integration.py --file-id YOUR_ID --token YOUR_TOKEN --mode containers --containers hero infographics table
-#
-# 4. Batch process entire presentation:
-#    python integration.py --file-id YOUR_ID --token YOUR_TOKEN --mode batch
-#
-# 5. Validate font weights and config compliance:
-#    python integration.py --file-id YOUR_ID --token YOUR_TOKEN --mode validate
-#
-# 6. Extract with custom output directory:
-#    python integration.py --file-id YOUR_ID --token YOUR_TOKEN --mode slides --slides 1 5 --output-dir my_slides

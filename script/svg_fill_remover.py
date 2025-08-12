@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 SVG Fill Remover Script
 
@@ -7,7 +6,7 @@ from SVG elements, making them inherit fill colors from CSS or parent elements.
 """
 
 import argparse
-import xml.etree.ElementTree as ET  # nosec
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -22,10 +21,8 @@ def remove_fill_attributes(svg_content):
         str: Modified SVG content with fill attributes removed
     """
     try:
-        # Parse the SVG content
-        root = ET.fromstring(svg_content)  # nosec
+        root = ET.fromstring(svg_content)
 
-        # Find all elements with fill attributes and remove them
         for elem in root.iter():
             if "fill" in elem.attrib:
                 del elem.attrib["fill"]
@@ -38,7 +35,6 @@ def remove_fill_attributes(svg_content):
             'xmlns="http://www.w3.org/2000/svg"',
         )
 
-        # Add XML declaration if it was present in original
         if svg_content.strip().startswith("<?xml"):
             modified_svg = '<?xml version="1.0" encoding="UTF-8"?>\n' + modified_svg
 
@@ -46,7 +42,7 @@ def remove_fill_attributes(svg_content):
 
     except ET.ParseError as e:
         print(f"Error parsing SVG: {e}")
-        return svg_content  # Return original content if parsing fails
+        return svg_content
 
 
 def process_svg_file(file_path, backup=False):
@@ -58,21 +54,17 @@ def process_svg_file(file_path, backup=False):
         backup (bool): Whether to create a backup of the original file
     """
     try:
-        # Read the original file
         with open(file_path, encoding="utf-8") as f:
             original_content = f.read()
 
-        # Create backup if requested
         if backup:
             backup_path = file_path + ".backup"
             with open(backup_path, "w", encoding="utf-8") as f:
                 f.write(original_content)
             print(f"Backup created: {backup_path}")
 
-        # Remove fill attributes
         modified_content = remove_fill_attributes(original_content)
 
-        # Write the modified content back
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(modified_content)
 
@@ -91,7 +83,6 @@ def scan_and_process_directory(directory_path, recursive=True, backup=False):
         recursive (bool): Whether to scan subdirectories
         backup (bool): Whether to create backups
     """
-    # Convert to Path object for easier handling
     dir_path = Path(directory_path)
 
     if not dir_path.exists():
@@ -102,7 +93,6 @@ def scan_and_process_directory(directory_path, recursive=True, backup=False):
         print(f"Error: '{directory_path}' is not a directory.")
         return
 
-    # Find SVG files
     if recursive:
         svg_files = list(dir_path.rglob("*.svg"))
     else:
@@ -114,7 +104,6 @@ def scan_and_process_directory(directory_path, recursive=True, backup=False):
 
     print(f"Found {len(svg_files)} SVG files to process...")
 
-    # Process each SVG file
     for svg_file in svg_files:
         process_svg_file(str(svg_file), backup=backup)
 
@@ -147,7 +136,6 @@ Examples:
 
     args = parser.parse_args()
 
-    # Process the directory
     scan_and_process_directory(
         directory_path=args.directory,
         recursive=not args.no_recursive,

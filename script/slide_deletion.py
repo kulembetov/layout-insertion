@@ -3,7 +3,6 @@ import os
 import re
 import shutil
 
-# Table deletion order: child to parent
 DELETE_ORDER = [
     "SlideLayoutIndexConfig",
     "BlockLayoutIndexConfig",
@@ -19,7 +18,6 @@ DELETE_ORDER = [
     "SlideLayout",
 ]
 
-# Table to key column mapping
 KEY_COLUMNS = {
     "SlideLayout": "id",
     "BlockLayout": "id",
@@ -35,8 +33,6 @@ KEY_COLUMNS = {
     "SlideLayoutAdditionalInfo": "slideLayoutId",
 }
 
-# Extraction functions for each table
-
 
 def extract_slide_layout_ids(sql):
     m = re.search(r"INSERT INTO \"SlideLayout\".*?VALUES\s*\(\s*'([^']+)'", sql, re.DOTALL)
@@ -48,7 +44,6 @@ def extract_block_layout_ids(sql):
     if not m:
         return []
     values = m.group(1)
-    # Each tuple: ('id', ...)
     return re.findall(r"\(\s*'([^']+)'", values)
 
 
@@ -57,7 +52,6 @@ def extract_block_layout_styles_ids(sql):
     if not m:
         return []
     values = m.group(1)
-    # Each tuple: ('blockLayoutId', ...)
     return re.findall(r"\(\s*'([^']+)'", values)
 
 
@@ -74,7 +68,6 @@ def extract_block_layout_limit_ids(sql):
     if not m:
         return []
     values = m.group(1)
-    # Each tuple: (min_words, max_words, 'blockLayoutId')
     return re.findall(r"\(\s*[^,]+,\s*[^,]+,\s*'([^']+)'", values)
 
 
@@ -83,7 +76,6 @@ def extract_figure_ids(sql):
     if not m:
         return []
     values = m.group(1)
-    # Each tuple: ('id', ...)
     return re.findall(r"\(\s*'([^']+)'", values)
 
 
@@ -92,7 +84,6 @@ def extract_precompiled_image_ids(sql):
     if not m:
         return []
     values = m.group(1)
-    # Each tuple: ('id', ...)
     return re.findall(r"\(\s*'([^']+)'", values)
 
 
@@ -186,15 +177,12 @@ def main():
         if not os.path.isdir(group_path):
             continue
         slide_insertion_dir = os.path.join(group_path, "slide_insertion")
-        # Do NOT remove or modify the input slide_insertion_dir
-        # Only remove the output slide_deletion directory if it exists
         output_group_path = os.path.join(root_dir, group)
         os.makedirs(output_group_path, exist_ok=True)
         slide_deletion_dir = os.path.join(output_group_path, "slide_deletion")
         if os.path.isdir(slide_deletion_dir):
             shutil.rmtree(slide_deletion_dir)
         os.makedirs(slide_deletion_dir, exist_ok=True)
-        # If slide_insertion_dir does not exist, skip this group
         if not os.path.isdir(slide_insertion_dir):
             print(f"  Warning: {slide_insertion_dir} does not exist, skipping group {group}.")
             continue
@@ -215,8 +203,8 @@ def main():
                     id_list = ids[table]
                     if id_list:
                         id_str = ", ".join(f"'{id_}'" for id_ in id_list)
-                        out.write(f"-- Delete from {table}\n")  # nosec
-                        out.write(f'DELETE FROM "{table}" WHERE "{key_col}" IN ({id_str});\n')  # nosec
+                        out.write(f"-- Delete from {table}\n")
+                        out.write(f'DELETE FROM "{table}" WHERE "{key_col}" IN ({id_str});\n')
                 out.write("\n")
         print(f"  Completed group: {group}")
 

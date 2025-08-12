@@ -13,7 +13,6 @@ def generate_uuid() -> str:
     return str(uuid.uuid7())
 
 
-# --- DB config parser ---
 def parse_db_config(ini_path):
     config = configparser.ConfigParser()
     config.read(ini_path)
@@ -111,7 +110,7 @@ def insert_palette_manual(pairs, csv_path):
     mapping = []
     for layout_id, color in pairs:
         palette_id = generate_uuid()
-        sql = f"INSERT INTO \"PresentationPalette\" (id, \"presentationLayoutId\", color) VALUES ('{palette_id}', '{layout_id}', '{color}');"  # nosec
+        sql = f"INSERT INTO \"PresentationPalette\" (id, \"presentationLayoutId\", color) VALUES ('{palette_id}', '{layout_id}', '{color}');"
         print(f"{sql}")
         mapping.append({"id": palette_id, "presentationLayoutId": layout_id, "color": color})
     print(f"Summary: Generated {len(pairs)} SQL statements.")
