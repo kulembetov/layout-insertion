@@ -44,6 +44,17 @@ class PresentationLayoutManager(BaseManager):
 
         return super().execute(logic, session)
 
+    def get_all_presentation_layout_names(self) -> list[str] | None:
+        """Get all presentation layout names from the database."""
+
+        presentation_layout_table, session = self.open_session("PresentationLayout")
+
+        def logic():
+            query = session.query(presentation_layout_table.c.name).all()
+            return [row[0] for row in query]
+
+        return super().execute(logic, session)
+
 
 class ColorSettingsManager(BaseManager):
     """Interacts With The ColorSettings Table."""
@@ -193,6 +204,28 @@ class SlideLayoutManager(BaseManager):
             updated_query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
             final_result = session.execute(updated_query)
             return final_result.fetchall()
+
+        return super().execute(logic, session)
+
+    def get_slides_by_presentation_layout_id(self, presentation_layout_id: str) -> list[dict] | None:
+        """Get all slides for a specific presentation layout."""
+
+        slide_layout_table, session = self.open_session("SlideLayout")
+
+        def logic():
+            query = (
+                session.query(
+                    slide_layout_table.c.id,
+                    slide_layout_table.c.name,
+                    slide_layout_table.c.presentationLayoutId,
+                )
+                .filter(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
+                .order_by(slide_layout_table.c.number)
+            )
+
+            result = query.all()
+
+            return [{"id": row.id, "name": row.name, "presentationLayoutId": row.presentationLayoutId} for row in result]
 
         return super().execute(logic, session)
 

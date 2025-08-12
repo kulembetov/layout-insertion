@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from db_work.database import BaseManager
+from db_work.services import PresentationLayoutManager, SlideLayoutManager
 from django_app.api_v1.services.filters.filter_settings import FilterMode
 from django_app.api_v1.utils.helpers import json_dump
 from log_utils import logs, setup_logger
@@ -73,15 +73,8 @@ class ReceiveFigmaPresentationLayout(APIView):
 
     @logs(logger, on=True)
     def get(self, request) -> Response:
-        manager = BaseManager()
-
-        table, session = manager.open_session("PresentationLayout")
-
-        def logic():
-            query = session.query(table.c.name).all()
-            return [row[0] for row in query]
-
-        names = manager.execute(logic, session)
+        presentation_manager = PresentationLayoutManager()
+        names = presentation_manager.get_all_presentation_layout_names()
 
         return Response(names if names is not None else [])
 
@@ -96,23 +89,7 @@ class ReceiveFigmaPresentationLayoutSlides(APIView):
 
         logger.info(f"Retrieving slides for presentation layout ID: {id}")
 
-        manager = BaseManager()
-        table, session = manager.open_session("SlideLayout")
+        slide_manager = SlideLayoutManager()
+        slides = slide_manager.get_slides_by_presentation_layout_id(str(id))
 
-        def logic():
-            query = (
-                session.query(
-                    table.c.id,
-                    table.c.name,
-                    table.c.presentationLayoutId,
-                )
-                .filter(table.c.presentationLayoutId == str(id))
-                .order_by(table.c.number)
-            )
-
-            result = query.all()
-
-            return [{"id": row.id, "name": row.name, "presentationLayoutId": row.presentationLayoutId} for row in result]
-
-        slides = manager.execute(logic, session)
         return Response(slides if slides is not None else [])
