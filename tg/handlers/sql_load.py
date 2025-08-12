@@ -2,7 +2,7 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from db_work.implemented import color_settings_manager, presentation_layout_manager, presentation_layout_styles_manager
+from db_work.implemented import color_settings_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_manager
 from log_utils import setup_logger
 from tg.states import FigmaLayoutState, LoadingProcessState, OptionState, StartingProcessState
 from tg.utils import r_text, to_str_user
@@ -68,11 +68,13 @@ async def update_choice(query: CallbackQuery, state: FSMContext):
 
     match cb_data:
         case "yes":
+            from tg.markups import start_process_markup
+
             logger.info(f"Пользователь {str_user} начал процесс обновления.")
             await query.message.edit_text("Обновление одобрено\\.", reply_markup=None)
 
-            await query.message.answer("Опция обновления находится в разработке\\.")
-            await state.clear()
+            await query.message.answer("Нажмите *__Начать__* для обновления шаблона\\.", reply_markup=start_process_markup.get())
+            await state.set_state(StartingProcessState.updating)
 
             await query.answer()
 
@@ -109,6 +111,22 @@ async def insert_logic(query: CallbackQuery, state: FSMContext):
     logger.info(f"Пользователь {str_user} добавил новые ID в PresentationLayoutStyles. " f"presentationLayoutId: {pl_uid}, colorSettingsId: {cs_uid}, presentationLayoutStyleId: {pls_uid}")
 
     await query.message.answer(f"Шаблон *{r_text(layout.name)}* успешно добавлен\\.")
-    await state.clear()
+    await query.message.answer(f"Шаблон *{r_text(layout.name)}* успешно добавлен\\.")
 
+    await state.clear()
+    await query.answer()
+
+
+@load_router.callback_query(F.data, StartingProcessState.updating)
+async def update_logic(query: CallbackQuery, state: FSMContext):
+    await query.message.edit_text(r_text("Идет процесс обновления..."), reply_markup=None)
+
+    layout_name, layout_id = await state.get_value("layout_name"), await state.get_value("layout_id")
+
+    res = slide_layout_manager.update_slide_layout_data(layout_id)
+
+    await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно обновлен\\.")
+    await query.message.answer(f"Результаты обновления: {res}")
+
+    await state.clear()
     await query.answer()
