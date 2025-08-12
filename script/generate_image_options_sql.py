@@ -247,7 +247,7 @@ class SQLGenerator:
         """Generate SQL statement for a single ImageOption and return both SQL and ID."""
         image_id = generate_uuid()
 
-        # Validate and escape inputs  # nosec B608
+        # Validate and escape inputs
         validated_id = self._validate_uuid(image_id)
         validated_source = self._validate_image_source(source)
         escaped_filename = self._escape_sql_string(image_info.filename)
@@ -275,13 +275,13 @@ INSERT INTO "ImageOption" (
     NULL,
     NULL,
     NULL
-);"""  # nosec B608
+);"""
 
         return sql, image_id
 
     def generate_junction_sql(self, image_option_id: str, presentation_layout_id: str) -> str:
         """Generate SQL statement for PresentationLayoutImageOption junction table."""
-        # Validate UUIDs  # nosec B608
+        # Validate UUIDs
         validated_image_id = self._validate_uuid(image_option_id)
         validated_layout_id = self._validate_uuid(presentation_layout_id)
 
@@ -291,7 +291,7 @@ INSERT INTO "ImageOption" (
 ) VALUES (
     '{validated_image_id}',
     '{validated_layout_id}'
-);"""  # nosec B608
+);"""
 
     def generate_batch_sql(self, images: list[S3ImageInfo], presentation_layout_id: str, source: str) -> tuple[str, list[str]]:
         """Generate batch SQL for multiple ImageOptions and PresentationLayoutImageOption records using bulk INSERT.
@@ -333,7 +333,7 @@ INSERT INTO "ImageOption" (
     "referalLink",
     "imageSourceId"
 ) VALUES
-{chr(10).join(values_parts)};"""  # nosec B608
+{chr(10).join(values_parts)};"""
 
         sql_parts.append(image_option_sql)
         sql_parts.extend(["", "-- PresentationLayoutImageOption bulk INSERT statement"])
@@ -351,7 +351,7 @@ INSERT INTO "ImageOption" (
     "imageOptionId",
     "presentationLayoutId"
 ) VALUES
-{chr(10).join(junction_values)};"""  # nosec B608
+{chr(10).join(junction_values)};"""
 
             sql_parts.append(junction_sql)
 
@@ -363,7 +363,7 @@ INSERT INTO "ImageOption" (
         if not image_option_ids:
             return ""
 
-        # Validate all UUIDs first  # nosec B608
+        # Validate all UUIDs first
         validated_ids = [self._validate_uuid(id_) for id_ in image_option_ids]
 
         # Create comma-separated list of validated IDs for WHERE IN clause
@@ -385,10 +385,10 @@ INSERT INTO "ImageOption" (
             "BEGIN;",
             "",
             "-- Delete PresentationLayoutImageOption records",
-            f"""DELETE FROM "PresentationLayoutImageOption" WHERE "imageOptionId" IN ({ids_in_clause});""",  # nosec B608
+            f"""DELETE FROM "PresentationLayoutImageOption" WHERE "imageOptionId" IN ({ids_in_clause});""",
             "",
             "-- Delete ImageOption records",
-            f"""DELETE FROM "ImageOption" WHERE "id" IN ({ids_in_clause});""",  # nosec B608
+            f"""DELETE FROM "ImageOption" WHERE "id" IN ({ids_in_clause});""",
             "",
             "COMMIT;",
         ]
