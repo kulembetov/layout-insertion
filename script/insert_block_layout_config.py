@@ -14,7 +14,6 @@ except ImportError:
     psycopg2 = None
 
 
-# --- DB config parser ---
 def parse_db_config(ini_path):
     config = configparser.ConfigParser()
     config.read(ini_path)
@@ -28,7 +27,6 @@ def parse_db_config(ini_path):
     }
 
 
-# --- Font mapping ---
 FONT_MAPPING = {
     "arial": "arial",
     "roboto": "roboto",
@@ -81,7 +79,6 @@ def normalize_font(font_name: str) -> str:
     return FONT_MAPPING.get(font_name.lower(), font_name.lower())
 
 
-# --- Main logic ---
 def collect_block_type_colors_fonts(json_path):
     with open(json_path, encoding="utf-8") as f:
         slides = json.load(f)
@@ -129,10 +126,8 @@ def create_palette_configs(json_path):
                 slide_config = slide.get("slideConfig", {})
                 color_objs = slide_config.get(block_type, {}).get(palette_color, None)
                 if color_objs:
-                    # Collect all unique fonts for this palette color
                     for obj in color_objs:
                         fonts.add(normalize_font(obj.get("fontFamily", "roboto")))
-                    # Use the color array from the first occurrence
                     if color_array is None:
                         color_array = [obj.get("color", "#ffffff").lower() for obj in color_objs]
             config[block_type] = color_array if color_array else ["#ffffff"]
@@ -184,7 +179,6 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
     try:
         configs = create_palette_configs(json_path)
         mapping = []
-        # Determine all block types and their font columns
         block_types = [
             "text",
             "slideTitle",
@@ -202,7 +196,6 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
         ]
         font_columns = [f"{bt}_font" for bt in block_types]
         for config in configs:
-            # Check if a similar config already exists
             cur.execute(
                 """
                 SELECT id FROM "BlockLayoutConfig"
@@ -222,7 +215,6 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
                 print(f"[AUTO] Found existing config: {config_id}")
             else:
                 config_id = config["id"]
-                # Insert new config
                 cur.execute(
                     """
                     INSERT INTO "BlockLayoutConfig" (
@@ -249,7 +241,6 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
                     ),
                 )
                 print(f"[AUTO] Inserted new config: {config_id}")
-            # Add to mapping, including all *_font columns
             mapping.append(
                 {
                     "id": config_id,
@@ -271,8 +262,6 @@ def insert_block_layout_config_auto(json_path, db_config, csv_path):
                 }
             )
         conn.commit()
-        # Write mapping to CSV, including *_font columns
-        # Only include BlockLayoutConfig table columns in CSV
         fieldnames = [
             "id",
             "text",
@@ -334,7 +323,7 @@ def insert_block_layout_config_manual(json_path, csv_path):
     {format_array(config['logo'])},
     {format_array(config['font'])}
 );
-"""  # nosec
+"""
         print(f"[MANUAL] {sql}")
         mapping.append(
             {

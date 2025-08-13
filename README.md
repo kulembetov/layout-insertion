@@ -242,7 +242,7 @@ poetry run python insert_block_layout_config.py --json my_output/sql_generator_i
 poetry run python match_block_layout_presentation_palette.py
 
 # 5. Generate SQL
-poetry run python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+poetry run python slide_insertion.py my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Validate SQL
 poetry run python sql_validator.py --input-dir my_sql_output
@@ -273,7 +273,7 @@ python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --out
 python insert_presentation_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
 python match_block_layout_presentation_palette.py
-python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python slide_insertion.py my_output/sql_generator_input.json --output-dir my_sql_output
 python sql_validator.py --input-dir my_sql_output
 python sql_pollution.py
 python slide_deletion.py
@@ -328,7 +328,7 @@ exit
   - Requires `database.ini` for database connection parameters
   - Supports custom output directories and file naming
 - **Dependencies:** `json`, `os`, `logging`, `config`, `argparse`, `uuid_utils`
-- **Usage:** `poetry run python slide_insertion.py --auto-from-figma input.json --output-dir sql_output`
+- **Usage:** `poetry run python slide_insertion.py input.json --output-dir sql_output`
 
 ### `sql_validator.py`
 - **Purpose:** Validates generated SQL files for syntax and referential integrity
@@ -493,54 +493,6 @@ exit
   5. **ID Replacement:** Replaces new UUIDs with existing SlideLayout IDs in new SQL files
   6. **File Generation:** Creates combined SQL files with cleanup statements followed by new INSERT statements
   7. **Statistics:** Provides detailed counts of processed slides, operations, and generated files
-
-### `export_issue_reports.py`
-- **Purpose:** Exports IssueReport table data from database to Excel and Google Sheets
-- **Functionality:**
-  - Connects to PostgreSQL database to fetch issue report records
-  - Exports data to Excel files with professional formatting
-  - Integrates with Google Sheets API for automated spreadsheet updates
-  - Prevents duplicate entries by checking existing IDs
-  - Applies professional formatting (borders, fonts, column widths)
-  - Provides comprehensive logging and error handling
-  - Supports both manual and automated export modes
-- **Configuration:**
-  - Requires `database.ini` with PostgreSQL connection parameters
-  - Requires Google API credentials (`credentials.json`) for Sheets integration
-  - Uses configurable Google Sheets spreadsheet ID and sheet name
-  - Supports custom column widths and formatting options
-- **Dependencies:** `psycopg2`, `pandas`, `google-api-python-client`, `google-auth-oauthlib`, `openpyxl`
-- **Usage:** `poetry run python export_issue_reports.py`
-- **How it works:**
-  1. **Database Connection:** Connects to PostgreSQL and fetches all IssueReport records
-  2. **Excel Export:** Creates formatted Excel file with issue report data
-  3. **Google Sheets Integration:** Authenticates with Google API and updates spreadsheet
-  4. **Duplicate Prevention:** Checks existing IDs to avoid duplicate entries
-  5. **Formatting:** Applies professional styling (borders, fonts, column widths)
-  6. **Logging:** Provides detailed operation logs and statistics
-
-### `export_feedback.py`
-- **Purpose:** Exports PresentationFeedback data to Google Sheets with daily statistics and comments
-- **Functionality:**
-  - Exports feedback data with comprehensive statistics calculation
-  - Integrates with Google Sheets for automated reporting
-  - Supports Excel export with professional formatting
-  - Calculates detailed statistics (likes, dislikes, averages, rates)
-  - Handles date range filtering for targeted exports
-  - Provides multiple export strategies (Excel, Google Sheets)
-  - Includes user and presentation metadata analysis
-- **Configuration:**
-  - Requires `database.ini` with PostgreSQL connection parameters
-  - Requires Google API credentials (`credentials.json`) for Sheets integration
-  - Supports configurable date ranges and export strategies
-  - Uses configurable Google Sheets spreadsheet ID
-- **Dependencies:** `psycopg2`, `pandas`, `google-api-python-client`, `google-auth-oauthlib`, `openpyxl`
-- **Usage:** `poetry run python export_feedback.py`
-- **How it works:**
-  1. **Database Connection:** Connects to PostgreSQL and fetches PresentationFeedback records
-  2. **Statistics Calculation:** Computes comprehensive feedback statistics (ratings, averages, rates)
-  3. **Data Processing:** Processes and normalizes feedback records with metadata
-  4. **Export Strategies:** Supports both Excel and Google Sheets export methods
 
 ### `generate_image_options_sql.py`
 - **Purpose:** Scans S3 bucket for images and generates SQL statements for ImageOption insertion
@@ -810,7 +762,7 @@ poetry run python insert_block_layout_config.py --json my_output/sql_generator_i
 poetry run python match_block_layout_presentation_palette.py
 
 # 5. Генерация SQL
-poetry run python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+poetry run python slide_insertion.py my_output/sql_generator_input.json --output-dir my_sql_output
 
 # 6. Валидация SQL
 poetry run python sql_validator.py --input-dir my_sql_output
@@ -841,7 +793,7 @@ python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --out
 python insert_presentation_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
 python match_block_layout_presentation_palette.py
-python slide_insertion.py --auto-from-figma my_output/sql_generator_input.json --output-dir my_sql_output
+python slide_insertion.py my_output/sql_generator_input.json --output-dir my_sql_output
 python sql_validator.py --input-dir my_sql_output
 python sql_pollution.py
 python slide_deletion.py
@@ -870,7 +822,7 @@ exit
 
 ### `slide_insertion.py`
 - **Назначение:** Генерирует SQL файлы из нормализованных данных Figma для заполнения базы данных
-- **Использование:** `poetry run python slide_insertion.py --auto-from-figma input.json --output-dir sql_output`
+- **Использование:** `poetry run python slide_insertion.py input.json --output-dir sql_output`
 
 ### `sql_validator.py`
 - **Назначение:** Проверяет сгенерированные SQL файлы на синтаксис и ссылочную целостность
@@ -895,57 +847,6 @@ exit
 ### `update_blocks.py`
 - **Назначение:** Генерирует очистку для существующих блоков и объединяет их с новыми операторами вставки
 - **Использование:** `poetry run python update_blocks.py my_sql_output_old my_sql_output --output-dir final`
-
-### `export_issue_reports.py`
-- **Назначение:** Экспортирует данные таблицы IssueReport из базы данных в Excel и Google Sheets
-- **Функциональность:**
-  - Подключается к PostgreSQL базе данных для получения записей отчетов о проблемах
-  - Экспортирует данные в Excel файлы с профессиональным форматированием
-  - Интегрируется с Google Sheets API для автоматического обновления таблиц
-  - Предотвращает дублирование записей путем проверки существующих ID
-  - Применяет профессиональное форматирование (границы, шрифты, ширина столбцов)
-  - Предоставляет подробное логирование и обработку ошибок
-  - Поддерживает как ручной, так и автоматический режимы экспорта
-- **Конфигурация:**
-  - Требует `database.ini` с параметрами подключения к PostgreSQL
-  - Требует учетные данные Google API (`credentials.json`) для интеграции с Sheets
-  - Использует настраиваемый ID таблицы Google Sheets и имя листа
-  - Поддерживает настраиваемую ширину столбцов и параметры форматирования
-- **Зависимости:** `psycopg2`, `pandas`, `google-api-python-client`, `google-auth-oauthlib`, `openpyxl`
-- **Использование:** `poetry run python export_issue_reports.py`
-- **Как работает:**
-  1. **Подключение к БД:** Подключается к PostgreSQL и получает все записи IssueReport
-  2. **Экспорт в Excel:** Создает отформатированный Excel файл с данными отчетов о проблемах
-  3. **Интеграция с Google Sheets:** Аутентифицируется с Google API и обновляет таблицу
-  4. **Предотвращение дублирования:** Проверяет существующие ID для избежания дублирования записей
-  5. **Форматирование:** Применяет профессиональное стилирование (границы, шрифты, ширина столбцов)
-  6. **Логирование:** Предоставляет подробные логи операций и статистику
-
-### `export_feedback.py`
-- **Назначение:** Экспортирует данные PresentationFeedback в Google Sheets с ежедневной статистикой и комментариями
-- **Функциональность:**
-  - Экспортирует данные обратной связи с комплексным расчетом статистики
-  - Интегрируется с Google Sheets для автоматической отчетности
-  - Поддерживает экспорт в Excel с профессиональным форматированием
-  - Рассчитывает детальную статистику (лайки, дизлайки, средние значения, показатели)
-  - Обрабатывает фильтрацию по диапазону дат для целевого экспорта
-  - Предоставляет несколько стратегий экспорта (Excel, Google Sheets)
-  - Включает анализ метаданных пользователей и презентаций
-- **Конфигурация:**
-  - Требует `database.ini` с параметрами подключения к PostgreSQL
-  - Требует учетные данные Google API (`credentials.json`) для интеграции с Sheets
-  - Поддерживает настраиваемые диапазоны дат и стратегии экспорта
-  - Использует настраиваемый ID таблицы Google Sheets
-- **Зависимости:** `psycopg2`, `pandas`, `google-api-python-client`, `google-auth-oauthlib`, `openpyxl`
-- **Использование:** `poetry run python export_feedback.py`
-- **Как работает:**
-  1. **Подключение к БД:** Подключается к PostgreSQL и получает записи PresentationFeedback
-  2. **Расчет статистики:** Вычисляет комплексную статистику обратной связи (рейтинги, средние значения, показатели)
-  3. **Обработка данных:** Обрабатывает и нормализует записи обратной связи с метаданными
-  4. **Стратегии экспорта:** Поддерживает как Excel, так и Google Sheets методы экспорта
-  5. **Интеграция с Google Sheets:** Обновляет таблицу статистикой и детальными данными
-  6. **Форматирование:** Применяет профессиональное стилирование и конфигурации столбцов
-  7. **Фильтрация по датам:** Поддерживает фильтрацию по диапазону дат для целевого экспорта
 
 ### `generate_image_options_sql.py`
 - **Назначение:** Сканирует S3 bucket для изображений и генерирует SQL-запросы для вставки в таблицу ImageOption

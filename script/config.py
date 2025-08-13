@@ -7,7 +7,6 @@ block types, slide layouts, and database configurations.
 """
 
 import os
-from enum import Enum
 from typing import TypedDict
 
 from dotenv import load_dotenv
@@ -55,43 +54,6 @@ FIGMA_CONFIG = {
 # Valid font weights - ONLY these are allowed
 VALID_FONT_WEIGHTS = [300, 400, 700]
 
-# ========================
-#  Enums for Types
-# ========================
-
-
-class SlideLayoutType(str, Enum):
-    CLASSIC = "classic"
-    MANY_TEXT = "manyText"
-    FEW_TEXT = "fewText"
-    OPTIMAL_TEXT = "optimalText"
-    CHART = "chart"
-    TABLE = "table"
-    INFOGRAPHICS = "infographics"
-    TITLE = "title"
-    LAST = "last"
-    OTHER = "other"
-
-
-class BlockType(str, Enum):
-    TEXT = "text"
-    SLIDE_TITLE = "slideTitle"
-    BLOCK_TITLE = "blockTitle"
-    EMAIL = "email"
-    DATE = "date"
-    NAME = "name"
-    PERCENTAGE = "percentage"
-    IMAGE = "image"
-    INFOGRAPHIK = "infographik"
-    TABLE = "table"
-    FIGURE = "figure"
-    ICON = "icon"
-    BACKGROUND = "background"
-    WATERMARK = "watermark"
-    SUBTITLE = "subTitle"
-    NUMBER = "number"
-    CHART = "chart"
-
 
 # ========================
 #  TypedDicts for Structured Configs
@@ -121,7 +83,7 @@ PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
 # ========================
 #  Defaults and Templates
 # ========================
-MINIATURES_BASE_PATH: str = "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen/miniatures"
+MINIATURES_BASE_PATH: str = "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/business/miniatures"
 DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"
 DEFAULT_COLOR: str = "#ffffff"
 MINIATURE_EXTENSION: str = ".png"
@@ -129,8 +91,8 @@ MINIATURE_EXTENSION: str = ".png"
 DEFAULT_VALUES: dict[str, object] = {
     "slide_layout_name": "grid_cards_horizontal",
     "slide_layout_number": 9,
-    "presentation_layout_id": "0197c55e-1c1b-7760-9525-f51752cf23e2",
-    "slide_layout_type": SlideLayoutType.CLASSIC,
+    "presentation_layout_id": "01989db8-b17d-78ec-b9d6-04e42c8bede2",
+    "slide_layout_type": "classic",
     "num_blocks": 5,
 }
 
@@ -406,103 +368,6 @@ SLIDE_LAYOUT_ADDITIONAL_INFO = {
 
 SLIDE_LAYOUT_DIMENSIONS = {"x": 0, "y": 0, "w": 1200, "h": 675}
 
-# SQL templates for generating queries
-SQL_TEMPLATES = {
-    "slide_layout": """-- Create SlideLayout
-INSERT INTO "SlideLayout" (
-    "id", "name", "number", "isActive", "presentationLayoutId",
-    "imagesCount", "maxTokensPerBlock", "maxWordsPerSentence", "minWordsPerSentence", "sentences",
-    "isLast", "forGeneration"
-) VALUES (
-    '{slide_layout_id}',
-    '{slide_layout_name}',
-    {slide_layout_number},
-    true,
-    '{presentation_layout_id}',
-    {imagesCount},
-    300,
-    15,
-    10,
-    1,
-    {is_last},
-    {for_generation}
-)
-RETURNING *;""",
-    "block_layout": """-- Create BlockLayouts
-INSERT INTO "BlockLayout" ("id", "slideLayoutId", "blockLayoutType")
-VALUES
-{block_layout_values}
-RETURNING *;""",
-    "block_styles": """-- Create BlockLayoutStyles
-INSERT INTO "BlockLayoutStyles" ("blockLayoutId", "textVertical", "textHorizontal", "fontSize", "weight", "zIndex", "color", "opacity", "textTransform", "borderRadius", "colorSettingsId")
-VALUES
-{styles_values}
-RETURNING *;""",
-    "block_dimensions": """-- Create BlockLayoutDimensions
-INSERT INTO "BlockLayoutDimensions" ("blockLayoutId", "x", "y", "w", "h", "rotation")
-VALUES
-{dimension_values}
-RETURNING *;""",
-    "figure": """-- Create Figures
-INSERT INTO "Figure" ("id", "blockLayoutId", "name")
-VALUES
-{figure_values}
-RETURNING *;""",
-    "precompiled_image": """-- Create PrecompiledImages
-INSERT INTO "PrecompiledImage" ("id", "blockLayoutId", "url", "color")
-VALUES
-{precompiled_image_values}
-RETURNING *;""",
-    "slide_layout_additional_info": """-- Create SlideLayoutAdditionalInfo
-INSERT INTO "SlideLayoutAdditionalInfo" (
-    "slideLayoutId", "percentesCount", "maxSymbolsInBlock", "hasHeaders", "type", "iconUrl", "infographicsType"
-) VALUES (
-    '{slide_layout_id}',
-    {percentesCount},
-    {maxSymbolsInBlock},
-    {hasHeaders},
-    '{type}'::"SlideLayoutType",
-    '{icon_url}',
-    {infographics_type}
-)
-RETURNING *;""",
-    "slide_layout_dimensions": """-- Create SlideLayoutDimensions
-INSERT INTO "SlideLayoutDimensions" (
-    "slideLayoutId", "x", "y", "w", "h"
-) VALUES (
-    '{slide_layout_id}',
-    {x},
-    {y},
-    {w},
-    {h}
-)
-RETURNING *;""",
-    "slide_layout_styles": """-- Create SlideLayoutStyles
-INSERT INTO "SlideLayoutStyles" (
-    "slideLayoutId"
-) VALUES (
-    '{slide_layout_id}'
-)
-RETURNING *;""",
-    "block_layout_index_config": """-- Create BlockLayoutIndexConfig
-INSERT INTO "BlockLayoutIndexConfig" (
-    "id", "blockLayoutId", "indexColorId", "indexFontId"
-)
-VALUES
-{block_layout_index_config_values}
-RETURNING *;""",
-    "slide_layout_index_config": """-- Create SlideLayoutIndexConfig
-INSERT INTO "SlideLayoutIndexConfig" (
-    "id", "presentationPaletteId", "configNumber", "slideLayoutId", "blockLayoutIndexConfigId", "blockLayoutConfigId"
-)
-VALUES
-{slide_layout_index_config_values}
-RETURNING *;""",
-    "block_layout_limit": """-- Create BlockLayoutLimit\nINSERT INTO "BlockLayoutLimit" ("minWords", "maxWords", "blockLayoutId")\nVALUES\n{block_layout_limit_values}\nRETURNING *;""",
-}
-
-MINIATURE_EXTENSION = ".png"
-
 # Output configuration
 OUTPUT_CONFIG = {
     "output_dir": "my_sql_output",
@@ -519,10 +384,12 @@ SLIDE_NUMBER_TO_FOLDER = {
     6: "4cols",
     7: "divider",
     8: "table",
-    9: "6cols",
-    10: "7cols",
-    11: "8cols",
-    12: "chart",
+    9: "5cols",
+    10: "6cols",
+    11: "7cols",
+    12: "8cols",
+    13: "chart",
+    14: "10cols",
     -1: "last",
 }
 
@@ -535,10 +402,12 @@ SLIDE_NUMBER_TO_NUMBER = {
     6: 4,  # 4cols
     7: None,  # divider
     8: None,  # table
-    9: 6,  # 6cols
-    10: 7,  # 7cols
-    11: 8,  # 8cols
-    12: None,  # chart
+    9: 5,  # 5 cols
+    10: 6,  # 6cols
+    11: 7,  # 7cols
+    12: 8,  # 8cols
+    13: None,  # chart
+    14: 10,  # 10cols
     -1: None,  # last
 }
 
@@ -551,14 +420,15 @@ SLIDE_NUMBER_TO_TYPE = {
     6: "extraText",  # 4cols
     7: "other",  # divider
     8: "table",  # table
-    9: "other",  # 6cols
-    10: "other",  # 7cols
-    11: "other",  # 8cols
-    12: "chart",  # chart
+    9: "other",  # 5 cols
+    10: "other",  # 6cols
+    11: "other",  # 7cols
+    12: "other",  # 8cols
+    13: "chart",  # chart
+    14: "other",  # 10cols
     -1: "last",  # last
 }
 
-WATERMARK_SLIDES: list[int] = []
 
 CONTAINER_NAME_TO_SLIDE_NUMBER = {
     "title": 1,
@@ -569,10 +439,12 @@ CONTAINER_NAME_TO_SLIDE_NUMBER = {
     "4cols": 6,
     "divider": 7,
     "table": 8,
-    "6cols": 9,
-    "7cols": 10,
-    "8cols": 11,
-    "chart": 12,
+    "5cols": 9,
+    "6cols": 10,
+    "7cols": 11,
+    "8cols": 12,
+    "chart": 13,
+    "10cols": 14,
     "last": -1,
 }
 
@@ -616,9 +488,3 @@ SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE = {
     "center_ring_chart": {"infographicsType": "doughnut"},
     "center_bar_chart": {"infographicsType": "bar"},
 }
-
-# Slide layout names that should have forGeneration = false
-SLIDE_LAYOUT_NAMES_FOR_GENERATION_FALSE = [
-    "one_rectangle_outline_icon_card_image_right",
-    "one_rectangle_outline_icon_card_image_left",
-]

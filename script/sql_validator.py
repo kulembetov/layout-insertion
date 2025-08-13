@@ -28,9 +28,7 @@ class SQLValidator:
             with open(file_path) as f:
                 content = f.read()
 
-            # Check for trailing commas line by line
             for i, line in enumerate(content.split("\n")):
-                # Look for trailing comma followed by RETURNING or closing parenthesis
                 if line.strip().endswith(","):
                     next_line_index = i + 1
                     if next_line_index < len(content.split("\n")):
@@ -47,7 +45,6 @@ class SQLValidator:
                                 )
                                 issues["issues"] = issues_list
 
-                # Check for comma at end of VALUES list before RETURNING
                 if line.rstrip().endswith(",") and i + 1 < len(content.split("\n")):
                     next_line = content.split("\n")[i + 1]
                     if next_line.strip().startswith(")") and "RETURNING" in next_line:
@@ -62,7 +59,6 @@ class SQLValidator:
                             )
                             issues["issues"] = issues_list
 
-            # Set overall issue flag
             issues["has_issues"] = bool(issues["issues"])
 
         except Exception as e:
@@ -73,7 +69,6 @@ class SQLValidator:
 
     def run(self):
         """Execute the validation process."""
-        # Find all SQL files
         sql_files = self.find_sql_files()
         print(f"Found {len(sql_files)} SQL files to check")
 
@@ -81,7 +76,6 @@ class SQLValidator:
             print("No SQL files found. Exiting.")
             return
 
-        # Check each file
         results = []
         files_with_issues = 0
 
@@ -105,16 +99,13 @@ class SQLValidator:
                     if self.verbose:
                         print(f"    {issue['content']}")
 
-        # Clear the progress line
         print(" " * 80, end="\r")
 
-        # Summary
         if files_with_issues > 0:
             print(f"\nFound issues in {files_with_issues} out of {len(sql_files)} files")
         else:
             print(f"\nNo issues found in any of the {len(sql_files)} SQL files")
 
-        # Write to output file if specified
         if self.output_file is not None and files_with_issues > 0:
             self._write_report(results, files_with_issues, len(sql_files))
 
@@ -159,7 +150,6 @@ if __name__ == "__main__":
         elif not output_file:
             output_file = arg
 
-    # Start the validation
     start_time = time.time()
     validator = SQLValidator(directory, output_file, verbose)
     validator.run()

@@ -64,7 +64,6 @@ def find_matches(palette_map, block_configs):
                 print(f"  Found in config {block_config['id']}: {block_config['background_colors']}")
 
         if matching_configs:
-            # If multiple configs match this palette color, create multiple matches
             for block_config in matching_configs:
                 matches.append(
                     {
@@ -85,18 +84,15 @@ def create_strategic_matches(palette_map, block_configs):
     """Create strategic matches - each palette color gets matched with each config that contains it"""
     matches = []
 
-    # First, try exact matches
     exact_matches = find_matches(palette_map, block_configs)
     matches.extend(exact_matches)
 
-    # If no exact matches found, create fallback matches
     if not exact_matches:
         print("\nNo exact matches found. Creating fallback matches...")
 
         list(palette_map.keys())
 
         for i, (palette_color, palette_id) in enumerate(palette_map.items()):
-            # Use modulo to cycle through block configs
             block_config = block_configs[i % len(block_configs)]
 
             matches.append(
@@ -116,7 +112,6 @@ def create_strategic_matches(palette_map, block_configs):
 
 
 def main():
-    # Fixed file paths - no parameters needed
     palette_file = "presentation_palette_mapping.csv"
     block_file = "block_layout_config_mapping.csv"
     output_file = "slide_layout_index_config_mapping.csv"
@@ -128,21 +123,19 @@ def main():
     block_configs = read_block_layout_mapping(block_file)
 
     print(f"\nFound {len(palette_map)} palette colors:")
-    for color, palette_id in list(palette_map.items())[:5]:  # Show first 5
+    for color, palette_id in list(palette_map.items())[:5]:
         print(f"  {color} -> {palette_id}")
     if len(palette_map) > 5:
         print(f"  ... and {len(palette_map) - 5} more")
 
     print(f"\nFound {len(block_configs)} block configs:")
-    for config in block_configs[:3]:  # Show first 3
+    for config in block_configs[:3]:
         print(f"  {config['id']}: {config['background_colors']}")
     if len(block_configs) > 3:
         print(f"  ... and {len(block_configs) - 3} more")
 
-    # Always use strategic strategy
     matches = create_strategic_matches(palette_map, block_configs)
 
-    # Write results
     fieldnames = [
         "id",
         "presentationPaletteId",
@@ -160,7 +153,6 @@ def main():
 
     print(f"\nWrote {len(matches)} matches to {output_file}")
 
-    # Summary
     exact_count = sum(1 for m in matches if m.get("match_type") != "fallback")
     fallback_count = sum(1 for m in matches if m.get("match_type") == "fallback")
 

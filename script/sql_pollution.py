@@ -74,17 +74,13 @@ class DatabaseManager:
         Parse SQL content and extract actual SQL statements,
         ignoring comments.
         """
-        # Remove SQL comments
         lines = []
         for line in sql_content.split("\n"):
-            # Remove inline comments
             if "--" in line:
                 line = line[: line.find("--")]
-            # Add non-empty lines
             if line.strip():
                 lines.append(line)
 
-        # Join lines and split by semicolon
         clean_sql = "\n".join(lines)
         statements = [stmt.strip() for stmt in clean_sql.split(";") if stmt.strip()]
         return statements
@@ -100,14 +96,12 @@ class SQLExecutor:
 
     def find_sql_files(self):
         """Find all SQL files in the directory and subdirectories (recursively), with logging."""
-        # Check if SQL directory exists
         if not os.path.isdir(self.sql_dir):
             print(f"Error: Directory '{self.sql_dir}' not found.")
             os.makedirs(self.sql_dir)
             print(f"Created empty directory '{self.sql_dir}'. Please add SQL files and run again.")
             return []
 
-        # List all files in the directory for debugging
         print("All files in directory:")
         try:
             dir_contents = os.listdir(self.sql_dir)
@@ -122,7 +116,6 @@ class SQLExecutor:
         except Exception as e:
             print(f"  [Error listing directory contents: {e}]")
 
-        # Recursively find all .sql files (case-insensitive), with per-directory logging
         sql_files = []
         for root, dirs, files in os.walk(self.sql_dir):
             found_in_dir = [file for file in files if file.lower().endswith(".sql")]
@@ -133,7 +126,6 @@ class SQLExecutor:
                 for file in found_in_dir:
                     sql_files.append(os.path.join(root, file))
 
-        # Remove duplicates and sort
         sql_files = sorted(list(set(sql_files)))
         print(f"Found SQL files: {len(sql_files)}")
 
@@ -187,7 +179,6 @@ class SQLExecutor:
             cursor.close()
             return
 
-        # Ask for confirmation before proceeding
         if not self.confirm_execution(sql_files):
             cursor.close()
             return
@@ -251,7 +242,6 @@ def main():
     print("=" * 30)
     print(f"Current working directory: {os.getcwd()}")
 
-    # Initialize and use the classes
     config_manager = ConfigManager(args.db_config)
     db_params = config_manager.load_config()
 

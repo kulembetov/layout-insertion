@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Clean script to download images from Google Drive and upload to Yandex Cloud Object Storage
 Supports both scenarios:
@@ -14,7 +13,6 @@ import os
 from pathlib import Path
 from typing import TypedDict
 
-# Required libraries
 try:
     import boto3
     from botocore.exceptions import ClientError
@@ -30,18 +28,15 @@ except ImportError as e:
     print("Install with: pip install boto3 google-api-python-client google-auth-oauthlib python-dotenv")
     exit(1)
 
-# Load environment variables
 load_dotenv()
 
-# Configuration
 GOOGLE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 CREDENTIALS_FILE = "credentials.json"
-TOKEN_FILE = "token.json"  # nosec
+TOKEN_FILE = "token.json"
 YANDEX_ENDPOINT_URL = "https://storage.yandexcloud.net"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".svg"}
 
 
-# Type definitions
 class GoogleDriveFile(TypedDict):
     """Type definition for Google Drive file objects"""
 
@@ -59,7 +54,6 @@ class GoogleDriveFolder(TypedDict):
     mimeType: str
 
 
-# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -200,7 +194,6 @@ class GoogleDriveDownloader:
         images: list[dict[str, str | int | float | bool]] = []
 
         try:
-            # Get all items in the subfolder
             query = f"'{folder_id}' in parents and trashed=false"
             request_params = {
                 "q": query,
@@ -218,7 +211,6 @@ class GoogleDriveDownloader:
 
                 for item in items:
                     if self.is_image_file(item["name"], item.get("mimeType", "")):
-                        # Add image with subfolder name as prefix
                         image_path = f"{subfolder_name}/{item['name']}"
                         images.append(
                             {
@@ -336,7 +328,6 @@ def check_credentials():
 def main():
     """Main migration function"""
     try:
-        # Check credentials
         missing_vars = check_credentials()
         if missing_vars:
             print(f"Missing credentials: {', '.join(missing_vars)}")
@@ -352,14 +343,12 @@ def main():
                 print("Set environment variables and run again.")
                 return
 
-        # Get configuration
         folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "1m5H3yQJhTuCF3dmQGJ-zAVqsY_T6dSfk")
         folder_path = os.getenv("YANDEX_FOLDER_PATH", "layouts/raiffeisen/miniatures/")
         bucket_name = os.getenv("YANDEX_BUCKET_NAME")
 
         logger.info(f"Starting migration from Google Drive to s3://{bucket_name}/{folder_path}")
 
-        # Initialize services
         gdrive = GoogleDriveDownloader()
         yandex = YandexCloudUploader()
 
@@ -367,11 +356,9 @@ def main():
             logger.error("Cannot access Yandex Cloud bucket. Exiting.")
             return
 
-        # Get subfolders from Google Drive
         logger.info("Fetching subfolders from Google Drive...")
         subfolders = gdrive.list_folders_in_folder(folder_id)
 
-        # Get direct images from the main folder
         logger.info("Fetching direct images from Google Drive...")
         direct_images = gdrive.list_files_in_folder(folder_id)
         direct_image_files = [
@@ -380,7 +367,7 @@ def main():
                 "name": file["name"],
                 "mimeType": file.get("mimeType", ""),
                 "size": file.get("size"),
-                "path": file["name"],  # No subfolder prefix for direct images
+                "path": file["name"],
             }
             for file in direct_images
             if gdrive.is_image_file(file["name"], file.get("mimeType", ""))
@@ -389,7 +376,6 @@ def main():
         total_successful = 0
         total_failed = 0
 
-        # Process direct images first (if any)
         if direct_image_files:
             logger.info(f"Found {len(direct_image_files)} direct images in main folder")
 
@@ -401,13 +387,11 @@ def main():
                 image_path = image_info["path"]
                 logger.info(f"Processing direct image {i}/{len(direct_image_files)}: {image_path}")
 
-                # Download
                 file_data = gdrive.download_file(image_info["id"], filename)
                 if not file_data:
                     failed_uploads += 1
                     continue
 
-                # Upload directly to the specified folder (no subfolder)
                 yandex_key = f"{folder_path}{image_path}"
                 if yandex.upload_file(file_data, yandex_key, image_info.get("mimeType")):
                     successful_uploads += 1
@@ -419,7 +403,6 @@ def main():
 
             logger.info(f"Completed direct images: {successful_uploads} successful, {failed_uploads} failed")
 
-        # Process subfolders (if any)
         if subfolders:
             logger.info(f"Found {len(subfolders)} subfolders to process")
 
@@ -427,7 +410,6 @@ def main():
                 subfolder_name = subfolder["name"]
                 logger.info(f"Processing subfolder: {subfolder_name}")
 
-                # Get images from this subfolder
                 images = gdrive.get_images_from_subfolder(subfolder["id"], subfolder_name)
 
                 if not images:
@@ -436,7 +418,6 @@ def main():
 
                 logger.info(f"Found {len(images)} images in {subfolder_name}")
 
-                # Process images in this subfolder
                 successful_uploads = 0
                 failed_uploads = 0
 
@@ -445,13 +426,11 @@ def main():
                     image_path = image_info["path"]
                     logger.info(f"Processing {i}/{len(images)}: {image_path}")
 
-                    # Download
                     file_data = gdrive.download_file(image_info["id"], filename)
                     if not file_data:
                         failed_uploads += 1
                         continue
 
-                    # Upload inside the specified folder
                     yandex_key = f"{folder_path}{image_path}"
                     if yandex.upload_file(file_data, yandex_key, image_info.get("mimeType")):
                         successful_uploads += 1
@@ -465,12 +444,10 @@ def main():
         else:
             logger.info("No subfolders found in Google Drive folder")
 
-        # Check if no images were found at all
         if not direct_image_files and not subfolders:
             logger.warning("No images or subfolders found in Google Drive folder")
             return
 
-        # Summary
         logger.info("Migration completed!")
         logger.info(f"Total successful: {total_successful} files")
         logger.info(f"Total failed: {total_failed} files")
