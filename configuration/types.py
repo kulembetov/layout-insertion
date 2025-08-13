@@ -8,12 +8,14 @@ from enum import StrEnum
 class TextVertical(StrEnum):
     top = "top"
     center = "center"  # type: ignore[assignment]
+    middle = "middle"
     bottom = "bottom"
 
 
 class TextHorizontal(StrEnum):
     left = "left"
     center = "center"  # type: ignore[assignment]
+    middle = "middle"
     right = "right"
 
 
