@@ -5,7 +5,7 @@ from .defaults import DEFAULT_COLOR, DEFAULT_COLOR_SETTINGS_ID, DEFAULT_VALUES, 
 
 # Единая точка импорта для остального кода.
 from .env import FigmaSettings, figma_settings
-from .figma import FIGMA_CONFIG, VALID_FONT_WEIGHTS, BlockType, FigmaKey, FigmaNodeType
+from .figma import FIGMA_CONFIG, TEXT_BLOCK_TYPES, VALID_FONT_WEIGHTS, BlockType, FigmaKey, FigmaNodeType
 from .mappings import AUTO_BLOCKS, BLOCK_TYPE_MIN_WORDS, BLOCK_TYPES, CONTAINER_NAME_TO_SLIDE_NUMBER, DEFAULT_DIMENSIONS, DEFAULT_STYLES, FIGMA_TO_SQL_BLOCK_MAPPING, SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE, SLIDE_LAYOUT_TYPES, SLIDE_NUMBER_TO_FOLDER, SLIDE_NUMBER_TO_NUMBER, SLIDE_NUMBER_TO_TYPE, Z_INDEX_DEFAULTS
 from .output import OUTPUT_CONFIG
 from .precompiled_images import PRECOMPILED_IMAGES, PrecompiledImagesConfig
@@ -22,6 +22,7 @@ __all__ = [
     "BlockType",
     "FIGMA_CONFIG",
     "VALID_FONT_WEIGHTS",
+    "TEXT_BLOCK_TYPES",
     # precompiled
     "PrecompiledImagesConfig",
     "PRECOMPILED_IMAGES",
