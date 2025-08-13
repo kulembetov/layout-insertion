@@ -1352,16 +1352,20 @@ def camel_to_snake(name):
 
 def build_slide_icon_url(slide_type: str, slide_name: str, slide_number: int, miniatures_base_path: str) -> str:
     """Generate icon URL for slide layout."""
-    skip_number_types = {config.SLIDE_NUMBER_TO_TYPE.get(n) for n in [1, 5, 8, 12, -1]}
+    # Slide numbers that should NOT have numbers in their miniature paths
+    skip_number_slides = {1, 5, 7, 8, 13, -1}
     miniature_folder = camel_to_snake(slide_type)
 
-    if slide_type in skip_number_types:
+    # If this slide number should skip numbering, return without number
+    if slide_number in skip_number_slides:
         return f"{miniatures_base_path}/{miniature_folder}/{slide_name}{config.MINIATURE_EXTENSION}"
 
+    # For slide numbers that should have numbers, get the number from the mapping
     number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(slide_number)
     if number_for_icon is not None:
         return f"{miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_name}{config.MINIATURE_EXTENSION}"
 
+    # Fallback: if no number mapping found, return without number
     return f"{miniatures_base_path}/{miniature_folder}/{slide_name}{config.MINIATURE_EXTENSION}"
 
 
