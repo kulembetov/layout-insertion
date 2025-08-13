@@ -195,14 +195,14 @@ class LayoutRolesManager(BaseManager):
         self.table = 'LayoutRoles'
 
     def insert(self, presentation_layout_id: str, user_role: str) -> tuple[str]:
-        """Insert a field in LayoutRolesTable."""
+        """Insert a field in LayoutRoles Table."""
 
         layout_roles_table, session = self.open_session(self.table)
 
         def logic():
             values = {
                 'presentationLayoutId': presentation_layout_id,
-                'role': user_role
+                'role': user_role.upper()
                 }
             query = insert(layout_roles_table).values(values)
             session.execute(query)
@@ -212,12 +212,35 @@ class LayoutRolesManager(BaseManager):
         return super().execute(logic, session)
 
 
+class SlideLayoutStyles(BaseManager):
+    """Interacts With The SlideLayoutStyles Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = 'SlideLayoutStyles'
+
+    def insert(self, slide_layout_id: str) -> None:
+        """Insert a field in SlideLayoutStyles Table."""
+
+        slide_layout_styles_table, session = self.open_session(self.table)
+
+        def logic():
+            values = {
+                'slideLayoutId': slide_layout_id
+            }
+            query = insert(slide_layout_styles_table).values(values)
+            session.execute(query)
+            session.commit()
+            return None
+        
+        return super().execute(logic, session)
 
 
 
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
+
     # print(PresentationLayoutManager().select_layout_by_name('classic'))
     #     print(PresentationLayoutManager().insert_new_layout('test_12'))
     #     print(ColorSettingsManager().select_color_id())
@@ -236,6 +259,8 @@ class LayoutRolesManager(BaseManager):
     # '019006b0-03af-7b04-a66f-8d31b0a08769'
     # # raif
     # '0197c55e-1c1b-7760-9525-f51752cf23e2'
+
+    # print(SlideLayoutStyles().insert('0198a2d8-2b88-7813-a049-a9997abac98b'))
 
 
 # poetry run python -m db_work.services
