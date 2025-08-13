@@ -19,15 +19,7 @@ def extract_frame_data(data: dict) -> list[dict]:
 
         if isinstance(obj, dict):
             if all(key in obj for key in ["slide_number", "frame_name", "imagesCount", "sentences", "forGeneration", "slide_type", "dimensions"]):
-                result_dict = {
-                    "number": obj.get("slide_number"),
-                    "name": obj.get("frame_name").split()[0],
-                    "imagesCount": obj.get("imagesCount"),
-                    "sentences": obj.get("sentences"),
-                    "forGeneration": obj.get("forGeneration"),
-                    "isLast": obj.get("slide_type"),
-                    "dimensions": obj.get("dimensions"),
-                }
+                result_dict = {"number": obj.get("slide_number"), "name": obj.get("frame_name").split()[0], "imagesCount": obj.get("imagesCount"), "sentences": obj.get("sentences"), "forGeneration": obj.get("forGeneration"), "isLast": obj.get("slide_type"), "dimensions": obj.get("dimensions"), "blocks": obj.get("blocks")}
                 results.append(result_dict)
 
             for value in obj.values():

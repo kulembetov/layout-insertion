@@ -126,6 +126,7 @@ class SlideLayoutManager(BaseManager):
 
             for data_item in cached_data:
                 slide_dimension = data_item.pop("dimensions")
+                slide_blocks = data_item.pop("blocks")
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
 
                 matching_row = [row for row in postgres_data if row.name == uuid_data_item["name"] and row.number == uuid_data_item["number"]]
@@ -144,7 +145,7 @@ class SlideLayoutManager(BaseManager):
                         stmt = update(slide_layout_table).where(slide_layout_table.c.id == compared_row.id).values(**uuid_data_item)
                         session.execute(stmt)
                         session.commit()
-                        updated_slides.append((compared_row.name, compared_row.id, slide_dimension))
+                        updated_slides.append((compared_row.name, compared_row.id, slide_dimension, slide_blocks))
 
                 else:
                     new_entry = dict(uuid_data_item)
@@ -152,16 +153,16 @@ class SlideLayoutManager(BaseManager):
                     stmt = insert(slide_layout_table).values(**new_entry)
                     session.execute(stmt)
                     session.commit()
-                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension))
+                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension, slide_blocks))
 
             updated_query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
             session.execute(updated_query)
 
             changes = []
-            for name, id_, slide_dimension in added_slides + updated_slides:
+            for name, id_, slide_dimension, slide_blocks in added_slides + updated_slides:
                 action = "Added" if (name, id_) in added_slides else "Updated"
                 # changes.append(f"{action}: {name} {id_}")
-                changes.append({"Action": action, "Name": name, "id": id_, "slide_dimension": slide_dimension})
+                changes.append({"Action": action, "Name": name, "id": id_, "slide_dimension": slide_dimension, "slide_blocks": slide_blocks})
             return changes
 
         return super().execute(logic, session)
@@ -252,7 +253,7 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
 
         def logic():
 
-            # hasHeaders = true, если на слайде есть как минимум 1 blockTitle, percentage
+            # hasHeaders = true, если на слайде есть как минимум 1 blockTitle
             # percentes - считается по количеству блоков с типом percentag
 
             # type - figma
@@ -292,7 +293,6 @@ class SlideLayoutDimensionsManager(BaseManager):
         def logic():
             for item in slide_layouts:
                 dimensions = item.get("slide_dimension")
-                print(item.get("id"))
                 values = {"slideLayoutId": item.get("id"), "x": 0, "y": 0, "w": dimensions.get("w"), "h": dimensions.get("h")}
                 query = insert(slide_layout_dimensions).values(values)
                 session.execute(query)
