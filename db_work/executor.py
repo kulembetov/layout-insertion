@@ -1,4 +1,4 @@
-from db_work.implemented import color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_manager, slide_layout_styles_manager
+from db_work.implemented import color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
 
 
 class Executor:
@@ -35,9 +35,13 @@ class Executor:
         new_slied_layout_styles = slide_layout_styles_manager.insert(slide_layouts=new_or_updated_slide_layouts)
         print(f"new_slied_layout_styles {new_slied_layout_styles}")
 
+        # Create new slide layout dimensions for every new slide layout
+        new_slide_layout_dimensions = slide_layout_dimensions_manager.insert(slide_layouts=new_or_updated_slide_layouts)
+        print(f"new_slide_layout_dimensions {new_slide_layout_dimensions}")
+
 
 if __name__ == "__main__":
-    new_layout_name = "Nikita_test_layout_1"
+    new_layout_name = "Nikita_test_layout_7"
     user_role = "USER"
     execute = Executor()
 

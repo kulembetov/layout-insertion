@@ -125,6 +125,7 @@ class SlideLayoutManager(BaseManager):
             cached_data = get_slide_layout_data_from_cache(presentation_layout_id)
 
             for data_item in cached_data:
+                slide_dimension = data_item.pop("dimensions")
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
 
                 matching_row = [row for row in postgres_data if row.name == uuid_data_item["name"] and row.number == uuid_data_item["number"]]
@@ -143,7 +144,7 @@ class SlideLayoutManager(BaseManager):
                         stmt = update(slide_layout_table).where(slide_layout_table.c.id == compared_row.id).values(**uuid_data_item)
                         session.execute(stmt)
                         session.commit()
-                        updated_slides.append((compared_row.name, compared_row.id))
+                        updated_slides.append((compared_row.name, compared_row.id, slide_dimension))
 
                 else:
                     new_entry = dict(uuid_data_item)
@@ -151,16 +152,16 @@ class SlideLayoutManager(BaseManager):
                     stmt = insert(slide_layout_table).values(**new_entry)
                     session.execute(stmt)
                     session.commit()
-                    added_slides.append((new_entry["name"], new_entry["id"]))
+                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension))
 
             updated_query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
             session.execute(updated_query)
 
             changes = []
-            for name, id_ in added_slides + updated_slides:
+            for name, id_, slide_dimension in added_slides + updated_slides:
                 action = "Added" if (name, id_) in added_slides else "Updated"
                 # changes.append(f"{action}: {name} {id_}")
-                changes.append({"Action": action, "Name": name, "id": id_})
+                changes.append({"Action": action, "Name": name, "id": id_, "slide_dimension": slide_dimension})
             return changes
 
         return super().execute(logic, session)
@@ -194,7 +195,6 @@ class LayoutRolesManager(BaseManager):
     def __init__(self):
         super().__init__()
         self.table = "LayoutRoles"
-        self.table = "LayoutRoles"
 
     def insert(self, presentation_layout_id: str | None, user_role: str) -> tuple[str] | None:
         """Insert a field in LayoutRoles Table."""
@@ -218,12 +218,11 @@ class SlideLayoutStylesManager(BaseManager):
     def __init__(self):
         super().__init__()
         self.table = "SlideLayoutStyles"
-        self.table = "SlideLayoutStyles"
 
     def insert(self, slide_layouts: list[dict]):
         """Insert a field in SlideLayoutStyles Table."""
 
-        # Возможно сюда нужно будет добвать логику на uodate
+        # Возможно сюда нужно будет добвать логику на update
         slide_layout_styles_table, session = self.open_session(self.table)
 
         def logic():
@@ -231,6 +230,71 @@ class SlideLayoutStylesManager(BaseManager):
                 values = {"slideLayoutId": item.get("id")}
 
                 query = insert(slide_layout_styles_table).values(values)
+                session.execute(query)
+
+            session.commit()
+            return None
+
+        return super().execute(logic, session)
+
+
+class SlideLayoutAdditionalInfoManager(BaseManager):
+    """Insert a field in SlideLayoutAdditionalInfo Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = "SlideLayoutAdditionalInfo"
+
+    def insert(self):
+        """Insert a field in SlideLayoutAdditionalInfo Table."""
+
+        slide_layout_additional_info, session = self.open_session(self.table)
+
+        def logic():
+
+            # hasHeaders = true, если на слайде есть как минимум 1 blockTitle, percentage
+            # percentes - считается по количеству блоков с типом percentag
+
+            # type - figma
+            # iconUrl - посмотреть в конфиге base path спросить у пользователя
+            # infographicsType -
+
+            # maxSymbolsInBlock - default
+            # contentType - default
+
+            # values = {
+            #     "slideLayoutId": None,
+            #     "percentesCount": None,
+            #     "hasHeaders": None,
+            #     "maxSymbolsInBlock": None,
+            #     "type": None,
+            #     "iconUrl": None,
+            #     "infographicsType": None,
+            #     "contentType": None,
+            # }
+            return ...
+
+        return super().execute(logic, session)
+
+
+class SlideLayoutDimensionsManager(BaseManager):
+    """Insert a field in SlideLayoutDimensions Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = "SlideLayoutDimensions"
+
+    def insert(self, slide_layouts: list[dict]):
+        """Insert a field in SlideLayoutDimensions Table."""
+
+        slide_layout_dimensions, session = self.open_session(self.table)
+
+        def logic():
+            for item in slide_layouts:
+                dimensions = item.get("slide_dimension")
+                print(item.get("id"))
+                values = {"slideLayoutId": item.get("id"), "x": 0, "y": 0, "w": dimensions.get("w"), "h": dimensions.get("h")}
+                query = insert(slide_layout_dimensions).values(values)
                 session.execute(query)
 
             session.commit()
