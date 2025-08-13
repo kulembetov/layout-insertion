@@ -185,9 +185,39 @@ class SlideLayoutManager(BaseManager):
             return [{"id": row.id, "name": row.name, "presentationLayoutId": row.presentationLayoutId} for row in result]
 
         return super().execute(logic, session)
+    
+
+class LayoutRolesManager(BaseManager):
+    """Interacts With The LayoutRoles Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = 'LayoutRoles'
+
+    def insert(self, presentation_layout_id: str, user_role: str) -> tuple[str]:
+        """Insert a field in LayoutRolesTable."""
+
+        layout_roles_table, session = self.open_session(self.table)
+
+        def logic():
+            values = {
+                'presentationLayoutId': presentation_layout_id,
+                'role': user_role
+                }
+            query = insert(layout_roles_table).values(values)
+            session.execute(query)
+            session.commit()
+            return presentation_layout_id, user_role
+        
+        return super().execute(logic, session)
 
 
-if __name__ == "__main__":
+
+
+
+
+
+# if __name__ == "__main__":
     # print(PresentationLayoutManager().select_layout_by_name('classic'))
     #     print(PresentationLayoutManager().insert_new_layout('test_12'))
     #     print(ColorSettingsManager().select_color_id())
@@ -201,7 +231,7 @@ if __name__ == "__main__":
 
     # print(SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2'))
     # SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2')
-    print(SlideLayoutManager().update_slide_layout_data("0197c55e-1c1b-7760-9525-f51752cf23e2"))
+    # print(SlideLayoutManager().update_slide_layout_data("0197c55e-1c1b-7760-9525-f51752cf23e2"))
     # # classic
     # '019006b0-03af-7b04-a66f-8d31b0a08769'
     # # raif
