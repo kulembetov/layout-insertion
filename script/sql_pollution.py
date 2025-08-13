@@ -226,7 +226,7 @@ def main():
     parser.add_argument(
         "--input-dir",
         type=str,
-        default="../script/my_sql_output",
+        default="../script/slide_deletion",
         help="Directory containing SQL files to execute (default: script/my_sql_output)",
     )
     parser.add_argument(
