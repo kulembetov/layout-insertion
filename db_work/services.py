@@ -1,11 +1,9 @@
-import json
-import os
 
 from sqlalchemy import insert, select, update
 from sqlalchemy.engine.row import Row
 
 from db_work.database import BaseManager
-from db_work.utils import generate_uuid
+from db_work.utils import generate_uuid, get_slide_layout_data_from_cache
 
 
 class PresentationLayoutManager(BaseManager):
@@ -13,11 +11,12 @@ class PresentationLayoutManager(BaseManager):
 
     def __init__(self):
         super().__init__()
+        self.table = "PresentationLayout"
 
     def select_layout_by_name(self, name: str) -> Row | None:
         """Find a row in 'PresentationLayout' by name."""
 
-        presentation_layout_table, session = self.open_session("PresentationLayout")
+        presentation_layout_table, session = self.open_session(self.table)
 
         def logic():
 
@@ -30,7 +29,7 @@ class PresentationLayoutManager(BaseManager):
     def insert_new_layout(self, name: str) -> str | None:
         """Add new row in 'PresentationLayout'."""
 
-        presentation_layout_table, session = self.open_session("PresentationLayout")
+        presentation_layout_table, session = self.open_session(self.table)
 
         def logic():
             uid = generate_uuid()
@@ -45,7 +44,7 @@ class PresentationLayoutManager(BaseManager):
     def get_all_presentation_layout_names(self) -> list[str] | None:
         """Get all presentation layout names from the database."""
 
-        presentation_layout_table, session = self.open_session("PresentationLayout")
+        presentation_layout_table, session = self.open_session(self.table)
 
         def logic():
             query = session.query(presentation_layout_table.c.name).all()
@@ -59,11 +58,12 @@ class ColorSettingsManager(BaseManager):
 
     def __init__(self):
         super().__init__()
+        self.table = "ColorSettings"
 
     def select_color_id(self) -> str | None:
         """Generate new color id."""
 
-        color_settings_table, session = self.open_session("ColorSettings")
+        color_settings_table, session = self.open_session(self.table)
 
         def logic():
             new_color_id = generate_uuid()
@@ -82,11 +82,12 @@ class PresentationLayoutStylesManager(BaseManager):
 
     def __init__(self):
         super().__init__()
+        self.table = "PresentationLayoutStyles"
 
     def insert_new_ids(self, presentation_layout_id: str | None, color_settings_id: str | None) -> str | None:
         """Inserts ColorSettingsID and PresentationLayoutID into PresentationLayoutStyles."""
 
-        presentation_layout_styles_table, session = self.open_session("PresentationLayoutStyles")
+        presentation_layout_styles_table, session = self.open_session(self.table)
 
         def logic():
             uid = generate_uuid()
@@ -100,71 +101,16 @@ class PresentationLayoutStylesManager(BaseManager):
 
 
 class SlideLayoutManager(BaseManager):
+    """Interacts With The SlideLayout Table."""
 
     def __init__(self):
         super().__init__()
-
-    def extract_frame_data(self, data):
-        """Recursive extraction from cache."""
-        results = []
-
-        def recursive_extract(obj):
-            nonlocal results
-
-            if isinstance(obj, dict):
-                if all(key in obj for key in ["slide_number", "frame_name", "imagesCount", "sentences", "forGeneration", "slide_type"]):
-                    result_dict = {
-                        "number": obj.get("slide_number"),
-                        "name": obj.get("frame_name").split()[0],
-                        "imagesCount": obj.get("imagesCount"),
-                        "sentences": obj.get("sentences"),
-                        "forGeneration": obj.get("forGeneration"),
-                        "isLast": obj.get("slide_type"),
-                    }
-                    results.append(result_dict)
-
-                for value in obj.values():
-                    recursive_extract(value)
-
-            elif isinstance(obj, list):
-                for item in obj:
-                    recursive_extract(item)
-
-        recursive_extract(data)
-        return results
-
-    def get_slide_layout_data_from_cache(self, presentation_layout_id: str) -> list[str] | None:
-        """Get slide layout data from cahce and add extra fields."""
-
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        parent_dir = os.path.dirname(current_dir)
-        json_file_path = os.path.join(parent_dir, "output.json")
-        with open(json_file_path, encoding="utf-8") as file:
-            cache = json.load(file)
-
-        # FIGMA_FILE_ID = os.getenv("FIGMA_FILE_ID")
-        # cache = get_cached_request(FIGMA_FILE_ID)
-        slide_layout_frame_data = self.extract_frame_data(cache)
-        for item in slide_layout_frame_data:
-            if item["isLast"] == "last":
-                item.update(
-                    {
-                        "isLast": True,
-                    }
-                )
-            else:
-                item.update(
-                    {
-                        "isLast": False,
-                    }
-                )
-            item.update({"presentationLayoutId": presentation_layout_id, "maxTokensPerBlock": 300, "maxWordsPerSentence": 15, "minWordsPerSentence": 10, "forGeneration": True, "isActive": True, "presentationLayoutIndexColor": 0})
-        return slide_layout_frame_data
+        self.table = "SlideLayout"
 
     def update_slide_layout_data(self, presentation_layout_id: str) -> list[str]:
         """Create or update fieds in SliedeLayout table."""
 
-        slide_layout_table, session = self.open_session("SlideLayout")
+        slide_layout_table, session = self.open_session(self.table)
         added_slides = []
         updated_slides = []
 
@@ -175,17 +121,8 @@ class SlideLayoutManager(BaseManager):
             result = session.execute(query)
             postgres_data = result.fetchall()
 
-            cached_data = self.get_slide_layout_data_from_cache(presentation_layout_id)
+            cached_data = get_slide_layout_data_from_cache(presentation_layout_id)
 
-            # Duplicated name logic
-            # from collections import Counter
-            # names_count = Counter(data_item['name'] for data_item in cached_data)
-            # duplicated_names = [data_item for data_item in cached_data if names_count[data_item['name']] > 1]
-            # print(duplicated_names)
-
-
-
-            # Main logic
             for data_item in cached_data:
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
 
@@ -230,7 +167,7 @@ class SlideLayoutManager(BaseManager):
     def get_slides_by_presentation_layout_id(self, presentation_layout_id: str) -> list[dict] | None:
         """Get all slides for a specific presentation layout."""
 
-        slide_layout_table, session = self.open_session("SlideLayout")
+        slide_layout_table, session = self.open_session(self.table)
 
         def logic():
             query = (
