@@ -1,4 +1,3 @@
-
 from sqlalchemy import insert, select, update
 from sqlalchemy.engine.row import Row
 
@@ -185,14 +184,14 @@ class SlideLayoutManager(BaseManager):
             return [{"id": row.id, "name": row.name, "presentationLayoutId": row.presentationLayoutId} for row in result]
 
         return super().execute(logic, session)
-    
+
 
 class LayoutRolesManager(BaseManager):
     """Interacts With The LayoutRoles Table."""
 
     def __init__(self):
         super().__init__()
-        self.table = 'LayoutRoles'
+        self.table = "LayoutRoles"
 
     def insert(self, presentation_layout_id: str, user_role: str) -> tuple[str]:
         """Insert a field in LayoutRoles Table."""
@@ -200,15 +199,12 @@ class LayoutRolesManager(BaseManager):
         layout_roles_table, session = self.open_session(self.table)
 
         def logic():
-            values = {
-                'presentationLayoutId': presentation_layout_id,
-                'role': user_role.upper()
-                }
+            values = {"presentationLayoutId": presentation_layout_id, "role": user_role.upper()}
             query = insert(layout_roles_table).values(values)
             session.execute(query)
             session.commit()
             return presentation_layout_id, user_role
-        
+
         return super().execute(logic, session)
 
 
@@ -217,7 +213,7 @@ class SlideLayoutStyles(BaseManager):
 
     def __init__(self):
         super().__init__()
-        self.table = 'SlideLayoutStyles'
+        self.table = "SlideLayoutStyles"
 
     def insert(self, slide_layout_id: str) -> None:
         """Insert a field in SlideLayoutStyles Table."""
@@ -225,42 +221,35 @@ class SlideLayoutStyles(BaseManager):
         slide_layout_styles_table, session = self.open_session(self.table)
 
         def logic():
-            values = {
-                'slideLayoutId': slide_layout_id
-            }
+            values = {"slideLayoutId": slide_layout_id}
             query = insert(slide_layout_styles_table).values(values)
             session.execute(query)
             session.commit()
             return None
-        
+
         return super().execute(logic, session)
 
 
-
-
-
-if __name__ == "__main__":
-
-    # print(PresentationLayoutManager().select_layout_by_name('classic'))
-    #     print(PresentationLayoutManager().insert_new_layout('test_12'))
-    #     print(ColorSettingsManager().select_color_id())
-    #     print(PresentationLayoutStylesManager().insert_new_ids(id))
-    #
-    #     presentation_layout_id = PresentationLayoutManager().insert_new_layout('test_name')
-    #     print(presentation_layout_id)
-    #     color_settings_id = ColorSettingsManager().select_color_id()
-    #     print(color_settings_id)
-    #     print(PresentationLayoutStylesManager().insert_new_ids(presentation_layout_id, color_settings_id))
-
-    # print(SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2'))
-    # SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2')
-    # print(SlideLayoutManager().update_slide_layout_data("0197c55e-1c1b-7760-9525-f51752cf23e2"))
-    # # classic
-    # '019006b0-03af-7b04-a66f-8d31b0a08769'
-    # # raif
-    # '0197c55e-1c1b-7760-9525-f51752cf23e2'
-
-    # print(SlideLayoutStyles().insert('0198a2d8-2b88-7813-a049-a9997abac98b'))
-
-
 # poetry run python -m db_work.services
+
+# if __name__ == "__main__":
+#     print(PresentationLayoutManager().select_layout_by_name('classic'))
+#     print(PresentationLayoutManager().insert_new_layout('test_12'))
+#     print(ColorSettingsManager().select_color_id())
+#     print(PresentationLayoutStylesManager().insert_new_ids(id))
+#
+#     presentation_layout_id = PresentationLayoutManager().insert_new_layout('test_name')
+#     print(presentation_layout_id)
+#     color_settings_id = ColorSettingsManager().select_color_id()
+#     print(color_settings_id)
+#     print(PresentationLayoutStylesManager().insert_new_ids(presentation_layout_id, color_settings_id))
+#
+#     print(SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2'))
+#     SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2')
+#     print(SlideLayoutManager().update_slide_layout_data("0197c55e-1c1b-7760-9525-f51752cf23e2"))
+#     # classic
+#     '019006b0-03af-7b04-a66f-8d31b0a08769'
+#     # raif
+#     '0197c55e-1c1b-7760-9525-f51752cf23e2'
+#
+#     print(SlideLayoutStyles().insert('0198a2d8-2b88-7813-a049-a9997abac98b'))
