@@ -3,6 +3,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from configuration import figma_settings
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv()
 
@@ -104,8 +106,8 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 
 # Figma
-FIGMA_TOKEN = os.getenv("FIGMA_TOKEN", "")
-FIGMA_FILE_ID = os.getenv("FIGMA_FILE_ID", "")
+FIGMA_TOKEN = figma_settings.FIGMA_TOKEN
+FIGMA_FILE_ID = figma_settings.FIGMA_FILE_ID
 
 CACHE_ENABLED = True
 

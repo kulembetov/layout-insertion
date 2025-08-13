@@ -194,6 +194,7 @@ class LayoutRolesManager(BaseManager):
     def __init__(self):
         super().__init__()
         self.table = "LayoutRoles"
+        self.table = "LayoutRoles"
 
     def insert(self, presentation_layout_id: str | None, user_role: str) -> tuple[str] | None:
         """Insert a field in LayoutRoles Table."""
@@ -201,6 +202,7 @@ class LayoutRolesManager(BaseManager):
         layout_roles_table, session = self.open_session(self.table)
 
         def logic():
+            values = {"presentationLayoutId": presentation_layout_id, "role": user_role.upper()}
             values = {"presentationLayoutId": presentation_layout_id, "role": user_role.upper()}
             query = insert(layout_roles_table).values(values)
             session.execute(query)
@@ -215,6 +217,7 @@ class SlideLayoutStylesManager(BaseManager):
 
     def __init__(self):
         super().__init__()
+        self.table = "SlideLayoutStyles"
         self.table = "SlideLayoutStyles"
 
     def insert(self, slide_layouts: list[dict]):

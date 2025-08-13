@@ -50,3 +50,15 @@ FIGMA_CONFIG: Final[FigmaExtractConfig] = FigmaExtractConfig(
 
 # Valid font weights - ONLY these are allowed
 VALID_FONT_WEIGHTS: Final[tuple[int, ...]] = (300, 400, 700)
+
+TEXT_BLOCK_TYPES: Final[list[str]] = [
+    "text",
+    "blockTitle",
+    "slideTitle",
+    "subTitle",
+    "number",
+    "email",
+    "date",
+    "name",
+    "percentage",
+]
