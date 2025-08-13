@@ -1,3 +1,4 @@
+from typing import Any
 
 from sqlalchemy import insert, select, update
 from sqlalchemy.engine.row import Row
@@ -26,8 +27,8 @@ class PresentationLayoutManager(BaseManager):
 
         return super().execute(logic, session)
 
-    def insert_new_layout(self, name: str) -> str | None:
-        """Add new row in 'PresentationLayout'."""
+    def insert(self, name: str) -> str | None:
+        """Insert New Layout."""
 
         presentation_layout_table, session = self.open_session(self.table)
 
@@ -60,8 +61,8 @@ class ColorSettingsManager(BaseManager):
         super().__init__()
         self.table = "ColorSettings"
 
-    def select_color_id(self) -> str | None:
-        """Generate new color id."""
+    def insert(self) -> str | None:
+        """Insert new color id."""
 
         color_settings_table, session = self.open_session(self.table)
 
@@ -84,7 +85,7 @@ class PresentationLayoutStylesManager(BaseManager):
         super().__init__()
         self.table = "PresentationLayoutStyles"
 
-    def insert_new_ids(self, presentation_layout_id: str | None, color_settings_id: str | None) -> str | None:
+    def insert(self, presentation_layout_id: str | None, color_settings_id: str | None) -> str | None:
         """Inserts ColorSettingsID and PresentationLayoutID into PresentationLayoutStyles."""
 
         presentation_layout_styles_table, session = self.open_session(self.table)
@@ -107,7 +108,7 @@ class SlideLayoutManager(BaseManager):
         super().__init__()
         self.table = "SlideLayout"
 
-    def update_slide_layout_data(self, presentation_layout_id: str) -> list[str]:
+    def insert_or_update(self, presentation_layout_id: str | None) -> list[dict[Any, Any]]:
         """Create or update fieds in SliedeLayout table."""
 
         slide_layout_table, session = self.open_session(self.table)
@@ -158,8 +159,8 @@ class SlideLayoutManager(BaseManager):
             changes = []
             for name, id_ in added_slides + updated_slides:
                 action = "Added" if (name, id_) in added_slides else "Updated"
-                changes.append(f"{action}: {name} {id_}")
-
+                # changes.append(f"{action}: {name} {id_}")
+                changes.append({"Action": action, "Name": name, "id": id_})
             return changes
 
         return super().execute(logic, session)
@@ -185,82 +186,56 @@ class SlideLayoutManager(BaseManager):
             return [{"id": row.id, "name": row.name, "presentationLayoutId": row.presentationLayoutId} for row in result]
 
         return super().execute(logic, session)
-    
+
 
 class LayoutRolesManager(BaseManager):
     """Interacts With The LayoutRoles Table."""
 
     def __init__(self):
         super().__init__()
-        self.table = 'LayoutRoles'
+        self.table = "LayoutRoles"
 
-    def insert(self, presentation_layout_id: str, user_role: str) -> tuple[str]:
+    def insert(self, presentation_layout_id: str | None, user_role: str) -> tuple[str] | None:
         """Insert a field in LayoutRoles Table."""
 
         layout_roles_table, session = self.open_session(self.table)
 
         def logic():
-            values = {
-                'presentationLayoutId': presentation_layout_id,
-                'role': user_role.upper()
-                }
+            values = {"presentationLayoutId": presentation_layout_id, "role": user_role.upper()}
             query = insert(layout_roles_table).values(values)
             session.execute(query)
             session.commit()
             return presentation_layout_id, user_role
-        
+
         return super().execute(logic, session)
 
 
-class SlideLayoutStyles(BaseManager):
+class SlideLayoutStylesManager(BaseManager):
     """Interacts With The SlideLayoutStyles Table."""
 
     def __init__(self):
         super().__init__()
-        self.table = 'SlideLayoutStyles'
+        self.table = "SlideLayoutStyles"
 
-    def insert(self, slide_layout_id: str) -> None:
+    def insert(self, slide_layouts: list[dict]):
         """Insert a field in SlideLayoutStyles Table."""
 
+        # Возможно сюда нужно будет добвать логику на uodate
         slide_layout_styles_table, session = self.open_session(self.table)
 
         def logic():
-            values = {
-                'slideLayoutId': slide_layout_id
-            }
-            query = insert(slide_layout_styles_table).values(values)
-            session.execute(query)
+            for item in slide_layouts:
+                values = {"slideLayoutId": item.get("id")}
+
+                query = insert(slide_layout_styles_table).values(values)
+                session.execute(query)
+
             session.commit()
             return None
-        
+
         return super().execute(logic, session)
 
 
-
-
-
-if __name__ == "__main__":
-
-    # print(PresentationLayoutManager().select_layout_by_name('classic'))
-    #     print(PresentationLayoutManager().insert_new_layout('test_12'))
-    #     print(ColorSettingsManager().select_color_id())
-    #     print(PresentationLayoutStylesManager().insert_new_ids(id))
-    #
-    #     presentation_layout_id = PresentationLayoutManager().insert_new_layout('test_name')
-    #     print(presentation_layout_id)
-    #     color_settings_id = ColorSettingsManager().select_color_id()
-    #     print(color_settings_id)
-    #     print(PresentationLayoutStylesManager().insert_new_ids(presentation_layout_id, color_settings_id))
-
-    # print(SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2'))
-    # SlideLayoutManager().get_slide_layout_data_from_cache('0197c55e-1c1b-7760-9525-f51752cf23e2')
-    # print(SlideLayoutManager().update_slide_layout_data("0197c55e-1c1b-7760-9525-f51752cf23e2"))
-    # # classic
-    # '019006b0-03af-7b04-a66f-8d31b0a08769'
-    # # raif
-    # '0197c55e-1c1b-7760-9525-f51752cf23e2'
-
-    # print(SlideLayoutStyles().insert('0198a2d8-2b88-7813-a049-a9997abac98b'))
-
-
 # poetry run python -m db_work.services
+
+# if __name__ == "__main__":

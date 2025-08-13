@@ -1,11 +1,14 @@
-import uuid_utils as uuid
 import json
 import os
+from typing import Any
+
+import uuid_utils as uuid
 
 
 def generate_uuid() -> str:
     """Generate a UUID7 string for database use."""
     return str(uuid.uuid7())
+
 
 def extract_frame_data(data: dict) -> list[dict]:
     """Recursive extraction from cache."""
@@ -36,26 +39,28 @@ def extract_frame_data(data: dict) -> list[dict]:
     recursive_extract(data)
     return results
 
-def add_frame_data(data: dict, presentation_layout_id: str) -> list[dict]:
+
+def add_frame_data(data: list[dict[Any, Any]], presentation_layout_id: str) -> list[dict[Any, Any]]:
     """Add extra fields."""
 
     for item in data:
         if item["isLast"] == "last":
-            item.update({"isLast": True,})
+            item.update(
+                {
+                    "isLast": True,
+                }
+            )
         else:
-            item.update({"isLast": False,})
-        item.update({
-            "presentationLayoutId": presentation_layout_id,
-            "maxTokensPerBlock": 300,
-            "maxWordsPerSentence": 15,
-            "minWordsPerSentence": 10,
-            "forGeneration": True,
-            "isActive": True,
-            "presentationLayoutIndexColor": 0
-        })
+            item.update(
+                {
+                    "isLast": False,
+                }
+            )
+        item.update({"presentationLayoutId": presentation_layout_id, "maxTokensPerBlock": 300, "maxWordsPerSentence": 15, "minWordsPerSentence": 10, "forGeneration": True, "isActive": True, "presentationLayoutIndexColor": 0})
     return data
 
-def get_slide_layout_data_from_cache(presentation_layout_id: str) -> list[str] | None:
+
+def get_slide_layout_data_from_cache(presentation_layout_id: str) -> list[dict[Any, Any]]:
     """Get slide layout data from cahce."""
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -67,8 +72,5 @@ def get_slide_layout_data_from_cache(presentation_layout_id: str) -> list[str] |
     # FIGMA_FILE_ID = os.getenv("FIGMA_FILE_ID")
     # cache = get_cached_request(FIGMA_FILE_ID)
     slide_layout_frame_data = extract_frame_data(cache)
-    slide_layout_frame_data = add_frame_data(
-        slide_layout_frame_data,
-        presentation_layout_id=presentation_layout_id
-    )
+    slide_layout_frame_data = add_frame_data(slide_layout_frame_data, presentation_layout_id=presentation_layout_id)
     return slide_layout_frame_data
