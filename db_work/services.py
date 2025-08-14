@@ -1,3 +1,6 @@
+import datetime
+import json
+import os
 from typing import Any
 
 from sqlalchemy import insert, select, update
@@ -52,6 +55,180 @@ class PresentationLayoutManager(BaseManager):
             return [row[0] for row in query]
 
         return super().execute(logic, session)
+
+    def get_presentation_layout_structure(self, presentation_layout_id: str) -> dict | None:
+        """Получить структуру связей PresentationLayout со всеми связанными таблицами.
+
+        Возвращает только ID-шки для понимания структуры связей между таблицами.
+        Убирает дублирование parent ID и ненужные 1:1 связи.
+        ColorSettings берутся только из PresentationLayoutStyles (не из BlockLayoutStyles).
+
+        Args:
+            presentation_layout_id: ID презентационного макета
+
+        Returns:
+            dict: Структура связей с ID или None в случае ошибки
+        """
+        presentation_layout_table, session = self.open_session("PresentationLayout")
+
+        def logic():
+            # 1. Проверяем существование PresentationLayout
+            query = select(presentation_layout_table).where(presentation_layout_table.c.id == presentation_layout_id)
+            presentation_layout = session.execute(query).fetchone()
+
+            if not presentation_layout:
+                return None
+
+            result = {
+                "presentationLayout": presentation_layout.id,
+                "slideLayouts": [],
+                "layoutRoles": [],
+                "fontStyleConfigurations": [],
+                "presentationLayoutColors": [],
+                "presentationLayoutStyles": None,
+                "colorSettings": [],
+                "presentationPalettes": [],
+                "metadata": {"extracted_at": datetime.now().isoformat(), "presentation_layout_id": presentation_layout_id},
+            }
+
+            # Собираем все ColorSettings ID для избежания дублирования
+            color_settings_ids = set()
+
+            # 2. Получаем SlideLayout (только ID)
+            slide_layout_table, _ = self.open_session("SlideLayout")
+            slide_layouts_query = select(slide_layout_table.c.id).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
+            slide_layouts = session.execute(slide_layouts_query).fetchall()
+
+            for slide_layout in slide_layouts:
+                slide_layout_id = slide_layout.id
+                slide_data = {"id": slide_layout_id, "slideLayoutIndexConfigs": [], "blockLayouts": []}
+
+                # 2.1. SlideLayoutIndexConfig (только связующие ID)
+                slide_layout_index_config_table, _ = self.open_session("SlideLayoutIndexConfig")
+                index_config_query = select(slide_layout_index_config_table.c.id, slide_layout_index_config_table.c.presentationPaletteId, slide_layout_index_config_table.c.blockLayoutIndexConfigId, slide_layout_index_config_table.c.blockLayoutConfigId).where(slide_layout_index_config_table.c.slideLayoutId == slide_layout_id)
+                slide_index_configs = session.execute(index_config_query).fetchall()
+                slide_data["slideLayoutIndexConfigs"] = [{"id": config.id, "presentationPaletteId": config.presentationPaletteId, "blockLayoutIndexConfigId": config.blockLayoutIndexConfigId, "blockLayoutConfigId": config.blockLayoutConfigId} for config in slide_index_configs]
+
+                # 2.2. BlockLayout и связанные таблицы (только ID)
+                block_layout_table, _ = self.open_session("BlockLayout")
+                block_layouts_query = select(block_layout_table.c.id).where(block_layout_table.c.slideLayoutId == slide_layout_id)
+                block_layouts = session.execute(block_layouts_query).fetchall()
+
+                for block_layout in block_layouts:
+                    block_layout_id = block_layout.id
+                    block_data = {"id": block_layout_id, "figures": [], "precompiledImages": [], "blockLayoutIndexConfigs": []}
+
+                    # 2.5.1. Figure (только ID без parent)
+                    figure_table, _ = self.open_session("Figure")
+                    figures_query = select(figure_table.c.id).where(figure_table.c.blockLayoutId == block_layout_id)
+                    figures = session.execute(figures_query).fetchall()
+                    block_data["figures"] = [figure.id for figure in figures]
+
+                    # 2.5.2. PrecompiledImage (только ID без parent)
+                    precompiled_image_table, _ = self.open_session("PrecompiledImage")
+                    precompiled_images_query = select(precompiled_image_table.c.id).where(precompiled_image_table.c.blockLayoutId == block_layout_id)
+                    precompiled_images = session.execute(precompiled_images_query).fetchall()
+                    block_data["precompiledImages"] = [image.id for image in precompiled_images]
+
+                    # 2.5.3. BlockLayoutIndexConfig (только ID без parent)
+                    block_layout_index_config_table, _ = self.open_session("BlockLayoutIndexConfig")
+                    block_index_configs_query = select(block_layout_index_config_table.c.id).where(block_layout_index_config_table.c.blockLayoutId == block_layout_id)
+                    block_index_configs = session.execute(block_index_configs_query).fetchall()
+                    block_data["blockLayoutIndexConfigs"] = [config.id for config in block_index_configs]
+
+                    slide_data["blockLayouts"].append(block_data)
+
+                result["slideLayouts"].append(slide_data)
+
+            # 3. LayoutRoles (только count - родительский ID уже известен)
+            layout_roles_table, _ = self.open_session("LayoutRoles")
+            layout_roles_query = select(layout_roles_table.c.presentationLayoutId).where(layout_roles_table.c.presentationLayoutId == presentation_layout_id)
+            layout_roles = session.execute(layout_roles_query).fetchall()
+            result["layoutRoles"] = len(layout_roles)
+
+            # 4. FontStyleConfiguration (только ID без parent)
+            font_style_configuration_table, _ = self.open_session("FontStyleConfiguration")
+            font_configs_query = select(font_style_configuration_table.c.id).where(font_style_configuration_table.c.presentationLayoutId == presentation_layout_id)
+            font_configs = session.execute(font_configs_query).fetchall()
+            result["fontStyleConfigurations"] = [config.id for config in font_configs]
+
+            # 5. PresentationLayoutColor (только ID без parent)
+            presentation_layout_color_table, _ = self.open_session("PresentationLayoutColor")
+            layout_colors_query = select(presentation_layout_color_table.c.id).where(presentation_layout_color_table.c.presentationLayoutId == presentation_layout_id)
+            layout_colors = session.execute(layout_colors_query).fetchall()
+            result["presentationLayoutColors"] = [color.id for color in layout_colors]
+
+            # 6. PresentationLayoutStyles (только ID, ColorSettings собираем отдельно)
+            presentation_layout_styles_table, _ = self.open_session("PresentationLayoutStyles")
+            layout_styles_query = select(presentation_layout_styles_table.c.id, presentation_layout_styles_table.c.colorSettingsId).where(presentation_layout_styles_table.c.presentationLayoutId == presentation_layout_id)
+            layout_styles = session.execute(layout_styles_query).fetchone()
+
+            if layout_styles:
+                result["presentationLayoutStyles"] = layout_styles.id
+                # Добавляем ColorSettings ID в общий набор
+                if layout_styles.colorSettingsId:
+                    color_settings_ids.add(layout_styles.colorSettingsId)
+
+            # 7. PresentationPalette и связанные таблицы (только ID)
+            presentation_palette_table, _ = self.open_session("PresentationPalette")
+            palettes_query = select(presentation_palette_table.c.id).where(presentation_palette_table.c.presentationLayoutId == presentation_layout_id)
+            palettes = session.execute(palettes_query).fetchall()
+
+            for palette in palettes:
+                palette_id = palette.id
+                palette_data = {"id": palette_id, "slideConfigSequences": [], "slideLayoutIndexConfigs": []}
+
+                # 7.1. SlideConfigSequence (только ID без parent)
+                slide_config_sequence_table, _ = self.open_session("SlideConfigSequence")
+                sequences_query = select(slide_config_sequence_table.c.id).where(slide_config_sequence_table.c.presentationPaletteId == palette_id)
+                sequences = session.execute(sequences_query).fetchall()
+                palette_data["slideConfigSequences"] = [seq.id for seq in sequences]
+
+                # 7.2. SlideLayoutIndexConfig через PresentationPalette (только связующие ID)
+                slide_layout_index_config_by_palette_query = select(slide_layout_index_config_table.c.id, slide_layout_index_config_table.c.slideLayoutId, slide_layout_index_config_table.c.blockLayoutIndexConfigId, slide_layout_index_config_table.c.blockLayoutConfigId).where(slide_layout_index_config_table.c.presentationPaletteId == palette_id)
+                palette_slide_configs = session.execute(slide_layout_index_config_by_palette_query).fetchall()
+
+                palette_data["slideLayoutIndexConfigs"] = [{"id": config.id, "slideLayoutId": config.slideLayoutId, "blockLayoutIndexConfigId": config.blockLayoutIndexConfigId, "blockLayoutConfigId": config.blockLayoutConfigId} for config in palette_slide_configs]
+
+                result["presentationPalettes"].append(palette_data)
+
+            # Финализируем массив ColorSettings (убираем дублирование)
+            result["colorSettings"] = list(color_settings_ids)
+
+            return result
+
+        return super().execute(logic, session)
+
+    def save_presentation_layout_structure_to_file(self, presentation_layout_id: str, output_dir: str = "my_output") -> str | None:
+        """Получить и сохранить структуру связей PresentationLayout в JSON файл.
+
+        Args:
+            presentation_layout_id: ID презентационного макета
+            output_dir: Директория для сохранения файла
+
+        Returns:
+            str: Путь к созданному файлу или None в случае ошибки
+        """
+        data = self.get_presentation_layout_structure(presentation_layout_id)
+
+        if not data:
+            return None
+
+        # Создаем директорию если её нет
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Формируем имя файла
+        filename = f"presentation_layout_structure_{presentation_layout_id[:8]}.json"
+        filepath = os.path.join(output_dir, filename)
+
+        # Сохраняем в файл
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            return filepath
+        except Exception as e:
+            print(f"Ошибка при сохранении файла структуры: {e}")
+            return None
 
 
 class ColorSettingsManager(BaseManager):
