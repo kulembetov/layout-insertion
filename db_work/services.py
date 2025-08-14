@@ -612,8 +612,42 @@ class SlideLayoutDimensionsManager(BaseManager):
         return super().execute(logic, session)
 
 
+class BlockLayoutManager(BaseManager):
+    """Insert a field in BlockLayoutManager Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = "BlockLayout"
+
+    def insert(self, slide_layouts: list[dict]) -> list[dict]:
+        """Insert a field in BlockLayout Table."""
+
+        block_layout_table, session = self.open_session(self.table)
+
+        added_data = []
+
+        def logic():
+            nonlocal added_data
+
+            for slide_layout in slide_layouts:
+                slide_layout_id = slide_layout.get("id")
+                slide_layout_blocks = slide_layout.get("slide_blocks")
+
+                for slide_layout_block in slide_layout_blocks:
+                    block_layout_type = slide_layout_block.get("sql_type")
+                    id = generate_uuid()
+
+                    values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
+                    added_data.append(values)
+                    query = insert(block_layout_table).values(values)
+                    session.execute(query)
+
+            session.commit()
+            return added_data
+
+        return super().execute(logic, session)
+
+
 # poetry run python -m db_work.services
 
 # if __name__ == "__main__":
-#     slide_layout = SlideLayoutManager().insert_or_update('0197c55e-1c1b-7760-9525-f51752cf23e2')
-#     result = SlideLayoutAdditionalInfoManager().insert(slide_layout)

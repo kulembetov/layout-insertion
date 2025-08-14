@@ -1,4 +1,4 @@
-from db_work.implemented import color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
+from db_work.implemented import block_layout_manager, color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
 
 
 class Executor:
@@ -29,23 +29,27 @@ class Executor:
         # Slide Layout ===========================================
         # Create new slide layouts or update existing slide layouts.
         new_or_updated_slide_layouts = slide_layout_manager.insert_or_update(presentation_layout_id=new_presentation_layout_id)
-        # print(new_or_updated_slide_layouts)
+        print(f"new_or_updated_slide_layouts {len(new_or_updated_slide_layouts)}")
 
         # Create new slide_layout_styles for every new slide layout
         new_slied_layout_styles = slide_layout_styles_manager.insert(slide_layouts=new_or_updated_slide_layouts)
-        print(f"new_slied_layout_styles {new_slied_layout_styles} \n\n")
+        print(f"new_slied_layout_styles {len(new_slied_layout_styles)}")
 
         # Create new slide layout dimensions for every new slide layout
         new_slide_layout_dimensions = slide_layout_dimensions_manager.insert(slide_layouts=new_or_updated_slide_layouts)
-        print(f"new_slide_layout_dimensions {new_slide_layout_dimensions} \n\n")
+        print(f"new_slide_layout_dimensions {len(new_slide_layout_dimensions)}")
 
         # Create new slide layout addition info for every new slide layout
         new_slide_layout_additional_info = slide_layout_additional_info.insert(slide_layouts=new_or_updated_slide_layouts)
-        print(f"new_slide_layout_additional_info {new_slide_layout_additional_info} \n\n")
+        print(f"new_slide_layout_additional_info {len(new_slide_layout_additional_info)}")
+
+        # Block Layout ===========================================
+        new_block_layout = block_layout_manager.insert(new_or_updated_slide_layouts)
+        print(f"new_block_layout {len(new_block_layout)}")
 
 
 if __name__ == "__main__":
-    new_layout_name = "Nikita_test_layout_12"
+    new_layout_name = "Nikita_test_layout_13"
     user_role = "USER"
     execute = Executor()
 
