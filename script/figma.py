@@ -695,9 +695,7 @@ class FigmaExtractor:
 
     def _should_skip_full_image_block(self, sql_type: str, dimensions: dict[str, int], name: str) -> bool:
         """Check if an image block should be skipped (full-size background images)."""
-        name_lower = name.lower()
-        is_precompiled = "precompiled" in name_lower
-        return sql_type == "image" and dimensions["x"] == 0 and dimensions["y"] == 0 and dimensions["w"] == config.FIGMA_CONFIG["TARGET_WIDTH"] and dimensions["h"] == config.FIGMA_CONFIG["TARGET_HEIGHT"] and not is_precompiled
+        return False
 
     def _extract_block_styles(self, node: dict, sql_type: str, name: str) -> dict:
         """Extract and compile all styles for a block."""
