@@ -89,11 +89,12 @@ class PresentationLayoutManager(BaseManager):
                 "colorSettings": [],
                 "presentationPalettes": [],
                 "slideLayoutIndexConfigs": [],
+                "blockLayoutIndexConfigs": [],
                 "blockLayoutConfigs": [],
                 "metadata": {"extracted_at": datetime.now().isoformat(), "presentation_layout_id": presentation_layout_id},
             }
 
-            # Собираем все ColorSettings ID и BlockLayoutConfig ID для избежания дублирования
+            # Собираем все ID для избежания дублирования
             color_settings_ids = set()
             block_layout_config_ids = set()
 
@@ -134,7 +135,7 @@ class PresentationLayoutManager(BaseManager):
 
                 for block_layout in block_layouts:
                     block_layout_id = block_layout.id
-                    block_data = {"id": block_layout_id, "blockLayoutDimensions": None, "blockLayoutStyles": None, "blockLayoutLimit": None, "figures": [], "precompiledImages": [], "blockLayoutIndexConfigs": []}
+                    block_data = {"id": block_layout_id, "blockLayoutDimensions": None, "blockLayoutStyles": None, "blockLayoutLimit": None, "figures": [], "precompiledImages": []}
 
                     # 2.4.1. BlockLayoutDimensions (1:1)
                     block_layout_dimensions_table, _ = self.open_session("BlockLayoutDimensions")
@@ -171,12 +172,6 @@ class PresentationLayoutManager(BaseManager):
                     precompiled_images_query = select(precompiled_image_table.c.id).where(precompiled_image_table.c.blockLayoutId == block_layout_id)
                     precompiled_images = session.execute(precompiled_images_query).fetchall()
                     block_data["precompiledImages"] = [image.id for image in precompiled_images]
-
-                    # 2.4.6. BlockLayoutIndexConfig (1:N)
-                    block_layout_index_config_table, _ = self.open_session("BlockLayoutIndexConfig")
-                    block_index_configs_query = select(block_layout_index_config_table.c.id).where(block_layout_index_config_table.c.blockLayoutId == block_layout_id)
-                    block_index_configs = session.execute(block_index_configs_query).fetchall()
-                    block_data["blockLayoutIndexConfigs"] = [config.id for config in block_index_configs]
 
                     slide_data["blockLayouts"].append(block_data)
 
@@ -246,7 +241,23 @@ class PresentationLayoutManager(BaseManager):
                     if config.blockLayoutConfigId:
                         block_layout_config_ids.add(config.blockLayoutConfigId)
 
-            # 9. BlockLayoutConfig - получаем все уникальные конфигурации блоков
+            # 9. BlockLayoutIndexConfig - получаем все индексные конфигурации блоков
+            # Собираем все BlockLayout ID для получения их BlockLayoutIndexConfig
+            all_block_layout_ids = []
+            for slide in result["slideLayouts"]:
+                for block in slide["blockLayouts"]:
+                    all_block_layout_ids.append(block["id"])
+
+            if all_block_layout_ids:
+                block_layout_index_config_table, _ = self.open_session("BlockLayoutIndexConfig")
+                block_index_configs_query = select(block_layout_index_config_table.c.id, block_layout_index_config_table.c.blockLayoutId, block_layout_index_config_table.c.indexColorId, block_layout_index_config_table.c.indexFontId).where(block_layout_index_config_table.c.blockLayoutId.in_(all_block_layout_ids))
+
+                block_index_configs = session.execute(block_index_configs_query).fetchall()
+
+                for config in block_index_configs:
+                    result["blockLayoutIndexConfigs"].append({"id": config.id, "blockLayoutId": config.blockLayoutId, "indexColorId": config.indexColorId, "indexFontId": config.indexFontId})
+
+            # 10. BlockLayoutConfig - получаем все уникальные конфигурации блоков
             if block_layout_config_ids:
                 block_layout_config_table, _ = self.open_session("BlockLayoutConfig")
                 block_configs_query = select(block_layout_config_table.c.id).where(block_layout_config_table.c.id.in_(list(block_layout_config_ids)))
