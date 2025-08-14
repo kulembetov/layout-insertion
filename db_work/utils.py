@@ -1,8 +1,11 @@
 import json
 import os
+import re
 from typing import Any
 
 import uuid_utils as uuid
+
+from db_work import constants
 
 
 def generate_uuid() -> str:
@@ -19,7 +22,17 @@ def extract_frame_data(data: dict) -> list[dict]:
 
         if isinstance(obj, dict):
             if all(key in obj for key in ["slide_number", "frame_name", "imagesCount", "sentences", "forGeneration", "slide_type", "dimensions"]):
-                result_dict = {"number": obj.get("slide_number"), "name": obj.get("frame_name").split()[0], "imagesCount": obj.get("imagesCount"), "sentences": obj.get("sentences"), "forGeneration": obj.get("forGeneration"), "isLast": obj.get("slide_type"), "dimensions": obj.get("dimensions"), "blocks": obj.get("blocks")}
+                result_dict = {
+                    "number": obj.get("slide_number"),
+                    "name": obj.get("frame_name").split()[0],
+                    "imagesCount": obj.get("imagesCount"),
+                    "sentences": obj.get("sentences"),
+                    "forGeneration": obj.get("forGeneration"),
+                    "isLast": obj.get("slide_type"),
+                    "dimensions": obj.get("dimensions"),
+                    "blocks": obj.get("blocks"),
+                    "slide_type": obj.get("slide_type"),
+                }
                 results.append(result_dict)
 
             for value in obj.values():
@@ -67,3 +80,52 @@ def get_slide_layout_data_from_cache(presentation_layout_id: str) -> list[dict[A
     slide_layout_frame_data = extract_frame_data(cache)
     slide_layout_frame_data = add_frame_data(slide_layout_frame_data, presentation_layout_id=presentation_layout_id)
     return slide_layout_frame_data
+
+
+# Выделить в класс
+class SlideLayoutUtils:
+    """Slide Layout Utils"""
+
+    def __init__(self):
+        self.miniatures_base_path = constants.MINIATURES_BASE_PATH
+        self.slide_nimber_to_path = constants.SLIDE_NUMBER_TO_TYPE
+        self.slide_number_to_number = constants.SLIDE_NUMBER_TO_NUMBER
+        self.miniature_extension = constants.MINIATURE_EXTENSION
+
+    # def build_slide_icon_url(self, slide_type: str, slide_name: str, slide_number: int) -> str:
+    #     """Generate icon URL for slide layout."""
+
+    #     skip_number_types = {self.slide_nimber_to_path.get(n) for n in [1, 5, 8, 12, -1]}
+    #     miniature_folder = self._camel_to_snake(slide_type)
+
+    #     if slide_type in skip_number_types:
+    #         return f"{self.miniatures_base_path}/{miniature_folder}/{slide_name}{self.miniature_extension}"
+
+    #     number_for_icon = self.slide_number_to_number.get(slide_number)
+    #     if number_for_icon is not None:
+    #         return f"{self.miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_name}{self.miniature_extension}"
+
+    #     return f"{self.miniatures_base_path}/{miniature_folder}/{slide_name}{self.miniature_extension}"
+
+    def build_slide_icon_url(self, slide_type: str, slide_name: str, slide_number: int) -> str:
+        """Generate icon URL for slide layout."""
+        # Slide numbers that should NOT have numbers in their miniature paths
+        skip_number_slides = {1, 5, 7, 8, 13, -1}
+        miniature_folder = self._camel_to_snake(slide_type)
+
+        # If this slide number should skip numbering, return without number
+        if slide_number in skip_number_slides:
+            return f"{self.miniatures_base_path}/{miniature_folder}/{slide_name}{self.miniature_extension}"
+
+        # For slide numbers that should have numbers, get the number from the mapping
+        number_for_icon = self.slide_number_to_number.get(slide_number)
+        if number_for_icon is not None:
+            return f"{self.miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_name}{self.miniature_extension}"
+
+        # Fallback: if no number mapping found, return without number
+        return f"{self.miniatures_base_path}/{miniature_folder}/{slide_name}{self.miniature_extension}"
+
+    def _camel_to_snake(self, name):
+        """Convert camelCase or PascalCase to snake_case."""
+        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
