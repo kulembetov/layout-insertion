@@ -576,7 +576,7 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                     slide_infographics_type = f"{slide_infographics_type}" if slide_infographics_type is not None else null()
 
                     slide_layout_icon_url = SlideLayoutUtils().build_slide_icon_url(slide_type=slide_layout_type, slide_name=slide_layout_name, columns=slide_layout_colunms)
-
+                    # тут возможно надо спросить у пользователя
                     values = {
                         "slideLayoutId": slide_layout_id,
                         "percentesCount": percentes,
@@ -663,6 +663,7 @@ class BlockLayoutManager(BaseManager):
 
                     # Add block parametrs for other block layout managers
                     values["dimensions"] = slide_layout_block.get("dimensions")
+                    values["styles"] = slide_layout_block.get("styles")
 
                     added_data.append(values)
 
@@ -712,6 +713,78 @@ class BlockLayoutDimensionsManagers(BaseManager):
             return added_data
 
         return super().execute(logic, session)
+
+
+# class BlockLayoutStylesManagers(BaseManager):
+#     """Insert a field in BlockLayoutStyles Table."""
+
+#     # Возможно сюда нужно будет добвать логику на update
+
+#     def __init__(self):
+#         super().__init__()
+#         self.table = "BlockLayoutStyles"
+
+#     def insert(self, block_layouts: list[dict]) -> list[dict]:
+#         """Insert a field in BlockLayoutStyles Table."""
+
+#         block_layout_styles_table, session = self.open_session(self.table)
+
+#         added_data = []
+
+#         def logic():
+#             nonlocal added_data
+
+#             default_color = constants.DEFAULT_COLOR
+#             color_settings_id = constants.DEFAULT_COLOR_SETTINGS_ID
+
+#             for block_layout in block_layouts:
+#                 block_layout_styles = block_layout.get("styles")
+
+#                 border_radius = block_layout_styles.get("borderRadius")
+#                 border_radius_str = f"ARRAY[{', '.join(map(str, border_radius))}]"
+
+#                 # color_value = block.styles.get("color")
+#                 # color_value = ColorUtils.normalize_color(color_value) if color_value else None
+#                 # if not color_value or not color_value.startswith("#") or len(color_value) not in (4, 7):
+#                 color_value = default_color
+
+#                 # if block.needs_null_styles:
+
+#                 values = {
+#                     "blockLayoutId": block_layout.get("id"),
+#                     "textVertical": block_layout_styles.get("textVertical"),
+#                     "textHorizontal": block_layout_styles.get("textHorizontal"),
+#                     "fontSize": block_layout_styles.get("fontSize"),
+#                     "weight": block_layout_styles.get("weight"),
+#                     "zIndex": block_layout_styles.get("zIndex"),
+#                     "opacity": block_layout_styles.get("opacity"),
+#                     "textTransform": block_layout_styles.get("textTransform"),
+#                     "borderRadius": border_radius_str,
+#                     "colorSettingsId": None,
+#                     "color": color_value,
+#                     # Defoltes
+#                     "pathName": null(),
+#                     "italic": False,
+#                     "underline": False,
+#                     "listType": null(),
+#                     "autoResize": False,
+#                     "background": null(),
+#                     "fontFamily": "roboto",
+#                     "gradientType": None,
+#                     "contentEditable": True,
+#                     "movable": True,
+#                     "removable": True,
+#                     "selectable": True,
+#                     "styleEditable": True,
+#                     "visible": True,
+#                     "cropOffsetX": 0,
+#                     "cropOffsetY": 0,
+#                     "cropScale": 1,
+#                 }
+
+#             return added_data
+
+#         return super().execute(logic, session)
 
 
 # poetry run python -m db_work.services
