@@ -92,38 +92,19 @@ class SlideLayoutUtils:
         self.slide_number_to_number = constants.SLIDE_NUMBER_TO_NUMBER
         self.miniature_extension = constants.MINIATURE_EXTENSION
 
-    # def build_slide_icon_url(self, slide_type: str, slide_name: str, slide_number: int) -> str:
-    #     """Generate icon URL for slide layout."""
-
-    #     skip_number_types = {self.slide_nimber_to_path.get(n) for n in [1, 5, 8, 12, -1]}
-    #     miniature_folder = self._camel_to_snake(slide_type)
-
-    #     if slide_type in skip_number_types:
-    #         return f"{self.miniatures_base_path}/{miniature_folder}/{slide_name}{self.miniature_extension}"
-
-    #     number_for_icon = self.slide_number_to_number.get(slide_number)
-    #     if number_for_icon is not None:
-    #         return f"{self.miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_name}{self.miniature_extension}"
-
-    #     return f"{self.miniatures_base_path}/{miniature_folder}/{slide_name}{self.miniature_extension}"
-
-    def build_slide_icon_url(self, slide_type: str, slide_name: str, slide_number: int) -> str:
+    def build_slide_icon_url(self, slide_type: str, slide_name: str, columns: int | None) -> str:
         """Generate icon URL for slide layout."""
-        # Slide numbers that should NOT have numbers in their miniature paths
-        skip_number_slides = {1, 5, 7, 8, 13, -1}
+        # Slide types that should NOT have numbers in their miniature paths
+        skip_slides_type = {"infographics", "chart", "table", "title", "last"}
+
         miniature_folder = self._camel_to_snake(slide_type)
 
-        # If this slide number should skip numbering, return without number
-        if slide_number in skip_number_slides:
+        # If this slide type should skip numbering or no columns provided, return without number
+        if slide_type in skip_slides_type or columns is None:
             return f"{self.miniatures_base_path}/{miniature_folder}/{slide_name}{self.miniature_extension}"
 
-        # For slide numbers that should have numbers, get the number from the mapping
-        number_for_icon = self.slide_number_to_number.get(slide_number)
-        if number_for_icon is not None:
-            return f"{self.miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_name}{self.miniature_extension}"
-
-        # Fallback: if no number mapping found, return without number
-        return f"{self.miniatures_base_path}/{miniature_folder}/{slide_name}{self.miniature_extension}"
+        # For slides with columns, use the column number directly in the path
+        return f"{self.miniatures_base_path}/{miniature_folder}/{columns}_{slide_name}{self.miniature_extension}"
 
     def _camel_to_snake(self, name):
         """Convert camelCase or PascalCase to snake_case."""
