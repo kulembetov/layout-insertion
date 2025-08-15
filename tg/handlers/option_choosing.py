@@ -24,7 +24,7 @@ async def option_callback(query: CallbackQuery, state: FSMContext) -> None:
 
             escaped_sample = r_text("sber_marketing")
             await query.message.answer(f"Введите имя шаблона\\.\n_Пример: {escaped_sample}_")
-            await state.set_state(LoadingProcessState.name)
+            await state.set_state(LoadingProcessState.typing_name)
 
             await query.answer()
 
