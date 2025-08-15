@@ -53,3 +53,6 @@ SLIDE_NUMBER_TO_NUMBER = {
     14: 10,  # 10cols
     -1: None,  # last
 }
+
+DEFAULT_COLOR: str = "#ffffff"
+DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"

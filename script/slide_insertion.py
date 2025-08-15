@@ -1354,7 +1354,7 @@ def camel_to_snake(name):
 def build_slide_icon_url(slide_type: str, slide_name: str, columns: int | None, miniatures_base_path: str) -> str:
     """Generate icon URL for slide layout."""
     # Slide types that should NOT have numbers in their miniature paths
-    skip_slides_type = {"infographics", "chart", "table", "title", "last"}
+    skip_slides_type = {"classic", "infographics", "chart", "table", "title", "last"}
 
     # File extension for miniatures
     miniature_extension = config.MINIATURE_EXTENSION
