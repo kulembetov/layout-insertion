@@ -1,4 +1,4 @@
-from db_work.implemented import block_layout_manager, color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
+from db_work.implemented import block_layout_dimensions_manager, block_layout_manager, color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
 
 
 class Executor:
@@ -48,9 +48,15 @@ class Executor:
             print(f"new_slide_layout_additional_info {len(new_slide_layout_additional_info)}")
 
         # Block Layout ===========================================
-        new_block_layout = block_layout_manager.insert(new_or_updated_slide_layouts)
-        if new_block_layout:
-            print(f"new_block_layout {len(new_block_layout)}")
+        # Create new block layouts
+        new_block_layouts = block_layout_manager.insert(new_or_updated_slide_layouts)
+        if new_block_layouts:
+            print(f"new_block_layout {len(new_block_layouts)}")
+
+        # Create new block layout dimensions
+        new_block_layout_dimensions = block_layout_dimensions_manager.insert(new_block_layouts)
+        if new_block_layout_dimensions:
+            print(f"new_block_layout_dimensions {len(new_block_layout_dimensions)}")
 
 
 executor = Executor()

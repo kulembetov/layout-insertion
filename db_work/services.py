@@ -658,9 +658,55 @@ class BlockLayoutManager(BaseManager):
                     id = generate_uuid()
 
                     values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
-                    added_data.append(values)
                     query = insert(block_layout_table).values(values)
                     session.execute(query)
+
+                    # Add block parametrs for other block layout managers
+                    values["dimensions"] = slide_layout_block.get("dimensions")
+
+                    added_data.append(values)
+
+            session.commit()
+            return added_data
+
+        return super().execute(logic, session)
+
+
+class BlockLayoutDimensionsManagers(BaseManager):
+    """Insert a field in BlockLayoutDimensionsManagers Table."""
+
+    # Возможно сюда нужно будет добвать логику на update
+
+    def __init__(self):
+        super().__init__()
+        self.table = "BlockLayoutDimensions"
+
+    def insert(self, block_layouts: list[dict]) -> list[dict]:
+        """Insert a field in BlockLayoutDimensions Table."""
+
+        block_layout_dimensions_table, session = self.open_session(self.table)
+
+        added_data = []
+
+        def logic():
+            nonlocal added_data
+
+            for block_layout in block_layouts:
+                block_layout_dimensions = block_layout.get("dimensions")
+                block_layout_id = block_layout.get("id")
+
+                values = {
+                    "blockLayoutId": block_layout_id,
+                    "x": block_layout_dimensions.get("x"),
+                    "y": block_layout_dimensions.get("y"),
+                    "w": block_layout_dimensions.get("w"),
+                    "h": block_layout_dimensions.get("h"),
+                    "rotation": block_layout_dimensions.get("r", 0),
+                }
+
+                added_data.append(values)
+                query = insert(block_layout_dimensions_table).values(values)
+                session.execute(query)
 
             session.commit()
             return added_data
@@ -671,3 +717,28 @@ class BlockLayoutManager(BaseManager):
 # poetry run python -m db_work.services
 
 # if __name__ == "__main__":
+
+
+# pattern
+# class BlockLayoutDimensionsManagers(BaseManager):
+#     """Insert a field in BlockLayoutDimensionsManagers Table."""
+
+#     # Возможно сюда нужно будет добвать логику на update
+
+#     def __init__(self):
+#         super().__init__()
+#         self.table = "BlockLayoutDimensions"
+
+#     def insert(self, slide_layouts: list[dict]) -> list[dict]:
+#         """Insert a field in BlockLayoutDimensions Table."""
+
+#         block_layout_dimensions_table, session = self.open_session(self.table)
+
+#         added_data = []
+
+#         def logic():
+#             nonlocal added_data
+
+#             return added_data
+
+#         return super().execute(logic, session)
