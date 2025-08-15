@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any, cast
 
-from sqlalchemy import insert, null, select, update
+from sqlalchemy import delete, insert, null, select, update
 from sqlalchemy.engine.row import Row
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -316,6 +316,311 @@ class PresentationLayoutManager(BaseManager):
         except Exception as e:
             print(f"Ошибка при сохранении файла структуры: {e}")
             return None
+
+    def delete_presentation_layout_structure(self, presentation_layout_id: str) -> bool:
+        """Удалить полную структуру PresentationLayout со всеми связанными данными.
+
+        Сначала получает структуру связей через get_presentation_layout_structure,
+        затем удаляет все записи в строго определённом порядке, исключающем ошибки внешних ключей:
+
+        Порядок удаления:
+        1. SlideConfigSequence
+        2. SlideLayoutIndexConfig
+        3. BlockLayoutIndexConfig
+        4. Figure
+        5. PrecompiledImage
+        6. BlockLayoutLimit
+        7. BlockLayoutDimensions
+        8. BlockLayoutStyles
+        9. BlockLayout
+        10. Layout Tables (16-27)
+        11. SlideLayoutDimensions
+        12. SlideLayoutStyles
+        13. SlideLayoutAdditionalInfo
+        14. SlideLayout
+        15. PresentationPalette
+        16. BlockLayoutConfig
+        17. FontStyleConfiguration
+        18. PresentationLayoutColor
+        19. LayoutRoles
+        20. PresentationLayoutStyles
+        21. ColorSettings
+        22. PresentationLayout
+
+        Args:
+            presentation_layout_id: ID презентационного макета для удаления
+
+        Returns:
+            bool: True если удаление прошло успешно, False в случае ошибки
+        """
+        # Получаем структуру данных для удаления
+        structure = self.get_presentation_layout_structure(presentation_layout_id)
+
+        if not structure:
+            print(f"PresentationLayout с ID {presentation_layout_id} не найден")
+            return False
+
+        presentation_layout_table, session = self.open_session("PresentationLayout")
+
+        def logic():
+            try:
+                # Удаляем в правильном порядке согласно зависимостям внешних ключей
+
+                # 1. SlideConfigSequence (связаны с PresentationPalette)
+                for palette in structure["presentationPalettes"]:
+                    if palette["slideConfigSequences"]:
+                        slide_config_sequence_table, _ = self.open_session("SlideConfigSequence")
+                        for sequence_id in palette["slideConfigSequences"]:
+                            delete_query = delete(slide_config_sequence_table).where(slide_config_sequence_table.c.id == sequence_id)
+                            session.execute(delete_query)
+
+                # 2. SlideLayoutIndexConfig (связующая N:N таблица)
+                if structure["slideLayoutIndexConfigs"]:
+                    slide_layout_index_config_table, _ = self.open_session("SlideLayoutIndexConfig")
+                    for config in structure["slideLayoutIndexConfigs"]:
+                        delete_query = delete(slide_layout_index_config_table).where(slide_layout_index_config_table.c.id == config["id"])
+                        session.execute(delete_query)
+
+                # 3. BlockLayoutIndexConfig
+                if structure["blockLayoutIndexConfigs"]:
+                    block_layout_index_config_table, _ = self.open_session("BlockLayoutIndexConfig")
+                    for config in structure["blockLayoutIndexConfigs"]:
+                        delete_query = delete(block_layout_index_config_table).where(block_layout_index_config_table.c.id == config["id"])
+                        session.execute(delete_query)
+
+                # 4. Figure (связаны с BlockLayout)
+                for slide in structure["slideLayouts"]:
+                    for block in slide["blockLayouts"]:
+                        if block["figures"]:
+                            figure_table, _ = self.open_session("Figure")
+                            for figure_id in block["figures"]:
+                                delete_query = delete(figure_table).where(figure_table.c.id == figure_id)
+                                session.execute(delete_query)
+
+                # 5. PrecompiledImage (связаны с BlockLayout)
+                for slide in structure["slideLayouts"]:
+                    for block in slide["blockLayouts"]:
+                        if block["precompiledImages"]:
+                            precompiled_image_table, _ = self.open_session("PrecompiledImage")
+                            for image_id in block["precompiledImages"]:
+                                delete_query = delete(precompiled_image_table).where(precompiled_image_table.c.id == image_id)
+                                session.execute(delete_query)
+
+                # 6. BlockLayoutLimit
+                for slide in structure["slideLayouts"]:
+                    for block in slide["blockLayouts"]:
+                        if block["blockLayoutLimit"]:
+                            block_layout_limit_table, _ = self.open_session("BlockLayoutLimit")
+                            delete_query = delete(block_layout_limit_table).where(block_layout_limit_table.c.blockLayoutId == block["id"])
+                            session.execute(delete_query)
+
+                # 7. BlockLayoutDimensions
+                for slide in structure["slideLayouts"]:
+                    for block in slide["blockLayouts"]:
+                        if block["blockLayoutDimensions"]:
+                            block_layout_dimensions_table, _ = self.open_session("BlockLayoutDimensions")
+                            delete_query = delete(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block["id"])
+                            session.execute(delete_query)
+
+                # 8. BlockLayoutStyles
+                for slide in structure["slideLayouts"]:
+                    for block in slide["blockLayouts"]:
+                        if block["blockLayoutStyles"]:
+                            block_layout_styles_table, _ = self.open_session("BlockLayoutStyles")
+                            delete_query = delete(block_layout_styles_table).where(block_layout_styles_table.c.blockLayoutId == block["id"])
+                            session.execute(delete_query)
+
+                # 9. BlockLayout
+                for slide in structure["slideLayouts"]:
+                    for block in slide["blockLayouts"]:
+                        block_layout_table, _ = self.open_session("BlockLayout")
+                        delete_query = delete(block_layout_table).where(block_layout_table.c.id == block["id"])
+                        session.execute(delete_query)
+
+                # 11. SlideLayoutDimensions
+                for slide in structure["slideLayouts"]:
+                    if slide["slideLayoutDimensions"]:
+                        slide_layout_dimensions_table, _ = self.open_session("SlideLayoutDimensions")
+                        delete_query = delete(slide_layout_dimensions_table).where(slide_layout_dimensions_table.c.slideLayoutId == slide["id"])
+                        session.execute(delete_query)
+
+                # 12. SlideLayoutStyles
+                for slide in structure["slideLayouts"]:
+                    if slide["slideLayoutStyles"]:
+                        slide_layout_styles_table, _ = self.open_session("SlideLayoutStyles")
+                        delete_query = delete(slide_layout_styles_table).where(slide_layout_styles_table.c.slideLayoutId == slide["id"])
+                        session.execute(delete_query)
+
+                # 13. SlideLayoutAdditionalInfo
+                for slide in structure["slideLayouts"]:
+                    if slide["slideLayoutAdditionalInfo"]:
+                        slide_layout_additional_info_table, _ = self.open_session("SlideLayoutAdditionalInfo")
+                        delete_query = delete(slide_layout_additional_info_table).where(slide_layout_additional_info_table.c.slideLayoutId == slide["id"])
+                        session.execute(delete_query)
+
+                # 14. SlideLayout
+                for slide in structure["slideLayouts"]:
+                    slide_layout_table, _ = self.open_session("SlideLayout")
+                    delete_query = delete(slide_layout_table).where(slide_layout_table.c.id == slide["id"])
+                    session.execute(delete_query)
+
+                # 15. PresentationPalette
+                for palette in structure["presentationPalettes"]:
+                    presentation_palette_table, _ = self.open_session("PresentationPalette")
+                    delete_query = delete(presentation_palette_table).where(presentation_palette_table.c.id == palette["id"])
+                    session.execute(delete_query)
+
+                # 16. BlockLayoutConfig
+                if structure["blockLayoutConfigs"]:
+                    block_layout_config_table, _ = self.open_session("BlockLayoutConfig")
+                    for config_id in structure["blockLayoutConfigs"]:
+                        delete_query = delete(block_layout_config_table).where(block_layout_config_table.c.id == config_id)
+                        session.execute(delete_query)
+
+                # 17. FontStyleConfiguration
+                if structure["fontStyleConfigurations"]:
+                    font_style_configuration_table, _ = self.open_session("FontStyleConfiguration")
+                    for config_id in structure["fontStyleConfigurations"]:
+                        delete_query = delete(font_style_configuration_table).where(font_style_configuration_table.c.id == config_id)
+                        session.execute(delete_query)
+
+                # 18. PresentationLayoutColor
+                if structure["presentationLayoutColors"]:
+                    presentation_layout_color_table, _ = self.open_session("PresentationLayoutColor")
+                    for color_id in structure["presentationLayoutColors"]:
+                        delete_query = delete(presentation_layout_color_table).where(presentation_layout_color_table.c.id == color_id)
+                        session.execute(delete_query)
+
+                # 19. LayoutRoles
+                if structure["layoutRoles"] > 0:
+                    layout_roles_table, _ = self.open_session("LayoutRoles")
+                    delete_query = delete(layout_roles_table).where(layout_roles_table.c.presentationLayoutId == presentation_layout_id)
+                    session.execute(delete_query)
+
+                # 20. PresentationLayoutStyles
+                if structure["presentationLayoutStyles"]:
+                    presentation_layout_styles_table, _ = self.open_session("PresentationLayoutStyles")
+                    delete_query = delete(presentation_layout_styles_table).where(presentation_layout_styles_table.c.id == structure["presentationLayoutStyles"])
+                    session.execute(delete_query)
+
+                # 21. ColorSettings (только те, которые не используются в других местах)
+                if structure["colorSettings"]:
+                    color_settings_table, _ = self.open_session("ColorSettings")
+                    for color_settings_id in structure["colorSettings"]:
+                        # Проверяем, используется ли ColorSettings в других местах
+                        # Проверяем PresentationLayoutStyles
+                        pls_table, _ = self.open_session("PresentationLayoutStyles")
+                        pls_check = select(pls_table.c.id).where(pls_table.c.colorSettingsId == color_settings_id)
+                        pls_result = session.execute(pls_check).fetchone()
+
+                        # Проверяем BlockLayoutStyles
+                        bls_table, _ = self.open_session("BlockLayoutStyles")
+                        bls_check = select(bls_table.c.blockLayoutId).where(bls_table.c.colorSettingsId == color_settings_id)
+                        bls_result = session.execute(bls_check).fetchone()
+
+                        # Удаляем только если не используется в других местах
+                        if not pls_result and not bls_result:
+                            delete_query = delete(color_settings_table).where(color_settings_table.c.id == color_settings_id)
+                            session.execute(delete_query)
+
+                # 22. Наконец, удаляем сам PresentationLayout
+                delete_query = delete(presentation_layout_table).where(presentation_layout_table.c.id == presentation_layout_id)
+                session.execute(delete_query)
+
+                # Коммитим все изменения
+                session.commit()
+                return True
+
+            except Exception as e:
+                session.rollback()
+                print(f"Ошибка при удалении PresentationLayout структуры: {e}")
+                return False
+
+        return super().execute(logic, session)
+
+    def get_deletion_summary(self, presentation_layout_id: str) -> dict | None:
+        """Получить сводку о том, что будет удалено при удалении PresentationLayout.
+
+        Полезно для подтверждения перед удалением.
+
+        Args:
+            presentation_layout_id: ID презентационного макета
+
+        Returns:
+            dict: Сводка с количеством записей для удаления или None в случае ошибки
+        """
+        structure = self.get_presentation_layout_structure(presentation_layout_id)
+
+        if not structure:
+            return None
+
+        # Подсчитываем количество записей для удаления
+        summary = {
+            "presentation_layout_id": presentation_layout_id,
+            "slide_layouts_count": len(structure["slideLayouts"]),
+            "block_layouts_count": sum(len(slide["blockLayouts"]) for slide in structure["slideLayouts"]),
+            "figures_count": sum(len(block["figures"]) for slide in structure["slideLayouts"] for block in slide["blockLayouts"]),
+            "precompiled_images_count": sum(len(block["precompiledImages"]) for slide in structure["slideLayouts"] for block in slide["blockLayouts"]),
+            "presentation_palettes_count": len(structure["presentationPalettes"]),
+            "slide_config_sequences_count": sum(len(palette["slideConfigSequences"]) for palette in structure["presentationPalettes"]),
+            "slide_layout_index_configs_count": len(structure["slideLayoutIndexConfigs"]),
+            "block_layout_index_configs_count": len(structure["blockLayoutIndexConfigs"]),
+            "block_layout_configs_count": len(structure["blockLayoutConfigs"]),
+            "presentation_layout_colors_count": len(structure["presentationLayoutColors"]),
+            "font_style_configurations_count": len(structure["fontStyleConfigurations"]),
+            "layout_roles_count": structure["layoutRoles"],
+            "color_settings_count": len(structure["colorSettings"]),
+            "has_presentation_layout_styles": structure["presentationLayoutStyles"] is not None,
+        }
+
+        # Подсчитываем связанные стили и размеры
+        slide_styles_count = sum(1 for slide in structure["slideLayouts"] if slide["slideLayoutStyles"])
+        slide_dimensions_count = sum(1 for slide in structure["slideLayouts"] if slide["slideLayoutDimensions"])
+        slide_additional_info_count = sum(1 for slide in structure["slideLayouts"] if slide["slideLayoutAdditionalInfo"])
+
+        block_styles_count = sum(1 for slide in structure["slideLayouts"] for block in slide["blockLayouts"] if block["blockLayoutStyles"])
+        block_dimensions_count = sum(1 for slide in structure["slideLayouts"] for block in slide["blockLayouts"] if block["blockLayoutDimensions"])
+        block_limits_count = sum(1 for slide in structure["slideLayouts"] for block in slide["blockLayouts"] if block["blockLayoutLimit"])
+
+        summary.update(
+            {
+                "slide_layout_styles_count": slide_styles_count,
+                "slide_layout_dimensions_count": slide_dimensions_count,
+                "slide_layout_additional_info_count": slide_additional_info_count,
+                "block_layout_styles_count": block_styles_count,
+                "block_layout_dimensions_count": block_dimensions_count,
+                "block_layout_limits_count": block_limits_count,
+            }
+        )
+
+        # Общее количество записей для удаления
+        total_records = (
+            1
+            + summary["slide_layouts_count"]  # сам PresentationLayout
+            + summary["block_layouts_count"]
+            + summary["figures_count"]
+            + summary["precompiled_images_count"]
+            + summary["presentation_palettes_count"]
+            + summary["slide_config_sequences_count"]
+            + summary["slide_layout_index_configs_count"]
+            + summary["block_layout_index_configs_count"]
+            + summary["block_layout_configs_count"]
+            + summary["presentation_layout_colors_count"]
+            + summary["font_style_configurations_count"]
+            + summary["layout_roles_count"]
+            + summary["color_settings_count"]
+            + (1 if summary["has_presentation_layout_styles"] else 0)
+            + summary["slide_layout_styles_count"]
+            + summary["slide_layout_dimensions_count"]
+            + summary["slide_layout_additional_info_count"]
+            + summary["block_layout_styles_count"]
+            + summary["block_layout_dimensions_count"]
+            + summary["block_layout_limits_count"]
+        )
+
+        summary["total_records_to_delete"] = total_records
+
+        return summary
 
 
 class ColorSettingsManager(BaseManager):

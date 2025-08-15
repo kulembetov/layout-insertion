@@ -149,3 +149,36 @@ class ReceiveFigmaPresentationLayoutFullData(APIView):
         except Exception as e:
             logger.error(f"Error retrieving presentation layout structure: {str(e)}")
             return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeletePresentationLayout(APIView):
+    """API endpoint to delete a presentation layout with all related data."""
+
+    @logs(logger, on=True)
+    def delete(self, request, id=None) -> Response:
+        if not id:
+            return Response(data={"message": "Presentation layout ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Deleting presentation layout ID: {id}")
+
+        presentation_manager = PresentationLayoutManager()
+
+        try:
+            # Получаем сводку перед удалением (опционально)
+            summary = presentation_manager.get_deletion_summary(str(id))
+            if summary is None:
+                return Response(data={"message": f"Presentation layout with ID {id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            # Выполняем удаление
+            deletion_result = presentation_manager.delete_presentation_layout_structure(str(id))
+
+            if deletion_result:
+                logger.info(f"Successfully deleted presentation layout ID: {id}")
+                return Response(data={"message": f"Presentation layout {id} and all related data successfully deleted", "deleted_presentation_id": str(id), "deletion_summary": summary}, status=status.HTTP_200_OK)
+            else:
+                logger.error(f"Failed to delete presentation layout ID: {id}")
+                return Response(data={"message": f"Failed to delete presentation layout {id}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            logger.error(f"Error deleting presentation layout {id}: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
