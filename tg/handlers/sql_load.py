@@ -2,7 +2,7 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from db_work.executor import executor
+from db_work.executor import Executor
 from db_work.implemented import presentation_layout_manager, slide_layout_manager
 from log_utils import setup_logger
 from tg.states import LoadingProcessState, MiniatureState, OptionState, StartingProcessState
@@ -110,7 +110,16 @@ async def insert_logic(query: CallbackQuery, state: FSMContext):
     str_user = to_str_user(query.from_user)
     logger.info(f"Пользователь {str_user} начал процесс добавления.")
 
-    layout_name = await state.get_value("layout_name")
+    data = await state.get_data()
+    miniature_path = data.get("miniature_path")
+    miniature_extension = data.get("miniature_extension")
+    layout_name = data.get("layout_name")
+
+    executor = Executor(
+        path=miniature_path,
+        extension=miniature_extension,
+        layout_name=layout_name,
+    )
     executor.insert(layout_name, user_role="USER")
 
     await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно добавлен\\.")

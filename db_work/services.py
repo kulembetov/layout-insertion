@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import uuid
 from datetime import datetime
 from typing import Any, cast
@@ -394,6 +395,7 @@ class SlideLayoutManager(BaseManager):
                 slide_type = data_item.pop("slide_type")
                 slide_columns = data_item.pop("columns")
                 slide_number = data_item.get("number")
+                slide_presentation_palette = data_item.pop("presentationPaletteColors")
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
 
                 matching_row = [row for row in postgres_data if row.name == uuid_data_item["name"] and row.number == uuid_data_item["number"]]
@@ -421,6 +423,7 @@ class SlideLayoutManager(BaseManager):
                                 slide_number,
                                 slide_columns,
                                 slide_blocks,
+                                slide_presentation_palette,
                             )
                         )
 
@@ -430,15 +433,14 @@ class SlideLayoutManager(BaseManager):
                     stmt = insert(slide_layout_table).values(**new_entry)
                     session.execute(stmt)
                     session.commit()
-                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension, slide_type, slide_number, slide_columns, slide_blocks))
+                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension, slide_type, slide_number, slide_columns, slide_blocks, slide_presentation_palette))
 
             updated_query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
             session.execute(updated_query)
 
             changes = []
-            for name, id_, slide_dimension, slide_type, slide_number, slide_columns, slide_blocks in added_slides + updated_slides:
+            for name, id_, slide_dimension, slide_type, slide_number, slide_columns, slide_blocks, slide_presentation_palette in added_slides + updated_slides:
                 action = "Added" if (name, id_) in added_slides else "Updated"
-                # changes.append(f"{action}: {name} {id_}")
                 changes.append(
                     {
                         "Action": action,
@@ -449,6 +451,7 @@ class SlideLayoutManager(BaseManager):
                         "slide_number": slide_number,
                         "slide_colums": slide_columns,
                         "slide_blocks": slide_blocks,
+                        "slide_presentation_palette": slide_presentation_palette,
                     }
                 )
             return changes
@@ -491,7 +494,6 @@ class LayoutRolesManager(BaseManager):
         layout_roles_table, session = self.open_session(self.table)
 
         def logic():
-            values = {"presentationLayoutId": presentation_layout_id, "role": user_role.upper()}
             values = {"presentationLayoutId": presentation_layout_id, "role": user_role.upper()}
             query = insert(layout_roles_table).values(values)
             session.execute(query)
@@ -652,6 +654,7 @@ class BlockLayoutManager(BaseManager):
             for slide_layout in slide_layouts:
                 slide_layout_id = slide_layout.get("id")
                 slide_layout_blocks = slide_layout.get("slide_blocks")
+                slide_layout_presentation_palette = slide_layout.get("slide_presentation_palette")
 
                 for slide_layout_block in slide_layout_blocks:
                     block_layout_type = slide_layout_block.get("sql_type")
@@ -663,7 +666,8 @@ class BlockLayoutManager(BaseManager):
 
                     # Add block parametrs for other block layout managers
                     values["dimensions"] = slide_layout_block.get("dimensions")
-                    values["styles"] = slide_layout_block.get("styles")
+                    values["precompiled_image_info"] = slide_layout_block.get("precompiled_image_info")
+                    values["presentation_palette"] = slide_layout_presentation_palette
 
                     added_data.append(values)
 
@@ -676,7 +680,7 @@ class BlockLayoutManager(BaseManager):
 class BlockLayoutDimensionsManagers(BaseManager):
     """Insert a field in BlockLayoutDimensionsManagers Table."""
 
-    # Возможно сюда нужно будет добвать логику на update
+    # Возможно сюда нужно будет добавить логику на update
 
     def __init__(self):
         super().__init__()
@@ -715,76 +719,62 @@ class BlockLayoutDimensionsManagers(BaseManager):
         return super().execute(logic, session)
 
 
-# class BlockLayoutStylesManagers(BaseManager):
-#     """Insert a field in BlockLayoutStyles Table."""
+class PrecompiledImageManager(BaseManager):
+    """Insert a row in PrecompiledImage Table."""
 
-#     # Возможно сюда нужно будет добвать логику на update
+    # Возможно сюда нужно будет добавить логику на update
 
-#     def __init__(self):
-#         super().__init__()
-#         self.table = "BlockLayoutStyles"
+    def __init__(self):
+        super().__init__()
+        self.table = "PrecompiledImage"
 
-#     def insert(self, block_layouts: list[dict]) -> list[dict]:
-#         """Insert a field in BlockLayoutStyles Table."""
+    def insert(self, block_layouts: list[dict], **tg_params: dict[str, str]) -> list[dict]:
+        """Insert a row in PrecompiledImage Table."""
 
-#         block_layout_styles_table, session = self.open_session(self.table)
+        precompiled_image_table, session = self.open_session(self.table)
 
-#         added_data = []
+        def logic():
+            added_data = []
 
-#         def logic():
-#             nonlocal added_data
+            for block_layout in block_layouts:
+                precompiled_image_info = block_layout.get("precompiled_image_info")
+                presentation_palette = block_layout.get("presentation_palette")
 
-#             default_color = constants.DEFAULT_COLOR
-#             color_settings_id = constants.DEFAULT_COLOR_SETTINGS_ID
+                if precompiled_image_info and presentation_palette:
+                    for color in presentation_palette:
+                        url = self._extract_precompiled_image_url(precompiled_image_info.get("name"), color, **tg_params)
+                        values = {
+                            "id": generate_uuid(),
+                            "blockLayoutId": block_layout.get("id"),
+                            "url": url,
+                            "color": color,
+                        }
 
-#             for block_layout in block_layouts:
-#                 block_layout_styles = block_layout.get("styles")
+                        added_data.append(values)
+                        query = insert(precompiled_image_table).values(values)
+                        session.execute(query)
 
-#                 border_radius = block_layout_styles.get("borderRadius")
-#                 border_radius_str = f"ARRAY[{', '.join(map(str, border_radius))}]"
+            session.commit()
+            return added_data
 
-#                 # color_value = block.styles.get("color")
-#                 # color_value = ColorUtils.normalize_color(color_value) if color_value else None
-#                 # if not color_value or not color_value.startswith("#") or len(color_value) not in (4, 7):
-#                 color_value = default_color
+        return super().execute(logic, session)
 
-#                 # if block.needs_null_styles:
+    @staticmethod
+    def _extract_precompiled_image_url(name: str, color: str, **tg_params: dict[str, str]) -> str | None:
+        if name is None:
+            return None
 
-#                 values = {
-#                     "blockLayoutId": block_layout.get("id"),
-#                     "textVertical": block_layout_styles.get("textVertical"),
-#                     "textHorizontal": block_layout_styles.get("textHorizontal"),
-#                     "fontSize": block_layout_styles.get("fontSize"),
-#                     "weight": block_layout_styles.get("weight"),
-#                     "zIndex": block_layout_styles.get("zIndex"),
-#                     "opacity": block_layout_styles.get("opacity"),
-#                     "textTransform": block_layout_styles.get("textTransform"),
-#                     "borderRadius": border_radius_str,
-#                     "colorSettingsId": None,
-#                     "color": color_value,
-#                     # Defoltes
-#                     "pathName": null(),
-#                     "italic": False,
-#                     "underline": False,
-#                     "listType": null(),
-#                     "autoResize": False,
-#                     "background": null(),
-#                     "fontFamily": "roboto",
-#                     "gradientType": None,
-#                     "contentEditable": True,
-#                     "movable": True,
-#                     "removable": True,
-#                     "selectable": True,
-#                     "styleEditable": True,
-#                     "visible": True,
-#                     "cropOffsetX": 0,
-#                     "cropOffsetY": 0,
-#                     "cropScale": 1,
-#                 }
+        match = re.match(r"image precompiled ([^ ]+)(?: z-index \d+)?(?: (#[0-9a-fA-F]{3,6}))?", name)
+        if not match:
+            return None
 
-#             return added_data
+        base_url = "https://storage.yandexcloud.net/"  # откуда его надо брать?
+        path = tg_params["path"]
+        layout_name = tg_params["layout_name"]
+        block_name = match.group(1)
+        ext = tg_params["extension"]
 
-#         return super().execute(logic, session)
+        return f"{base_url}{path}/layouts/{layout_name}/{block_name}_{color[1:]}.{ext}"
 
 
 # poetry run python -m db_work.services
@@ -796,7 +786,7 @@ class BlockLayoutDimensionsManagers(BaseManager):
 # class BlockLayoutDimensionsManagers(BaseManager):
 #     """Insert a field in BlockLayoutDimensionsManagers Table."""
 
-#     # Возможно сюда нужно будет добвать логику на update
+#     # Возможно сюда нужно будет добавить логику на update
 
 #     def __init__(self):
 #         super().__init__()
