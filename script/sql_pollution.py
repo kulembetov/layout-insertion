@@ -199,7 +199,7 @@ class SQLExecutor:
                     file_success = True
                     for i, command in enumerate(commands, 1):
                         try:
-                            cursor.execute(command + ";")
+                            cursor.executor(command + ";")
                             conn.commit()
                             print(f"  Command {i}: Success")
                         except psycopg2.Error as e:

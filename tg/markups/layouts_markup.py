@@ -2,11 +2,11 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-def get(layout_names: list[str] | None):
+def get(layouts: list[tuple[str, str]] | None):
     """Creating an inline keyboard with layout names."""
     builder = InlineKeyboardBuilder()
 
-    buttons = [InlineKeyboardButton(text=name, callback_data=name) for name in layout_names] if layout_names else []
+    buttons = [InlineKeyboardButton(text=layout[1], callback_data=layout[0]) for layout in layouts] if layouts else []
 
     builder.row(*buttons)
     builder.adjust(1)

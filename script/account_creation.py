@@ -129,7 +129,7 @@ class DatabaseManager:
         if self.connection is None:
             return None
         with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(query, params)
+            cursor.executor(query, params)
             if cursor.description:
                 return cursor.fetchone()
             return None
@@ -139,7 +139,7 @@ class DatabaseManager:
         if self.connection is None:
             return []
         with self.connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute(query, params)
+            cursor.executor(query, params)
             if cursor.description:
                 return cursor.fetchall()
             return []
@@ -341,7 +341,7 @@ class UserAccountCreator:
                 with self.db.connection.cursor() as cursor:
                     user_query = """INSERT INTO "User" (id, role, username, image, ip, "createdAt", "presentationsCount")
 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-                    cursor.execute(
+                    cursor.executor(
                         user_query,
                         (
                             user_id,
@@ -357,7 +357,7 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                     auth_query = """INSERT INTO "Auth" (id, provider, key, "userId")
 VALUES (%s, %s, %s, %s)"""
                     auth_key = user_data.get("auth_key", user_data.get("username", user_id))
-                    cursor.execute(auth_query, (auth_id, user_data["provider"], auth_key, user_id))
+                    cursor.executor(auth_query, (auth_id, user_data["provider"], auth_key, user_id))
 
                     if user_data["provider"] == Provider.LOCAL.value and "password" in user_data:
                         password_raw = user_data["password"]
@@ -367,7 +367,7 @@ VALUES (%s, %s, %s, %s)"""
 
                         password_query = """INSERT INTO "Password" ("userId", password, salt)
 VALUES (%s, %s, %s)"""
-                        cursor.execute(password_query, (user_id, hashed_password, salt))
+                        cursor.executor(password_query, (user_id, hashed_password, salt))
 
                 if self.db.connection is not None:
                     self.db.connection.commit()
@@ -596,7 +596,7 @@ VALUES (%s, %s, %s)"""
                     payment_query = """INSERT INTO "Payment" (id, "userId", status, price, description, "createdAt")
 VALUES (%s, %s, %s, %s, %s, %s)"""
                     payment_description = f"Subscription to {plan['name'] or 'Plan'}"
-                    cursor.execute(
+                    cursor.executor(
                         payment_query,
                         (
                             payment_id,
@@ -610,7 +610,7 @@ VALUES (%s, %s, %s, %s, %s, %s)"""
 
                     subscription_query = """INSERT INTO "Subscription" (id, "userId", "planId", "createdAt", "expiredAt", "isActive", "nextPaymentAt")
 VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-                    cursor.execute(
+                    cursor.executor(
                         subscription_query,
                         (
                             subscription_id,
@@ -625,7 +625,7 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)"""
 
                     symbols_purchase_query = """INSERT INTO "SymbolsPurchase" (id, "userId", symbols, price, "planId", "isActive", "createdAt", "paymentId")
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
-                    cursor.execute(
+                    cursor.executor(
                         symbols_purchase_query,
                         (
                             symbols_purchase_id,
@@ -641,17 +641,17 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
 
                     subscription_payment_query = """INSERT INTO "SubscriptionPayment" ("subscriptionId", "paymentId")
 VALUES (%s, %s)"""
-                    cursor.execute(subscription_payment_query, (subscription_id, payment_id))
+                    cursor.executor(subscription_payment_query, (subscription_id, payment_id))
 
                     balance_query = """INSERT INTO "Balance" ("userId", symbols, "subscriptionSymbols")
 VALUES (%s, %s, %s)"""
-                    cursor.execute(balance_query, (user_id, 0, 0))
+                    cursor.executor(balance_query, (user_id, 0, 0))
 
                     if payment_status == PaymentStatus.SUCCEEDED.value:
                         balance_update_query = """UPDATE "Balance"
  SET "subscriptionSymbols" = "subscriptionSymbols" + %s
  WHERE "userId" = %s"""
-                        cursor.execute(balance_update_query, (plan["symbols"], user_id))
+                        cursor.executor(balance_update_query, (plan["symbols"], user_id))
 
                 if self.db.connection is not None:
                     self.db.connection.commit()
@@ -762,7 +762,7 @@ WHERE "userId" = %s"""
                 with self.db.connection.cursor() as cursor:
                     ab_user_group_query = """INSERT INTO "ABUserGroup" ("userId", type)
 VALUES (%s, %s)"""
-                    cursor.execute(ab_user_group_query, (user_id, ab_test_type))
+                    cursor.executor(ab_user_group_query, (user_id, ab_test_type))
 
                 if self.db.connection is not None:
                     self.db.connection.commit()

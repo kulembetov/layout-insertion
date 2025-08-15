@@ -1,10 +1,12 @@
 import json
 import os
+import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import insert, null, select, update
 from sqlalchemy.engine.row import Row
+from sqlalchemy.sql.elements import ColumnElement
 
 from db_work import constants
 from db_work.database import BaseManager
@@ -24,8 +26,20 @@ class PresentationLayoutManager(BaseManager):
         presentation_layout_table, session = self.open_session(self.table)
 
         def logic():
+            query = select(presentation_layout_table).where(cast(ColumnElement[bool], presentation_layout_table.c.name == name))
+            result = session.execute(query).fetchone()
+            return result
 
-            query = select(presentation_layout_table).where(presentation_layout_table.c.name == name)
+        return super().execute(logic, session)
+
+    def select_layout_by_uid(self, str_uid: str) -> Row | None:
+        """Find a row in 'PresentationLayout' by uid."""
+
+        presentation_layout_table, session = self.open_session(self.table)
+
+        def logic():
+            uid = uuid.UUID(str_uid)
+            query = select(presentation_layout_table).where(cast(ColumnElement[bool], presentation_layout_table.c.id == uid))
             result = session.execute(query).fetchone()
             return result
 
@@ -46,14 +60,14 @@ class PresentationLayoutManager(BaseManager):
 
         return super().execute(logic, session)
 
-    def get_all_presentation_layout_names(self) -> list[str] | None:
+    def get_presentation_layout_ids_names(self) -> list[tuple[str, str]] | None:
         """Get all presentation layout names from the database."""
 
         presentation_layout_table, session = self.open_session(self.table)
 
         def logic():
-            query = session.query(presentation_layout_table.c.name).all()
-            return [row[0] for row in query]
+            query = session.query(presentation_layout_table.c).all()
+            return [(f"{row.id}", row.name) for row in query]
 
         return super().execute(logic, session)
 
@@ -74,7 +88,7 @@ class PresentationLayoutManager(BaseManager):
 
         def logic():
             # 1. Проверяем существование PresentationLayout
-            query = select(presentation_layout_table).where(presentation_layout_table.c.id == presentation_layout_id)
+            query = select(presentation_layout_table).where(cast(ColumnElement[bool], presentation_layout_table.c.id == presentation_layout_id))
             presentation_layout = session.execute(query).fetchone()
 
             if not presentation_layout:

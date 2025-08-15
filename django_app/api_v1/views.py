@@ -74,7 +74,7 @@ class ReceiveFigmaPresentationLayout(APIView):
     @logs(logger, on=True)
     def get(self, request) -> Response:
         presentation_manager = PresentationLayoutManager()
-        names = presentation_manager.get_all_presentation_layout_names()
+        names = presentation_manager.get_presentation_layout_ids_names()
 
         return Response(names if names is not None else [])
 

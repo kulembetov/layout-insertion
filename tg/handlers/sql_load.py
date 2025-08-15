@@ -2,7 +2,8 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from db_work.implemented import color_settings_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_manager
+from db_work.executor import executor
+from db_work.implemented import presentation_layout_manager, slide_layout_manager
 from log_utils import setup_logger
 from tg.states import FigmaLayoutState, LoadingProcessState, OptionState, StartingProcessState
 from tg.utils import r_text, to_str_user
@@ -18,13 +19,15 @@ async def define_layout_name(message: Message, state: FSMContext):
 
     layout_name = message.text
     layout = presentation_layout_manager.select_layout_by_name(layout_name)
-    if layout:
+    if layout is not None:
         await state.update_data(layout_name=layout.name, layout_id=str(layout.id))
 
         await message.answer(f"Нашелся шаблон *{r_text(layout.name)}* в базе данных\\. Хотите обновить шаблон?", reply_markup=yes_or_no_markup.get())
         await state.set_state(LoadingProcessState.updating)
 
     else:
+        await state.update_data(layout_name=layout_name)
+
         await message.answer(
             f"Шаблон *{r_text(layout_name)}* не был найден в базе данных\\. Хотите добавить шаблон?",
             reply_markup=yes_or_no_markup.get(),
@@ -101,18 +104,8 @@ async def insert_logic(query: CallbackQuery, state: FSMContext):
     await query.message.edit_text(r_text("Шаблон загружен. Идет процесс добавления..."), reply_markup=None)
 
     layout_name = await state.get_value("layout_name")
-    str_user = to_str_user(query.from_user)
+    executor.insert(layout_name, user_role="USER")
 
-    pl_uid = presentation_layout_manager.insert(layout_name)
-    logger.info(f"Пользователь {str_user} добавил шаблон с именем <{layout_name}> в PresentationLayout.")
-
-    cs_uid = color_settings_manager.insert()
-    logger.info(f"Пользователь {str_user} добавил настройки в ColorSettings.")
-
-    pls_uid = presentation_layout_styles_manager.insert(pl_uid, cs_uid)
-    logger.info(f"Пользователь {str_user} добавил новые ID в PresentationLayoutStyles. " f"presentationLayoutId: {pl_uid}, colorSettingsId: {cs_uid}, presentationLayoutStyleId: {pls_uid}")
-
-    await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно добавлен\\.")
     await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно добавлен\\.")
 
     await state.clear()

@@ -111,7 +111,7 @@ class GoogleDriveDownloader:
                 if page_token:
                     request_params["pageToken"] = page_token
 
-                results = self.service.files().list(**request_params).execute()
+                results = self.service.files().list(**request_params).executor()
                 files = results.get("files", [])
                 all_files.extend(files)
 
@@ -144,7 +144,7 @@ class GoogleDriveDownloader:
                 if page_token:
                     request_params["pageToken"] = page_token
 
-                results = self.service.files().list(**request_params).execute()
+                results = self.service.files().list(**request_params).executor()
                 folders = results.get("files", [])
                 all_folders.extend(folders)
 
@@ -206,7 +206,7 @@ class GoogleDriveDownloader:
                 if page_token:
                     request_params["pageToken"] = page_token
 
-                results = self.service.files().list(**request_params).execute()
+                results = self.service.files().list(**request_params).executor()
                 items = results.get("files", [])
 
                 for item in items:

@@ -282,7 +282,7 @@ def query_existing_slide_layout(conn, slide_name: str, slide_number: int, presen
         SELECT id FROM "SlideLayout"
         WHERE name = %s AND number = %s AND "presentationLayoutId" = %s
         """
-        cursor.execute(query, (slide_name, slide_number, presentation_layout_id))
+        cursor.executor(query, (slide_name, slide_number, presentation_layout_id))
         result = cursor.fetchone()
         return result[0] if result else None
 
@@ -367,7 +367,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
         try:
             if extracted_data["block_layout_ids"]:
                 block_ids_str = build_in_clause(list(extracted_data["block_layout_ids"]))
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT id, "parentLayoutId"
                     FROM "UserBlockLayout"
@@ -378,7 +378,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
 
             if extracted_data["slide_layout_index_config_ids"]:
                 config_ids_str = build_in_clause(list(extracted_data["slide_layout_index_config_ids"]))
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT id, "slideLayoutId", "blockLayoutConfigId", "blockLayoutIndexConfigId", "configNumber"
                     FROM "SlideLayoutIndexConfig"
@@ -398,7 +398,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
 
             if extracted_data["block_layout_index_config_ids"]:
                 config_ids_str = build_in_clause(list(extracted_data["block_layout_index_config_ids"]))
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT id, "blockLayoutId", "indexColorId", "indexFontId"
                     FROM "BlockLayoutIndexConfig"
@@ -417,7 +417,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
 
             if extracted_data["figure_ids"]:
                 figure_ids_str = build_in_clause(list(extracted_data["figure_ids"]))
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT id, "blockLayoutId", name
                     FROM "Figure"
@@ -428,7 +428,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
 
             if extracted_data["precompiled_image_ids"]:
                 image_ids_str = build_in_clause(list(extracted_data["precompiled_image_ids"]))
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT id, "blockLayoutId", url, color
                     FROM "PrecompiledImage"
@@ -439,7 +439,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
 
             if extracted_data["block_layout_ids"]:
                 block_ids_str = build_in_clause(list(extracted_data["block_layout_ids"]))
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT "blockLayoutId", "textVertical", "textHorizontal", "fontSize", "weight",
                            "zIndex", "textTransform", "color", "fontFamily", "background"
@@ -464,7 +464,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
                 ]
 
             if extracted_data["block_layout_ids"]:
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT "blockLayoutId", x, y, w, h, rotation
                     FROM "BlockLayoutDimensions"
@@ -484,7 +484,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
                 ]
 
             if extracted_data["block_layout_ids"]:
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT "blockLayoutId", "minWords", "maxWords"
                     FROM "BlockLayoutLimit"
@@ -494,7 +494,7 @@ def query_existing_data(conn, extracted_data: ExtractedData) -> ExistingData:
                 existing_data["block_layout_limits"] = [BlockLayoutLimit(blockLayoutId=row[0], minWords=row[1], maxWords=row[2]) for row in cursor.fetchall()]
 
             if extracted_data["block_layout_ids"]:
-                cursor.execute(
+                cursor.executor(
                     f"""
                     SELECT id, "slideLayoutId", "blockLayoutType"
                     FROM "BlockLayout"
