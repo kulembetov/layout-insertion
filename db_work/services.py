@@ -777,6 +777,83 @@ class PrecompiledImageManager(BaseManager):
         return f"{base_url}{path}/layouts/{layout_name}/{block_name}_{color[1:]}.{ext}"
 
 
+class BlockLayoutStylesManagers(BaseManager):
+    """Insert a field in BlockLayoutStyles Table."""
+
+    # Возможно сюда нужно будет добвать логику на update
+
+    def __init__(self):
+        super().__init__()
+        self.table = "BlockLayoutStyles"
+
+    def insert(self, block_layouts: list[dict]) -> list[dict]:
+        """Insert a field in BlockLayoutStyles Table."""
+
+        block_layout_styles_table, session = self.open_session(self.table)
+
+        added_data = []
+
+        def logic():
+            nonlocal added_data
+
+            default_color = constants.DEFAULT_COLOR
+            color_settings_id = constants.DEFAULT_COLOR_SETTINGS_ID
+
+            for block_layout in block_layouts:
+                block_layout_styles = block_layout.get("styles")
+
+                border_radius = block_layout_styles.get("borderRadius")
+                border_radius_str = f"ARRAY[{', '.join(map(str, border_radius))}]"
+
+                # color_value = block.styles.get("color")
+                # color_value = ColorUtils.normalize_color(color_value) if color_value else None
+                # if not color_value or not color_value.startswith("#") or len(color_value) not in (4, 7):
+                color_value = default_color
+
+                # if block.needs_null_styles:
+
+                values = {
+                    "blockLayoutId": block_layout.get("id"),
+                    "textVertical": block_layout_styles.get("textVertical"),
+                    "textHorizontal": block_layout_styles.get("textHorizontal"),
+                    "fontSize": block_layout_styles.get("fontSize"),
+                    "weight": block_layout_styles.get("weight"),
+                    "zIndex": block_layout_styles.get("zIndex"),
+                    "opacity": block_layout_styles.get("opacity"),
+                    "textTransform": block_layout_styles.get("textTransform"),
+                    "borderRadius": border_radius_str,
+                    "colorSettingsId": color_settings_id,
+                    "color": color_value,
+                    # Defoltes
+                    "pathName": null(),
+                    "italic": False,
+                    "underline": False,
+                    "listType": null(),
+                    "autoResize": False,
+                    "background": null(),
+                    "fontFamily": "roboto",
+                    "gradientType": None,
+                    "contentEditable": True,
+                    "movable": True,
+                    "removable": True,
+                    "selectable": True,
+                    "styleEditable": True,
+                    "visible": True,
+                    "cropOffsetX": 0,
+                    "cropOffsetY": 0,
+                    "cropScale": 1,
+                }
+
+                added_data.append(values)
+                query = insert(block_layout_styles_table).values(values)
+                session.execute(query)
+
+            session.commit()
+            return added_data
+
+        return super().execute(logic, session)
+
+
 # poetry run python -m db_work.services
 
 # if __name__ == "__main__":
