@@ -392,6 +392,7 @@ class SlideLayoutManager(BaseManager):
                 slide_dimension = data_item.pop("dimensions")
                 slide_blocks = data_item.pop("blocks")
                 slide_type = data_item.pop("slide_type")
+                slide_columns = data_item.pop("columns")
                 slide_number = data_item.get("number")
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
 
@@ -418,6 +419,7 @@ class SlideLayoutManager(BaseManager):
                                 slide_dimension,
                                 slide_type,
                                 slide_number,
+                                slide_columns,
                                 slide_blocks,
                             )
                         )
@@ -428,13 +430,13 @@ class SlideLayoutManager(BaseManager):
                     stmt = insert(slide_layout_table).values(**new_entry)
                     session.execute(stmt)
                     session.commit()
-                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension, slide_type, slide_number, slide_blocks))
+                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension, slide_type, slide_number, slide_columns, slide_blocks))
 
             updated_query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
             session.execute(updated_query)
 
             changes = []
-            for name, id_, slide_dimension, slide_type, slide_number, slide_blocks in added_slides + updated_slides:
+            for name, id_, slide_dimension, slide_type, slide_number, slide_columns, slide_blocks in added_slides + updated_slides:
                 action = "Added" if (name, id_) in added_slides else "Updated"
                 # changes.append(f"{action}: {name} {id_}")
                 changes.append(
@@ -445,6 +447,7 @@ class SlideLayoutManager(BaseManager):
                         "slide_dimension": slide_dimension,
                         "slide_type": slide_type,
                         "slide_number": slide_number,
+                        "slide_colums": slide_columns,
                         "slide_blocks": slide_blocks,
                     }
                 )
@@ -533,6 +536,7 @@ class SlideLayoutStylesManager(BaseManager):
 class SlideLayoutAdditionalInfoManager(BaseManager):
     """Insert a field in SlideLayoutAdditionalInfo Table."""
 
+    # Возможно сюда нужно будет добвать логику на update
     def __init__(self):
         super().__init__()
         self.table = "SlideLayoutAdditionalInfo"
@@ -552,7 +556,7 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                     slide_layout_id = slide_layout.get("id")
                     slide_layout_type = slide_layout.get("slide_type")
                     slide_layout_name = slide_layout.get("Name")
-                    slide_layout_number = slide_layout.get("slide_number")
+                    slide_layout_colunms = slide_layout.get("columns")
 
                     has_headers = False
                     percentes = 0
@@ -571,7 +575,7 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
 
                     slide_infographics_type = f"{slide_infographics_type}" if slide_infographics_type is not None else null()
 
-                    slide_layout_icon_url = SlideLayoutUtils().build_slide_icon_url(slide_type=slide_layout_type, slide_name=slide_layout_name, slide_number=slide_layout_number)
+                    slide_layout_icon_url = SlideLayoutUtils().build_slide_icon_url(slide_type=slide_layout_type, slide_name=slide_layout_name, columns=slide_layout_colunms)
 
                     values = {
                         "slideLayoutId": slide_layout_id,
@@ -628,6 +632,8 @@ class SlideLayoutDimensionsManager(BaseManager):
 
 class BlockLayoutManager(BaseManager):
     """Insert a field in BlockLayoutManager Table."""
+
+    # Возможно сюда нужно будет добвать логику на update
 
     def __init__(self):
         super().__init__()

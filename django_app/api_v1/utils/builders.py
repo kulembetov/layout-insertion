@@ -295,11 +295,21 @@ def slide_to_dict(slide: ExtractedSlide, comments: dict) -> dict[str, Any]:
             _update_figure_config_with_names(slide_config, slide.blocks)
     slide_name = slide.frame_name.lower()
     for_generation = "upload" not in slide_name
+
+    columns = None
+    container_lower = slide.container_name.lower().strip()
+    if container_lower.endswith("cols"):
+        try:
+            columns = int(container_lower.replace("cols", ""))
+        except ValueError:
+            columns = None
+
     return {
         "slide_number": slide.number,
         "container_name": slide.container_name,
         "frame_name": slide.frame_name,
         "slide_type": slide.slide_type,
+        "columns": columns,
         "sentences": sentence_count,
         "imagesCount": _get_imagesCount(slide),
         "frame_id": slide.frame_id,

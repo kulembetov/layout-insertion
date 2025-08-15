@@ -710,7 +710,7 @@ class FigmaExtractor:
                 "slides": [],
             }
 
-    def _slide_to_dict(self, slide: ExtractedSlide) -> dict[str, str | int | dict | list | bool]:
+    def _slide_to_dict(self, slide: ExtractedSlide) -> dict[str, str | int | dict | list | bool | None]:
         """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs. Add slideColors extraction."""
         max_text_block = None
         max_len = 0
@@ -743,11 +743,20 @@ class FigmaExtractor:
 
         extracted_slide_type = self.extract_slide_type_from_name(slide.frame_name)
 
+        columns = None
+        container_lower = slide.container_name.lower().strip()
+        if container_lower.endswith("cols"):
+            try:
+                columns = int(container_lower.replace("cols", ""))
+            except ValueError:
+                columns = None
+
         return {
             "slide_number": slide.number,
             "container_name": slide.container_name,
             "frame_name": slide.frame_name,
             "slide_type": extracted_slide_type,
+            "columns": columns,
             "forGeneration": for_generation,
             "sentences": sentence_count,
             "imagesCount": images_count,
