@@ -393,24 +393,6 @@ SLIDE_NUMBER_TO_FOLDER = {
     -1: "last",
 }
 
-SLIDE_NUMBER_TO_NUMBER = {
-    1: None,  # title
-    2: 1,  # 1cols
-    3: 2,  # 2cols
-    4: 3,  # 3cols
-    5: None,  # infographics
-    6: 4,  # 4cols
-    7: None,  # divider
-    8: None,  # table
-    9: 5,  # 5 cols
-    10: 6,  # 6cols
-    11: 7,  # 7cols
-    12: 8,  # 8cols
-    13: None,  # chart
-    14: 10,  # 10cols
-    -1: None,  # last
-}
-
 SLIDE_NUMBER_TO_TYPE = {
     1: "title",  # title
     2: "fewText",  # 1cols

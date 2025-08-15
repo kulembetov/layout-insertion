@@ -695,9 +695,7 @@ class FigmaExtractor:
 
     def _should_skip_full_image_block(self, sql_type: str, dimensions: dict[str, int], name: str) -> bool:
         """Check if an image block should be skipped (full-size background images)."""
-        name_lower = name.lower()
-        is_precompiled = "precompiled" in name_lower
-        return sql_type == "image" and dimensions["x"] == 0 and dimensions["y"] == 0 and dimensions["w"] == config.FIGMA_CONFIG["TARGET_WIDTH"] and dimensions["h"] == config.FIGMA_CONFIG["TARGET_HEIGHT"] and not is_precompiled
+        return False
 
     def _extract_block_styles(self, node: dict, sql_type: str, name: str) -> dict:
         """Extract and compile all styles for a block."""
@@ -1166,7 +1164,7 @@ class FigmaExtractor:
                 "slides": [],
             }
 
-    def _slide_to_dict(self, slide: ExtractedSlide) -> dict[str, str | int | dict | list | bool]:
+    def _slide_to_dict(self, slide: ExtractedSlide) -> dict[str, str | int | dict | list | bool | None]:
         """Convert slide object to dictionary, using only the text block with the most text for sentence count. Remove debug logs. Add slideColors extraction."""
         max_text_block = None
         max_len = 0
@@ -1199,11 +1197,20 @@ class FigmaExtractor:
 
         extracted_slide_type = self.extract_slide_type_from_name(slide.frame_name)
 
+        columns = None
+        container_lower = slide.container_name.lower().strip()
+        if container_lower.endswith("cols"):
+            try:
+                columns = int(container_lower.replace("cols", ""))
+            except ValueError:
+                columns = None
+
         return {
             "slide_number": slide.number,
             "container_name": slide.container_name,
             "frame_name": slide.frame_name,
             "slide_type": extracted_slide_type,
+            "columns": columns,
             "forGeneration": for_generation,
             "sentences": sentence_count,
             "imagesCount": images_count,
@@ -1321,6 +1328,7 @@ class FigmaToSQLIntegrator:
                 "slide_layout_name": frame_name_raw,
                 "slide_layout_number": slide_number_raw,
                 "slide_type": slide_type_raw,
+                "columns": slide_raw.get("columns"),
                 "forGeneration": slide_raw.get("forGeneration", True),
                 "presentation_layout_id": presentation_layout_id,
                 "is_last": is_last,
@@ -1656,176 +1664,6 @@ class FigmaToSQLIntegrator:
             f.write("\n".join(instructions))
 
 
-def example_usage():
-    """Examples of how to use the integration with config compatibility"""
-
-    integrator = FigmaToSQLIntegrator(figma_file_id="<your-figma-file-id>", figma_token="<your-figma-access-token>")
-
-    LogUtils.log_block_event("Example 1: Extract slides 1, 3, and 5 with SQL generation")
-    integrator.generate_sql_for_slides([1, 3, 5], "output/hero_and_cols")
-
-    LogUtils.log_block_event("\nExample 2: Extract slides containing tables")
-    table_data = integrator.extract_by_block_types(["table"])
-    if table_data:
-        sql_input = integrator.prepare_sql_generator_input(table_data)
-        LogUtils.log_block_event(f"Found {len(sql_input)} slides with tables, ready for SQL Generator")
-
-        os.makedirs("output/tables", exist_ok=True)
-        with open("output/tables/table_slides_config.json", "w") as f:
-            json.dump(sql_input, f, indent=2)
-
-    LogUtils.log_block_event("\nExample 3: Extract from hero and infographics containers")
-    container_data = integrator.extract_by_containers(["hero", "infographics"])
-    if container_data:
-        sql_input = integrator.prepare_sql_generator_input(container_data)
-        LogUtils.log_block_event(f"Found {len(sql_input)} slides from specified containers")
-
-        for slide in sql_input:
-            LogUtils.log_block_event(f"  Slide {slide['slide_layout_number']}: {slide['slide_layout_name']}")
-            LogUtils.log_block_event(f"    Type: {slide['slide_type']}, Blocks: {len(slide['blocks'])}")
-            LogUtils.log_block_event(f"    Auto blocks: {list(slide['auto_blocks'].keys())}")
-
-    LogUtils.log_block_event("\nExample 4: Extract all slides for full presentation")
-    all_data = integrator.extract_specific_slides(list(range(1, 15)) + [-1])
-    if all_data:
-        sql_input = integrator.prepare_sql_generator_input(all_data)
-
-        output_dir = "output/complete_presentation"
-        os.makedirs(output_dir, exist_ok=True)
-
-        by_type = {}
-        for slide in sql_input:
-            slide_type = slide["slide_type"]
-            if slide_type not in by_type:
-                by_type[slide_type] = []
-            by_type[slide_type].append(slide)
-
-        for slide_type, slides in by_type.items():
-            type_dir = f"{output_dir}/{slide_type}"
-            os.makedirs(type_dir, exist_ok=True)
-            with open(f"{type_dir}/slides_config.json", "w") as f:
-                json.dump(slides, f, indent=2)
-            LogUtils.log_block_event(f"  • {slide_type}: {len(slides)} slides saved to {type_dir}/")
-
-    LogUtils.log_block_event("\nExample 5: Config validation")
-    validation_data = integrator.extract_specific_slides([1, 5, 8, 14])
-    if validation_data:
-        LogUtils.log_block_event("Config Validation Results:")
-        for slide in validation_data["slides"]:
-            LogUtils.log_block_event(f"  Slide {slide['slide_number']} ({slide['slide_type']}):")
-            for block in slide["blocks"]:
-                is_valid_type = block["sql_type"] in config.BLOCK_TYPES["block_layout_type_options"]
-                is_valid_weight = block["styles"]["weight"] in config.VALID_FONT_WEIGHTS
-                LogUtils.log_block_event(f"    • {block['sql_type']}: Type OK: {is_valid_type}, Weight OK: {is_valid_weight}")
-
-
-class BatchFigmaProcessor:
-    """Process multiple Figma files or large sets of slides"""
-
-    def __init__(self, figma_token: str):
-        self.figma_token = figma_token
-
-    def process_presentation_by_types(self, file_id: str, output_base: str = "batch_output"):
-        """Process a presentation by extracting different slide types separately"""
-        integrator = FigmaToSQLIntegrator(file_id, self.figma_token)
-
-        type_groups = {
-            "title_and_last": [-1, 1],
-            "text_layouts": [2, 3, 4, 6, 7, 9, 10, 11, 12, 13],
-            "special_content": [5, 8, 14],
-        }
-
-        results = {}
-        for group_name, slide_numbers in type_groups.items():
-            LogUtils.log_block_event(f"\nProcessing {group_name}...")
-            data = integrator.extract_specific_slides(slide_numbers)
-            if data:
-                sql_input = integrator.prepare_sql_generator_input(data)
-                results[group_name] = sql_input
-
-                group_dir = f"{output_base}/{group_name}"
-                os.makedirs(group_dir, exist_ok=True)
-                with open(f"{group_dir}/figma_extract.json", "w") as f:
-                    json.dump(data, f, indent=2)
-
-                with open(f"{group_dir}/sql_config.json", "w") as f:
-                    json.dump(sql_input, f, indent=2)
-                LogUtils.log_block_event(f"   {len(sql_input)} slides processed for {group_name}")
-
-        return results
-
-    def validate_font_weights_across_presentation(self, file_id: str) -> dict[str, str | int | list | dict]:
-        """Extract all slides and validate font weight compliance"""
-        integrator = FigmaToSQLIntegrator(file_id, self.figma_token)
-        all_data = integrator.extract_specific_slides(list(range(1, 15)) + [-1])
-
-        if not all_data:
-            return {"error": "Failed to extract data"}
-
-        if not isinstance(all_data, dict):
-            return {"error": "Invalid data format"}
-
-        slides_raw = all_data.get("slides", [])
-        if not isinstance(slides_raw, list):
-            return {"error": "Invalid slides format"}
-
-        weight_analysis: dict[str, str | int | list | dict] = {
-            "total_blocks": 0,
-            "weight_distribution": {weight: 0 for weight in config.VALID_FONT_WEIGHTS},
-            "invalid_weights_found": [],
-            "slides_analyzed": len(slides_raw),
-        }
-
-        for slide in slides_raw:
-            if not isinstance(slide, dict):
-                continue
-
-            blocks_raw = slide.get("blocks", [])
-            if not isinstance(blocks_raw, list):
-                continue
-
-            for block in blocks_raw:
-                if not isinstance(block, dict):
-                    continue
-
-                total_blocks_raw = weight_analysis.get("total_blocks", 0)
-                if isinstance(total_blocks_raw, int):
-                    weight_analysis["total_blocks"] = total_blocks_raw + 1
-                else:
-                    weight_analysis["total_blocks"] = 1
-
-                styles_raw = block.get("styles", {})
-                if not isinstance(styles_raw, dict):
-                    continue
-
-                weight_raw = styles_raw.get("weight")
-                if not isinstance(weight_raw, (int, float)):
-                    continue
-
-                weight = int(weight_raw)
-
-                if weight in config.VALID_FONT_WEIGHTS:
-                    weight_distribution_raw = weight_analysis.get("weight_distribution", {})
-                    if isinstance(weight_distribution_raw, dict):
-                        current_count = weight_distribution_raw.get(weight, 0)
-                        if isinstance(current_count, int):
-                            weight_distribution_raw[weight] = current_count + 1
-                else:
-                    slide_number = slide.get("slide_number", "unknown")
-                    block_name = block.get("name", "unknown")
-                    invalid_weights_raw = weight_analysis.get("invalid_weights_found", [])
-                    if isinstance(invalid_weights_raw, list):
-                        invalid_weights_raw.append(
-                            {
-                                "slide": slide_number,
-                                "block": block_name,
-                                "invalid_weight": weight,
-                            }
-                        )
-
-        return weight_analysis
-
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Figma to SQL Generator Integration (Config Compatible)")
@@ -1886,31 +1724,20 @@ if __name__ == "__main__":
                 json.dump(sql_input, f, indent=2)
             LogUtils.log_block_event(f"Processed {len(sql_input)} slides from specified containers")
 
-    elif args.mode == "batch":
-        LogUtils.log_block_event("Running batch processing...")
-        processor = BatchFigmaProcessor(token)
-        results = processor.process_presentation_by_types(file_id, args.output_dir)
-        LogUtils.log_block_event(f"Batch processing complete. Results: {list(results.keys())}")
-
-    elif args.mode == "validate":
-        LogUtils.log_block_event("Running validation...")
-        processor = BatchFigmaProcessor(token)
-        validation = processor.validate_font_weights_across_presentation(file_id)
-
         LogUtils.log_block_event("Validation Results:")
 
-        if not isinstance(validation, dict):
-            LogUtils.log_block_event("   Error: Invalid validation data format")
+        if not isinstance(data, dict):
+            LogUtils.log_block_event("   Error: Invalid data format")
         else:
-            total_blocks = validation.get("total_blocks", 0)
-        slides_analyzed = validation.get("slides_analyzed", 0)
-        weight_distribution = validation.get("weight_distribution", {})
+            total_blocks = data.get("total_blocks", 0)
+            slides_analyzed = data.get("slides_analyzed", 0)
+            weight_distribution = data.get("weight_distribution", {})
 
-        LogUtils.log_block_event(f"   Total blocks analyzed: {total_blocks}")
-        LogUtils.log_block_event(f"   Slides analyzed: {slides_analyzed}")
-        LogUtils.log_block_event(f"   Font weight distribution: {weight_distribution}")
+            LogUtils.log_block_event(f"   Total blocks analyzed: {total_blocks}")
+            LogUtils.log_block_event(f"   Slides analyzed: {slides_analyzed}")
+            LogUtils.log_block_event(f"   Font weight distribution: {weight_distribution}")
 
-        invalid_raw = validation.get("invalid_weights_found", [])
+            invalid_raw = data.get("invalid_weights_found", [])
         if isinstance(invalid_raw, list) and invalid_raw:
             LogUtils.log_block_event(f"   Found {len(invalid_raw)} blocks with invalid font weights:")
             for item in invalid_raw[:5]:
