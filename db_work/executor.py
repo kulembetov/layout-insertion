@@ -1,10 +1,11 @@
-from db_work.implemented import block_layout_dimensions_manager, block_layout_manager, color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
+from db_work.implemented import block_layout_dimensions_manager, block_layout_manager, color_settings_manager, layout_roles_manager, precompiled_image_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
 
 
 class Executor:
     """Execute Insertion Logic."""
 
-    def __init__(self): ...
+    def __init__(self, **tg_params):
+        self.tg_params = tg_params
 
     def insert(self, new_layout_name: str, user_role: str):
         """Insert New Presentation Layout And Fill Related Table."""
@@ -58,11 +59,16 @@ class Executor:
         if new_block_layout_dimensions:
             print(f"new_block_layout_dimensions {len(new_block_layout_dimensions)}")
 
+        # Create new precompiled images for every new block layout
+        new_precompiled_images = precompiled_image_manager.insert(new_block_layouts, **self.tg_params)
+        if new_precompiled_images:
+            print(f"new_precompiled_images {len(new_precompiled_images)}")
+
 
 executor = Executor()
 
 if __name__ == "__main__":
-    new_layout_name = "Nikita_test_layout_13"
+    new_layout_name = "qweryuiyhgf54465h6b"
     user_role = "USER"
 
     executor.insert(new_layout_name, user_role=user_role)

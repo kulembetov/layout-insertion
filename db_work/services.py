@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import uuid
 from datetime import datetime
 from typing import Any, cast
@@ -394,6 +395,7 @@ class SlideLayoutManager(BaseManager):
                 slide_type = data_item.pop("slide_type")
                 slide_columns = data_item.pop("columns")
                 slide_number = data_item.get("number")
+                slide_presentation_palette = data_item.pop("presentationPaletteColors")
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
 
                 matching_row = [row for row in postgres_data if row.name == uuid_data_item["name"] and row.number == uuid_data_item["number"]]
@@ -421,6 +423,7 @@ class SlideLayoutManager(BaseManager):
                                 slide_number,
                                 slide_columns,
                                 slide_blocks,
+                                slide_presentation_palette,
                             )
                         )
 
@@ -430,13 +433,13 @@ class SlideLayoutManager(BaseManager):
                     stmt = insert(slide_layout_table).values(**new_entry)
                     session.execute(stmt)
                     session.commit()
-                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension, slide_type, slide_number, slide_columns, slide_blocks))
+                    added_slides.append((new_entry["name"], new_entry["id"], slide_dimension, slide_type, slide_number, slide_columns, slide_blocks, slide_presentation_palette))
 
             updated_query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
             session.execute(updated_query)
 
             changes = []
-            for name, id_, slide_dimension, slide_type, slide_number, slide_columns, slide_blocks in added_slides + updated_slides:
+            for name, id_, slide_dimension, slide_type, slide_number, slide_columns, slide_blocks, slide_presentation_palette in added_slides + updated_slides:
                 action = "Added" if (name, id_) in added_slides else "Updated"
                 # changes.append(f"{action}: {name} {id_}")
                 changes.append(
@@ -449,6 +452,7 @@ class SlideLayoutManager(BaseManager):
                         "slide_number": slide_number,
                         "slide_colums": slide_columns,
                         "slide_blocks": slide_blocks,
+                        "slide_presentation_palette": slide_presentation_palette,
                     }
                 )
             return changes
@@ -491,7 +495,6 @@ class LayoutRolesManager(BaseManager):
         layout_roles_table, session = self.open_session(self.table)
 
         def logic():
-            values = {"presentationLayoutId": presentation_layout_id, "role": user_role.upper()}
             values = {"presentationLayoutId": presentation_layout_id, "role": user_role.upper()}
             query = insert(layout_roles_table).values(values)
             session.execute(query)
@@ -652,6 +655,7 @@ class BlockLayoutManager(BaseManager):
             for slide_layout in slide_layouts:
                 slide_layout_id = slide_layout.get("id")
                 slide_layout_blocks = slide_layout.get("slide_blocks")
+                slide_layout_presentation_palette = slide_layout.get("presentationPaletteColors")
 
                 for slide_layout_block in slide_layout_blocks:
                     block_layout_type = slide_layout_block.get("sql_type")
@@ -663,6 +667,8 @@ class BlockLayoutManager(BaseManager):
 
                     # Add block parametrs for other block layout managers
                     values["dimensions"] = slide_layout_block.get("dimensions")
+                    values["precompiled_image_info"] = slide_layout_block.get("precompiled_image_info")
+                    values["presentation_palette"] = slide_layout_presentation_palette
 
                     added_data.append(values)
 
@@ -675,7 +681,7 @@ class BlockLayoutManager(BaseManager):
 class BlockLayoutDimensionsManagers(BaseManager):
     """Insert a field in BlockLayoutDimensionsManagers Table."""
 
-    # Возможно сюда нужно будет добвать логику на update
+    # Возможно сюда нужно будет добавить логику на update
 
     def __init__(self):
         super().__init__()
@@ -714,6 +720,66 @@ class BlockLayoutDimensionsManagers(BaseManager):
         return super().execute(logic, session)
 
 
+class PrecompiledImageManager(BaseManager):
+    """Insert a row in PrecompiledImage Table."""
+
+    # Возможно сюда нужно будет добавить логику на update
+
+    def __init__(self):
+        super().__init__()
+        self.table = "PrecompiledImage"
+
+    def insert(self, block_layouts: list[dict], **tg_params: dict[str, str]) -> list[dict]:
+        """Insert a row in PrecompiledImage Table."""
+
+        precompiled_image_table, session = self.open_session(self.table)
+
+        def logic():
+            added_data = []
+
+            for block_layout in block_layouts:
+                precompiled_image_info = block_layout.get("precompiled_image_info")
+
+                if precompiled_image_info:
+                    presentation_palette = block_layout.get("presentation_palette")
+                    print(f"presentation_palette: {presentation_palette}")
+
+                    for color in presentation_palette:
+                        url = self._extract_precompiled_image_url(precompiled_image_info.get("name"), color, **tg_params)
+                        values = {
+                            "id": generate_uuid(),
+                            "blockLayoutId": block_layout.get("id"),
+                            "url": url,
+                            "color": color,
+                        }
+
+                        added_data.append(values)
+                        query = insert(precompiled_image_table).values(values)
+                        session.execute(query)
+
+            session.commit()
+            return added_data
+
+        return super().execute(logic, session)
+
+    @staticmethod
+    def _extract_precompiled_image_url(name: str, color: str, **tg_params: dict[str, str]) -> str | None:
+        if name is None:
+            return None
+
+        match = re.match(r"image precompiled ([^ ]+)(?: z-index \d+)?(?: (#[0-9a-fA-F]{3,6}))?", name)
+        if not match:
+            return None
+
+        base_url = "https://storage.yandexcloud.net/"  # откуда его надо брать?
+        path = tg_params["path"]
+        layout_name = tg_params["layout_name"]
+        block_name = match.group(1)
+        ext = tg_params["extension"]
+
+        return f"{base_url}{path}/layouts/{layout_name}/{block_name}_{color[1:]}.{ext}"
+
+
 # poetry run python -m db_work.services
 
 # if __name__ == "__main__":
@@ -723,7 +789,7 @@ class BlockLayoutDimensionsManagers(BaseManager):
 # class BlockLayoutDimensionsManagers(BaseManager):
 #     """Insert a field in BlockLayoutDimensionsManagers Table."""
 
-#     # Возможно сюда нужно будет добвать логику на update
+#     # Возможно сюда нужно будет добавить логику на update
 
 #     def __init__(self):
 #         super().__init__()
