@@ -1075,12 +1075,12 @@ class SQLGenerator:
             logger.info(f"\nAutomatically added background block with color {bg_config['color']}")
         return blocks
 
-    def _set_slide_icon_url(self, slide_layout, blocks):
-        """Set slide layout icon URL based on slide type and number."""
+    def _set_slide_icon_url(self, slide_layout, blocks, columns=None):
+        """Set slide layout icon URL based on slide type and columns."""
         logger.info(f"forGeneration value from input JSON: {slide_layout.for_generation} (not overridden by config)")
         logger.info(f"slide_type from input data: {slide_layout.type} (not overridden by config)")
 
-        slide_layout.icon_url = build_slide_icon_url(slide_layout.type, slide_layout.name, slide_layout.number, self.config_manager.get_miniatures_base_path())
+        slide_layout.icon_url = build_slide_icon_url(slide_layout.type, slide_layout.name, columns, self.config_manager.get_miniatures_base_path())
 
     def _build_complete_sql(
         self,
@@ -1246,7 +1246,8 @@ def _generate_slide_sql(slide: dict, generator: "SQLGenerator", output_dir: str,
     )
     logger.info(f"Created SlideLayout: {slide_layout}")
     miniatures_base_path = config.MINIATURES_BASE_PATH
-    slide_layout.icon_url = build_slide_icon_url(slide_type, slide_layout.name, slide_layout.number, miniatures_base_path)
+    columns = slide.get("columns")
+    slide_layout.icon_url = build_slide_icon_url(slide_type, slide_layout.name, columns, miniatures_base_path)
     blocks, precompiled_images, figure_blocks, slide_config = _create_blocks_from_slide(slide, generator, strip_zindex)
     sql = generator._build_complete_sql(slide_layout, blocks, figure_blocks, precompiled_images, slide_config)
     folder_name = generator.config_manager.get_folder_for_slide_number(slide_layout.number)
@@ -1350,23 +1351,22 @@ def camel_to_snake(name):
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
-def build_slide_icon_url(slide_type: str, slide_name: str, slide_number: int, miniatures_base_path: str) -> str:
+def build_slide_icon_url(slide_type: str, slide_name: str, columns: int | None, miniatures_base_path: str) -> str:
     """Generate icon URL for slide layout."""
-    # Slide numbers that should NOT have numbers in their miniature paths
-    skip_number_slides = {1, 5, 7, 8, 13, -1}
+    # Slide types that should NOT have numbers in their miniature paths
+    skip_slides_type = {"infographics", "chart", "table", "title", "last"}
+
+    # File extension for miniatures
+    miniature_extension = config.MINIATURE_EXTENSION
+
     miniature_folder = camel_to_snake(slide_type)
 
-    # If this slide number should skip numbering, return without number
-    if slide_number in skip_number_slides:
-        return f"{miniatures_base_path}/{miniature_folder}/{slide_name}{config.MINIATURE_EXTENSION}"
+    # If this slide type should skip numbering or no columns provided, return without number
+    if slide_type in skip_slides_type or columns is None:
+        return f"{miniatures_base_path}/{miniature_folder}/{slide_name}{miniature_extension}"
 
-    # For slide numbers that should have numbers, get the number from the mapping
-    number_for_icon = config.SLIDE_NUMBER_TO_NUMBER.get(slide_number)
-    if number_for_icon is not None:
-        return f"{miniatures_base_path}/{miniature_folder}/{number_for_icon}_{slide_name}{config.MINIATURE_EXTENSION}"
-
-    # Fallback: if no number mapping found, return without number
-    return f"{miniatures_base_path}/{miniature_folder}/{slide_name}{config.MINIATURE_EXTENSION}"
+    # For slides with columns, use the column number directly in the path
+    return f"{miniatures_base_path}/{miniature_folder}/{columns}_{slide_name}{miniature_extension}"
 
 
 class BlockNameUtils:
