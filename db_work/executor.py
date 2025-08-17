@@ -7,50 +7,53 @@ class Executor:
     def __init__(self, **tg_params):
         self.tg_params = tg_params
 
-    def insert(self, new_layout_name: str, user_role: str):
+    def insert_or_update(self, layout_name: str, user_role: str):
         """Insert New Presentation Layout And Fill Related Table."""
 
         # Presentation Layout ===========================================
+        # Времено
+        update = True
+
+        if update is True:
+            layout_data = presentation_layout_manager.select_layout_by_name(layout_name)
+            new_presentation_layout_id = layout_data[0] if layout_data else None
+
         # Create new Presentation Layout
-        new_presentation_layout_id = presentation_layout_manager.insert(name=new_layout_name)
-        print(f"new_presentation_layout_id {new_presentation_layout_id}")
+        if update is False:
+            new_presentation_layout_id = presentation_layout_manager.insert(name=layout_name)
+            print(f"new_presentation_layout_id {new_presentation_layout_id}")
 
         # Create user role for new presentation layout
-        new_role = layout_roles_manager.insert(presentation_layout_id=new_presentation_layout_id, user_role=user_role)
-        print(f"new_role {new_role}")
+        if update is False:
+            new_role = layout_roles_manager.insert(presentation_layout_id=new_presentation_layout_id, user_role=user_role)
+            print(f"new_role {new_role}")
 
         # Crate new color id
-        new_color_id = color_settings_manager.insert()
-        print(f"new_color_id {new_color_id}")
+        if update is False:
+            new_color_id = color_settings_manager.insert()
+            print(f"new_color_id {new_color_id}")
 
         # Create new presentation layout styles
-        new_presentation_layout_styles_id = presentation_layout_styles_manager.insert(presentation_layout_id=new_presentation_layout_id, color_settings_id=new_color_id)
-        print(f"new_presentation_layout_styles_id {new_presentation_layout_styles_id}")
+        if update is False:
+            new_presentation_layout_styles_id = presentation_layout_styles_manager.insert(presentation_layout_id=new_presentation_layout_id, color_settings_id=new_color_id)
+            print(f"new_presentation_layout_styles_id {new_presentation_layout_styles_id}")
 
         # Slide Layout ===========================================
         # Create new slide layouts or update existing slide layouts.
-        new_or_updated_slide_layouts = slide_layout_manager.insert_or_update(presentation_layout_id=new_presentation_layout_id)
-        if new_or_updated_slide_layouts:
-            print(f"new_or_updated_slide_layouts {len(new_or_updated_slide_layouts)}")
+        slide_layouts_data = slide_layout_manager.insert_or_update(presentation_layout_id=new_presentation_layout_id)
 
         # Create new slide_layout_styles for every new slide layout
-        new_slied_layout_styles = slide_layout_styles_manager.insert_or_upate(slide_layouts=new_or_updated_slide_layouts)
-        if new_slied_layout_styles:
-            print(f"new_slied_layout_styles {len(new_slied_layout_styles)}")
+        slide_layout_styles_manager.insert_or_upate(slide_layouts=slide_layouts_data)
 
         # Create new slide layout dimensions for every new slide layout
-        new_slide_layout_dimensions = slide_layout_dimensions_manager.insert(slide_layouts=new_or_updated_slide_layouts)
-        if new_slide_layout_dimensions:
-            print(f"new_slide_layout_dimensions {len(new_slide_layout_dimensions)}")
+        slide_layout_dimensions_manager.insert_or_update(slide_layouts=slide_layouts_data)
 
         # Create new slide layout addition info for every new slide layout
-        new_slide_layout_additional_info = slide_layout_additional_info.insert_or_update(slide_layouts=new_or_updated_slide_layouts)
-        if new_slide_layout_additional_info:
-            print(f"new_slide_layout_additional_info {len(new_slide_layout_additional_info)}")
+        slide_layout_additional_info.insert_or_update(slide_layouts=slide_layouts_data)
 
         # Block Layout ===========================================
         # Create new block layouts
-        new_block_layouts = block_layout_manager.insert(new_or_updated_slide_layouts)
+        new_block_layouts = block_layout_manager.insert(slide_layouts_data)
         if new_block_layouts:
             print(f"new_block_layout {len(new_block_layouts)}")
 
@@ -68,10 +71,10 @@ class Executor:
 executor = Executor()
 
 if __name__ == "__main__":
-    new_layout_name = "qweryuiyhgf54465h6b"
+    layout_name = "qweryuiyhgf54465h6b"
     user_role = "USER"
 
-    executor.insert(new_layout_name, user_role=user_role)
+    executor.insert_or_update(layout_name, user_role=user_role)
 
 
 # # classic

@@ -775,91 +775,6 @@ class SlideLayoutManager(BaseManager):
 
         return super().execute(logic, session)
 
-    # def insert_or_update(self, presentation_layout_id: str | None) -> list[dict[Any, Any]]:
-    #     """Create or update fieds in SliedeLayout table."""
-
-    #     slide_layout_table, session = self.open_session(self.table)
-    #     added_slides = []
-    #     updated_slides = []
-
-    #     def logic():
-    #         nonlocal added_slides, updated_slides
-
-    # query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
-    # result = session.execute(query)
-    # postgres_data = result.fetchall()
-
-    #         cached_data = get_slide_layout_data_from_cache(presentation_layout_id)
-
-    #         for data_item in cached_data:
-    #             slide_dimension = data_item.pop("dimensions")
-    #             slide_blocks = data_item.pop("blocks")
-    #             slide_type = data_item.pop("slide_type")
-    #             slide_columns = data_item.pop("columns")
-    #             slide_number = data_item.get("number")
-    #             slide_presentation_palette = data_item.pop("presentationPaletteColors")
-    #             uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in data_item.items()}
-
-    #             matching_row = [row for row in postgres_data if row.name == uuid_data_item["name"] and row.number == uuid_data_item["number"]]
-
-    # if len(matching_row) > 0:
-    #     compared_row = matching_row[0]
-    #     keys_to_compare = ["number", "imagesCount", "maxTokensPerBlock", "maxWordsPerSentence", "minWordsPerSentence", "sentences", "isLast", "forGeneration", "presentationLayoutIndexColor"]
-    #     need_update = False
-
-    #     for key in keys_to_compare:
-    #         if getattr(compared_row, key) != uuid_data_item[key]:
-    #             need_update = True
-    #             break
-
-    # if need_update:
-    #     stmt = update(slide_layout_table).where(slide_layout_table.c.id == compared_row.id).values(**uuid_data_item)
-    #     session.execute(stmt)
-    #     session.commit()
-    #                     updated_slides.append(
-    #                         (
-    #                             compared_row.name,
-    #                             compared_row.id,
-    #                             slide_dimension,
-    #                             slide_type,
-    #                             slide_number,
-    #                             slide_columns,
-    #                             slide_blocks,
-    #                             slide_presentation_palette,
-    #                         )
-    #                     )
-
-    # else:
-    #     new_entry = dict(uuid_data_item)
-    #     new_entry["id"] = generate_uuid()
-    #     stmt = insert(slide_layout_table).values(**new_entry)
-    #     session.execute(stmt)
-    #     session.commit()
-    #                 added_slides.append((new_entry["name"], new_entry["id"], slide_dimension, slide_type, slide_number, slide_columns, slide_blocks, slide_presentation_palette))
-
-    # updated_query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
-    # session.execute(updated_query)
-
-    #         changes = []
-    #         for name, id_, slide_dimension, slide_type, slide_number, slide_columns, slide_blocks, slide_presentation_palette in added_slides + updated_slides:
-    #             action = "Added" if (name, id_) in added_slides else "Updated"
-    #             changes.append(
-    #                 {
-    #                     "Action": action,
-    #                     "Name": name,
-    #                     "id": id_,
-    #                     "slide_dimension": slide_dimension,
-    #                     "slide_type": slide_type,
-    #                     "slide_number": slide_number,
-    #                     "slide_colums": slide_columns,
-    #                     "slide_blocks": slide_blocks,
-    #                     "slide_presentation_palette": slide_presentation_palette,
-    #                 }
-    #             )
-    #     return changes
-
-    # return super().execute(logic, session)
-
     def get_slides_by_presentation_layout_id(self, presentation_layout_id: str) -> list[dict] | None:
         """Get all slides for a specific presentation layout."""
 
@@ -1006,13 +921,11 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
 class SlideLayoutDimensionsManager(BaseManager):
     """Insert a field in SlideLayoutDimensions Table."""
 
-    # Возможно сюда нужно будет добвать логику на update
-
     def __init__(self):
         super().__init__()
         self.table = "SlideLayoutDimensions"
 
-    def insert(self, slide_layouts: list[dict]) -> list[dict]:
+    def insert_or_update(self, slide_layouts: list[dict]) -> list[dict]:
         """Insert a field in SlideLayoutDimensions Table."""
 
         slide_layout_dimensions, session = self.open_session(self.table)
@@ -1312,9 +1225,3 @@ class BlockLayoutStylesManagers(BaseManager):
 #             return added_data
 
 #         return super().execute(logic, session)
-
-if __name__ == "__main__":
-    slide_layouts = SlideLayoutManager().insert_or_update("0197c55e-1c1b-7760-9525-f51752cf23e2")
-    SlideLayoutStylesManager().insert_or_upate(slide_layouts=slide_layouts)
-    SlideLayoutDimensionsManager().insert(slide_layouts=slide_layouts)
-    SlideLayoutAdditionalInfoManager().insert_or_update(slide_layouts=slide_layouts)
