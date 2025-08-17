@@ -827,12 +827,15 @@ class SlideLayoutStylesManager(BaseManager):
             nonlocal added_data
 
             for item in slide_layouts:
-                values = {"slideLayoutId": item.get("id")}
+                existing_query = select(slide_layout_styles_table.c.slideLayoutId).where(slide_layout_styles_table.c.slideLayoutId == item.get("id"))
+                result = session.execute(existing_query).scalar_one_or_none()
 
-                added_data.append(values)
+                if not result:
+                    values = {"slideLayoutId": item.get("id")}
+                    added_data.append(values)
 
-                query = insert(slide_layout_styles_table).values(values)
-                session.execute(query)
+                    query = insert(slide_layout_styles_table).values(values)
+                    session.execute(query)
 
             session.commit()
             return added_data
