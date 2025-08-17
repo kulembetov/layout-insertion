@@ -34,7 +34,7 @@ class Executor:
             print(f"new_or_updated_slide_layouts {len(new_or_updated_slide_layouts)}")
 
         # Create new slide_layout_styles for every new slide layout
-        new_slied_layout_styles = slide_layout_styles_manager.insert(slide_layouts=new_or_updated_slide_layouts)
+        new_slied_layout_styles = slide_layout_styles_manager.insert_or_upate(slide_layouts=new_or_updated_slide_layouts)
         if new_slied_layout_styles:
             print(f"new_slied_layout_styles {len(new_slied_layout_styles)}")
 
@@ -44,7 +44,7 @@ class Executor:
             print(f"new_slide_layout_dimensions {len(new_slide_layout_dimensions)}")
 
         # Create new slide layout addition info for every new slide layout
-        new_slide_layout_additional_info = slide_layout_additional_info.insert(slide_layouts=new_or_updated_slide_layouts)
+        new_slide_layout_additional_info = slide_layout_additional_info.insert_or_update(slide_layouts=new_or_updated_slide_layouts)
         if new_slide_layout_additional_info:
             print(f"new_slide_layout_additional_info {len(new_slide_layout_additional_info)}")
 
