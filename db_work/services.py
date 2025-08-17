@@ -897,10 +897,23 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                         "infographicsType": slide_infographics_type,
                         "contentType": constants.CONTENT_TYPE,
                     }
-                    added_data.append(values)
+                    existing_query = select(slide_layout_additional_info.c.slideLayoutId).where(slide_layout_additional_info.c.slideLayoutId == slide_layout_id)
+                    result = session.execute(existing_query).scalar_one_or_none()
 
-                    query = insert(slide_layout_additional_info).values(values)
-                    session.execute(query)
+                    if not result:
+                        query = insert(slide_layout_additional_info).values(values)
+                        session.execute(query)
+                        added_data.append(values)
+
+                    else:
+                        existing_values = dict(result._mapping)
+                        should_update = any(existing_values[key] != value for key, value in values.items())
+
+                        if should_update:
+                            update_query = update(slide_layout_additional_info).where(slide_layout_additional_info.c.slideLayoutId == slide_layout_id).values(**values)
+                        session.execute(update_query)
+                        added_data.append(values)
+
                 session.commit()
 
             return added_data
@@ -1190,3 +1203,8 @@ class BlockLayoutStylesManagers(BaseManager):
 #             return added_data
 
 #         return super().execute(logic, session)
+
+if __name__ == "__main__":
+    slide_layouts = SlideLayoutManager().insert_or_update("0197c55e-1c1b-7760-9525-f51752cf23e2")
+    print(SlideLayoutStylesManager().insert(slide_layouts=slide_layouts))
+    print(SlideLayoutAdditionalInfoManager().insert(slide_layouts=slide_layouts))

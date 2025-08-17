@@ -1,4 +1,4 @@
-MAX_SYMBOLS_IN_BLOCK = 0
+MAX_SYMBOLS_IN_BLOCK = 200
 CONTENT_TYPE = None
 
 # Infographics type mapping based on slide layout name patterns
