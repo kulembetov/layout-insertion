@@ -955,18 +955,11 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                         if slide_layout_block.get("percentage"):
                             percentes += 1
 
-                    # slide_infographics_type = None
-                    # for pattern, config_data in constants.SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE.items():
-                    #     if pattern in slide_layout_name:
-                    #         slide_infographics_type = config_data["infographicsType"]
-                    #         break
                     slide_infographics_type = None
                     for pattern, config_data in constants.SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE.items():
                         if pattern in slide_layout_name:
                             slide_infographics_type = config_data["infographicsType"]
                             break
-
-                    # slide_infographics_type = f"{slide_infographics_type}" if slide_infographics_type is not None else null()
 
                     slide_layout_icon_url = SlideLayoutUtils().build_slide_icon_url(slide_type=slide_layout_type, slide_name=slide_layout_name, columns=slide_layout_colunms)
 
@@ -994,11 +987,6 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                         existing_values = dict(result._mapping)
                         should_update = any(existing_values[key] != value for key, value in values.items())
 
-                        # if should_update:
-                        #     update_query = update(slide_layout_additional_info).where(slide_layout_additional_info.c.slideLayoutId == slide_layout_id).values(**values)
-                        # session.execute(update_query)
-                        # added_data.append(values)
-                        # updated_items += 1
                         if should_update:
                             update_query = update(slide_layout_additional_info).where(slide_layout_additional_info.c.slideLayoutId == slide_layout_id).values(**values)
                             session.execute(update_query)
@@ -1030,18 +1018,45 @@ class SlideLayoutDimensionsManager(BaseManager):
         slide_layout_dimensions, session = self.open_session(self.table)
 
         added_data = []
+        updated_items = 0
+        added_items = 0
 
         def logic():
             nonlocal added_data
+            nonlocal updated_items
+            nonlocal added_items
 
             for item in slide_layouts:
-                dimensions = item.get("slide_dimension")
+
+                dimensions = item.get("dimensions")
+                slide_layout_id = item.get("id")
+
                 values = {"slideLayoutId": item.get("id"), "x": 0, "y": 0, "w": dimensions.get("w"), "h": dimensions.get("h")}
-                added_data.append(values)
-                query = insert(slide_layout_dimensions).values(values)
-                session.execute(query)
+
+                existing_query = select(slide_layout_dimensions).where(slide_layout_dimensions.c.slideLayoutId == slide_layout_id)
+                result = session.execute(existing_query).one_or_none()
+
+                if result is None:
+                    added_data.append(values)
+                    query = insert(slide_layout_dimensions).values(values)
+                    session.execute(query)
+                    added_items += 1
+
+                else:
+                    existing_values = dict(result._mapping)
+                    should_update = any(existing_values[key] != value for key, value in values.items())
+
+                    if should_update:
+                        update_query = update(slide_layout_dimensions).where(slide_layout_dimensions.c.slideLayoutId == slide_layout_id).values(**values)
+                        session.execute(update_query)
+                        added_data.append(values)
+                        updated_items += 1
 
             session.commit()
+
+            logger.info(f"SlideLayoutDimensionsManager: add {added_items} items.")
+            logger.info(f"SlideLayoutDimensionsManager: update {updated_items} items.\n")
+
             return added_data
 
         return super().execute(logic, session)
@@ -1301,4 +1316,5 @@ class BlockLayoutStylesManagers(BaseManager):
 if __name__ == "__main__":
     slide_layouts = SlideLayoutManager().insert_or_update("0197c55e-1c1b-7760-9525-f51752cf23e2")
     SlideLayoutStylesManager().insert_or_upate(slide_layouts=slide_layouts)
+    SlideLayoutDimensionsManager().insert(slide_layouts=slide_layouts)
     SlideLayoutAdditionalInfoManager().insert_or_update(slide_layouts=slide_layouts)
