@@ -1,4 +1,17 @@
-from db_work.implemented import block_layout_dimensions_manager, block_layout_manager, color_settings_manager, layout_roles_manager, precompiled_image_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info_manager, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
+from db_work.implemented import (
+    block_layout_dimensions_manager,
+    block_layout_limit_manager,
+    block_layout_manager,
+    color_settings_manager,
+    layout_roles_manager,
+    precompiled_image_manager,
+    presentation_layout_manager,
+    presentation_layout_styles_manager,
+    slide_layout_additional_info_manager,
+    slide_layout_dimensions_manager,
+    slide_layout_manager,
+    slide_layout_styles_manager,
+)
 
 
 class Executor:
@@ -67,6 +80,11 @@ class Executor:
         new_precompiled_images = precompiled_image_manager.insert(block_layout_data, **self.tg_params)
         if new_precompiled_images:
             print(f"new_precompiled_images {len(new_precompiled_images)}")
+
+        # Create new limits for every block layout
+        block_layout_limit = block_layout_limit_manager.insert(block_layout_data)
+        if block_layout_limit:
+            print(f"block_layout_limit {len(block_layout_limit)}")
 
 
 executor = Executor()

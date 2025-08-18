@@ -56,3 +56,15 @@ SLIDE_NUMBER_TO_NUMBER = {
 
 DEFAULT_COLOR: str = "#ffffff"
 DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"
+
+BLOCK_TYPE_MIN_WORDS: dict[str, int] = {
+    "slideTitle": 3,
+    "subTitle": 5,
+    "blockTitle": 1,
+    "text": 8,
+    "percentage": 1,
+    "number": 1,
+    "date": 1,
+    "name": 1,
+    "email": 1,
+}

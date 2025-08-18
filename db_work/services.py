@@ -1004,6 +1004,7 @@ class BlockLayoutManager(BaseManager):
                 slide_layout_presentation_palette = slide_layout.get("presentationPaletteColors")
 
                 for slide_layout_block in slide_layout_blocks:
+
                     block_layout_type = slide_layout_block.get("sql_type")
                     id = generate_uuid()
 
@@ -1016,7 +1017,10 @@ class BlockLayoutManager(BaseManager):
 
                     # Add block parametrs for other block layout managers
                     values["dimensions"] = slide_layout_block.get("dimensions")
+                    values["name"] = slide_layout_block.get("name")
+                    values["sql_type"] = slide_layout_block.get("sql_type")
                     values["precompiled_image_info"] = slide_layout_block.get("precompiled_image_info")
+                    values["words"] = slide_layout_block.get("words")
                     values["presentation_palette"] = slide_layout_presentation_palette
                     data.append(values)
 
@@ -1219,6 +1223,50 @@ class BlockLayoutStylesManagers(BaseManager):
                 added_data.append(values)
                 query = insert(block_layout_styles_table).values(values)
                 session.execute(query)
+
+            session.commit()
+            return added_data
+
+        return super().execute(logic, session)
+
+
+class BlockLayoutLimitManagers(BaseManager):
+    """Insert an entry in BlockLayoutLimit Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = "BlockLayoutLimit"
+        self.block_layout_min_words = constants.BLOCK_TYPE_MIN_WORDS
+
+    def insert(self, block_layouts: list[dict]) -> list[dict]:
+        """Insert an entry in BlockLayoutLimit Table."""
+
+        block_layout_limit_table, session = self.open_session(self.table)
+
+        added_data = []
+
+        def logic():
+            nonlocal added_data
+
+            min_words_config = self.block_layout_min_words
+
+            for block_layout in block_layouts:
+                block_layout_type = block_layout.get("sql_type")
+                block_layout_id = block_layout.get("id")
+                block_layout_words = block_layout.get("words", [])
+
+                min_words = min_words_config.get(block_layout_type, 1)
+                max_words = len(block_layout_words) if isinstance(block_layout_words, list) else 1
+
+                values = {
+                    "blockLayoutId": block_layout_id,
+                    "maxWords": max_words,
+                    "minWords": min_words,
+                }
+
+                query = insert(block_layout_limit_table).values(values)
+                session.execute(query)
+                added_data.append(values)
 
             session.commit()
             return added_data
