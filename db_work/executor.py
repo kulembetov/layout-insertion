@@ -2,6 +2,7 @@ from db_work.implemented import (
     block_layout_dimensions_manager,
     block_layout_limit_manager,
     block_layout_manager,
+    block_layout_styles_manager,
     color_settings_manager,
     layout_roles_manager,
     precompiled_image_manager,
@@ -80,6 +81,11 @@ class Executor:
         new_precompiled_images = precompiled_image_manager.insert(block_layout_data, **self.tg_params)
         if new_precompiled_images:
             print(f"new_precompiled_images {len(new_precompiled_images)}")
+
+        # Create new styles for every new block layout
+        block_layout_styles = block_layout_styles_manager.insert(block_layout_data)
+        if block_layout_styles:
+            print(f"block_layout_styles {len(block_layout_styles)}")
 
         # Create new limits for every block layout
         block_layout_limit = block_layout_limit_manager.insert(block_layout_data)

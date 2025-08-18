@@ -1,4 +1,18 @@
-from db_work.services import BlockLayoutDimensionsManagers, BlockLayoutLimitManagers, BlockLayoutManager, ColorSettingsManager, LayoutRolesManager, PrecompiledImageManager, PresentationLayoutManager, PresentationLayoutStylesManager, SlideLayoutAdditionalInfoManager, SlideLayoutDimensionsManager, SlideLayoutManager, SlideLayoutStylesManager
+from db_work.services import (
+    BlockLayoutDimensionsManagers,
+    BlockLayoutLimitManagers,
+    BlockLayoutManager,
+    BlockLayoutStylesManagers,
+    ColorSettingsManager,
+    LayoutRolesManager,
+    PrecompiledImageManager,
+    PresentationLayoutManager,
+    PresentationLayoutStylesManager,
+    SlideLayoutAdditionalInfoManager,
+    SlideLayoutDimensionsManager,
+    SlideLayoutManager,
+    SlideLayoutStylesManager,
+)
 
 # Presentation Layout Managers
 presentation_layout_manager = PresentationLayoutManager()
@@ -17,3 +31,4 @@ block_layout_manager = BlockLayoutManager()
 block_layout_dimensions_manager = BlockLayoutDimensionsManagers()
 precompiled_image_manager = PrecompiledImageManager()
 block_layout_limit_manager = BlockLayoutLimitManagers()
+block_layout_styles_manager = BlockLayoutStylesManagers()

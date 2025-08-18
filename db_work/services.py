@@ -1022,6 +1022,7 @@ class BlockLayoutManager(BaseManager):
                     values["precompiled_image_info"] = slide_layout_block.get("precompiled_image_info")
                     values["words"] = slide_layout_block.get("words")
                     values["presentation_palette"] = slide_layout_presentation_palette
+                    values["styles"] = slide_layout_block.get("styles")
                     data.append(values)
 
             session.commit()
@@ -1168,18 +1169,23 @@ class BlockLayoutStylesManagers(BaseManager):
         block_layout_styles_table, session = self.open_session(self.table)
 
         added_data = []
+        values = {}
 
         def logic():
             nonlocal added_data
+            nonlocal values
 
             default_color = constants.DEFAULT_COLOR
             color_settings_id = constants.DEFAULT_COLOR_SETTINGS_ID
 
             for block_layout in block_layouts:
                 block_layout_styles = block_layout.get("styles")
-
                 border_radius = block_layout_styles.get("borderRadius")
-                border_radius_str = f"ARRAY[{', '.join(map(str, border_radius))}]"
+
+                weight = block_layout_styles.get("weight")
+                weight = block_layout_styles.get("weight")
+                weight = float(weight) if isinstance(weight, str) and weight.isdigit() else None
+                weight = null() if weight is None else weight
 
                 # color_value = block.styles.get("color")
                 # color_value = ColorUtils.normalize_color(color_value) if color_value else None
@@ -1193,11 +1199,11 @@ class BlockLayoutStylesManagers(BaseManager):
                     "textVertical": block_layout_styles.get("textVertical"),
                     "textHorizontal": block_layout_styles.get("textHorizontal"),
                     "fontSize": block_layout_styles.get("fontSize"),
-                    "weight": block_layout_styles.get("weight"),
+                    "weight": weight,
                     "zIndex": block_layout_styles.get("zIndex"),
                     "opacity": block_layout_styles.get("opacity"),
                     "textTransform": block_layout_styles.get("textTransform"),
-                    "borderRadius": border_radius_str,
+                    "borderRadius": border_radius,
                     "colorSettingsId": color_settings_id,
                     "color": color_value,
                     # Defoltes
