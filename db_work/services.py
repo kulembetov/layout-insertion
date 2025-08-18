@@ -989,11 +989,13 @@ class BlockLayoutManager(BaseManager):
 
         data = []
         added_items = 0
+        updated_items = 0
         values = {}
 
         def logic():
             nonlocal data
             nonlocal added_items
+            nonlocal updated_items
             nonlocal values
 
             for slide_layout in slide_layouts:
@@ -1005,26 +1007,24 @@ class BlockLayoutManager(BaseManager):
                     block_layout_type = slide_layout_block.get("sql_type")
                     id = generate_uuid()
 
-                    existing_query = select(block_layout_table).where(block_layout_table.c.slideLayoutId == slide_layout_id, block_layout_table.c.blockLayoutType == block_layout_type)
-                    result = session.execute(existing_query).fetchall()
+                    values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
+                    values_for_block_layout_table = values
 
-                    if result is None:
-                        values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
-                        query = insert(block_layout_table).values(values)
-                        session.execute(query)
-                        added_items += 1
+                    query = insert(block_layout_table).values(values_for_block_layout_table)
+                    session.execute(query)
+                    added_items += 1
 
                     # Add block parametrs for other block layout managers
                     values["dimensions"] = slide_layout_block.get("dimensions")
                     values["precompiled_image_info"] = slide_layout_block.get("precompiled_image_info")
                     values["presentation_palette"] = slide_layout_presentation_palette
-
                     data.append(values)
 
-            logger.info(f"BlockLayoutManager: send {len(data)} block layouts to other managers.")
-            logger.info(f"BlockLayoutManager: insert {added_items} items.\n")
-
             session.commit()
+
+            logger.info(f"BlockLayoutManager: insert {added_items} items.")
+            logger.info(f"BlockLayoutManager: update {updated_items} items.\n")
+
             return data
 
         return super().execute(logic, session)
@@ -1033,21 +1033,23 @@ class BlockLayoutManager(BaseManager):
 class BlockLayoutDimensionsManagers(BaseManager):
     """Insert a field in BlockLayoutDimensionsManagers Table."""
 
-    # Возможно сюда нужно будет добавить логику на update
-
     def __init__(self):
         super().__init__()
         self.table = "BlockLayoutDimensions"
 
-    def insert(self, block_layouts: list[dict]) -> list[dict]:
-        """Insert a field in BlockLayoutDimensions Table."""
+    def insert_or_update(self, block_layouts: list[dict]) -> list[dict]:
+        """Insert or update an entry in BlockLayoutDimensions Table."""
 
         block_layout_dimensions_table, session = self.open_session(self.table)
 
-        added_data = []
+        data = []
+        added_items = 0
+        updated_items = 0
 
         def logic():
-            nonlocal added_data
+            nonlocal data
+            nonlocal added_items
+            nonlocal updated_items
 
             for block_layout in block_layouts:
                 block_layout_dimensions = block_layout.get("dimensions")
@@ -1062,12 +1064,29 @@ class BlockLayoutDimensionsManagers(BaseManager):
                     "rotation": block_layout_dimensions.get("r", 0),
                 }
 
-                added_data.append(values)
-                query = insert(block_layout_dimensions_table).values(values)
-                session.execute(query)
+                existing_query = select(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block_layout_id)
+                result = session.execute(existing_query).one_or_none()
 
+                if result is None:
+                    query = insert(block_layout_dimensions_table).values(values)
+                    session.execute(query)
+                    added_items += 1
+
+                else:
+                    existing_values = dict(result._mapping)
+                    should_update = any(existing_values[key] != value for key, value in values.items())
+
+                    if should_update:
+                        update_query = update(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block_layout_id).values(**values)
+                        session.execute(update_query)
+                        updated_items += 1
+
+            logger.info(f"BlockLayoutDimensionsManagers: insert {added_items} items.")
+            logger.info(f"BlockLayoutDimensionsManagers: update {updated_items} items.\n")
+
+            data.append(values)
             session.commit()
-            return added_data
+            return data
 
         return super().execute(logic, session)
 

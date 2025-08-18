@@ -9,9 +9,8 @@ layout_roles_manager = LayoutRolesManager()
 # Slide Layout Managers
 slide_layout_manager = SlideLayoutManager()
 slide_layout_styles_manager = SlideLayoutStylesManager()
-slide_layout_additional_inf_manager = SlideLayoutAdditionalInfoManager()
+slide_layout_additional_info_manager = SlideLayoutAdditionalInfoManager()
 slide_layout_dimensions_manager = SlideLayoutDimensionsManager()
-slide_layout_additional_info = SlideLayoutAdditionalInfoManager()
 
 # Block Layout Managers
 block_layout_manager = BlockLayoutManager()

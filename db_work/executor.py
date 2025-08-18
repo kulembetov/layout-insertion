@@ -1,4 +1,4 @@
-from db_work.implemented import block_layout_manager, color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
+from db_work.implemented import block_layout_dimensions_manager, block_layout_manager, color_settings_manager, layout_roles_manager, precompiled_image_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info_manager, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
 
 
 class Executor:
@@ -13,6 +13,10 @@ class Executor:
         # Presentation Layout ===========================================
         # Времено
         update = True
+        find_name = presentation_layout_manager.select_layout_by_name(layout_name)
+        if find_name is not True:
+            update = False
+        print(f"Update: {update}")
 
         if update is True:
             layout_data = presentation_layout_manager.select_layout_by_name(layout_name)
@@ -49,30 +53,39 @@ class Executor:
         slide_layout_dimensions_manager.insert_or_update(slide_layouts=slide_layouts_data)
 
         # Create new slide layout addition info for every new slide layout
-        slide_layout_additional_info.insert_or_update(slide_layouts=slide_layouts_data)
+        slide_layout_additional_info_manager.insert_or_update(slide_layouts=slide_layouts_data)
 
         # Block Layout ===========================================
         # Create new block layouts
-        block_layout_manager.insert(slide_layouts_data)
+        block_layout_data = block_layout_manager.insert(slide_layouts_data)
 
         # Create new block layout dimensions
-        # new_block_layout_dimensions = block_layout_dimensions_manager.insert(new_block_layouts)
-        # if new_block_layout_dimensions:
-        #     print(f"new_block_layout_dimensions {len(new_block_layout_dimensions)}")
+        block_layout_dimensions_manager.insert_or_update(block_layout_data)
 
         # Create new precompiled images for every new block layout
-        # new_precompiled_images = precompiled_image_manager.insert(new_block_layouts, **self.tg_params)
-        # if new_precompiled_images:
-        #     print(f"new_precompiled_images {len(new_precompiled_images)}")
+        new_precompiled_images = precompiled_image_manager.insert(block_layout_data, **self.tg_params)
+        if new_precompiled_images:
+            print(f"new_precompiled_images {len(new_precompiled_images)}")
 
 
 executor = Executor()
 
 if __name__ == "__main__":
-    layout_name = "qweryuiyhgf54465h6b"
+    layout_name = "qweryuiyhgf544ss65hsss6b"
     user_role = "USER"
 
-    executor.insert_or_update(layout_name, user_role=user_role)
+    # executor.insert_or_update(layout_name, user_role=user_role)
+
+    miniature_path = "miniature_path"
+    miniature_extension = "miniature_extension"
+    layout_name = "layout_namea"
+
+    executor = Executor(
+        path=miniature_path,
+        extension=miniature_extension,
+        layout_name=layout_name,
+    )
+    executor.insert_or_update(layout_name, user_role="USER")
 
 
 # # classic
