@@ -1,4 +1,4 @@
-from db_work.implemented import block_layout_dimensions_manager, block_layout_manager, color_settings_manager, layout_roles_manager, precompiled_image_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
+from db_work.implemented import block_layout_manager, color_settings_manager, layout_roles_manager, presentation_layout_manager, presentation_layout_styles_manager, slide_layout_additional_info, slide_layout_dimensions_manager, slide_layout_manager, slide_layout_styles_manager
 
 
 class Executor:
@@ -53,19 +53,17 @@ class Executor:
 
         # Block Layout ===========================================
         # Create new block layouts
-        new_block_layouts = block_layout_manager.insert(slide_layouts_data)
-        if new_block_layouts:
-            print(f"new_block_layout {len(new_block_layouts)}")
+        block_layout_manager.insert(slide_layouts_data)
 
         # Create new block layout dimensions
-        new_block_layout_dimensions = block_layout_dimensions_manager.insert(new_block_layouts)
-        if new_block_layout_dimensions:
-            print(f"new_block_layout_dimensions {len(new_block_layout_dimensions)}")
+        # new_block_layout_dimensions = block_layout_dimensions_manager.insert(new_block_layouts)
+        # if new_block_layout_dimensions:
+        #     print(f"new_block_layout_dimensions {len(new_block_layout_dimensions)}")
 
         # Create new precompiled images for every new block layout
-        new_precompiled_images = precompiled_image_manager.insert(new_block_layouts, **self.tg_params)
-        if new_precompiled_images:
-            print(f"new_precompiled_images {len(new_precompiled_images)}")
+        # new_precompiled_images = precompiled_image_manager.insert(new_block_layouts, **self.tg_params)
+        # if new_precompiled_images:
+        #     print(f"new_precompiled_images {len(new_precompiled_images)}")
 
 
 executor = Executor()

@@ -768,7 +768,7 @@ class SlideLayoutManager(BaseManager):
             session.execute(updated_query)
 
             logger.info(f"SlideLayoutManager: send {len(data)} slide layouts to other managers.")
-            logger.info(f"SlideLayoutManager: add {added_slide_layouts} items.")
+            logger.info(f"SlideLayoutManager: insert {added_slide_layouts} items.")
             logger.info(f"SlideLayoutManager: update {updated_slide_layouts} items.\n")
 
             return data
@@ -910,8 +910,8 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
 
                 session.commit()
 
-            logger.info(f"SlideLayoutAdditionalInfoManager: add {added_items} items.")
-            logger.info(f"SlideLayoutAdditionalInfoManager: update {updated_items} items.")
+            logger.info(f"SlideLayoutAdditionalInfoManager: insert {added_items} items.")
+            logger.info(f"SlideLayoutAdditionalInfoManager: update {updated_items} items.\n")
 
             return added_data
 
@@ -967,7 +967,7 @@ class SlideLayoutDimensionsManager(BaseManager):
 
             session.commit()
 
-            logger.info(f"SlideLayoutDimensionsManager: add {added_items} items.")
+            logger.info(f"SlideLayoutDimensionsManager: insert {added_items} items.")
             logger.info(f"SlideLayoutDimensionsManager: update {updated_items} items.\n")
 
             return added_data
@@ -976,9 +976,7 @@ class SlideLayoutDimensionsManager(BaseManager):
 
 
 class BlockLayoutManager(BaseManager):
-    """Insert a field in BlockLayoutManager Table."""
-
-    # Возможно сюда нужно будет добвать логику на update
+    """Insert a entry in BlockLayoutManager Table."""
 
     def __init__(self):
         super().__init__()
@@ -989,33 +987,45 @@ class BlockLayoutManager(BaseManager):
 
         block_layout_table, session = self.open_session(self.table)
 
-        added_data = []
+        data = []
+        added_items = 0
+        values = {}
 
         def logic():
-            nonlocal added_data
+            nonlocal data
+            nonlocal added_items
+            nonlocal values
 
             for slide_layout in slide_layouts:
                 slide_layout_id = slide_layout.get("id")
-                slide_layout_blocks = slide_layout.get("slide_blocks")
-                slide_layout_presentation_palette = slide_layout.get("slide_presentation_palette")
+                slide_layout_blocks = slide_layout.get("blocks")
+                slide_layout_presentation_palette = slide_layout.get("presentationPaletteColors")
 
                 for slide_layout_block in slide_layout_blocks:
                     block_layout_type = slide_layout_block.get("sql_type")
                     id = generate_uuid()
 
-                    values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
-                    query = insert(block_layout_table).values(values)
-                    session.execute(query)
+                    existing_query = select(block_layout_table).where(block_layout_table.c.slideLayoutId == slide_layout_id, block_layout_table.c.blockLayoutType == block_layout_type)
+                    result = session.execute(existing_query).fetchall()
+
+                    if result is None:
+                        values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
+                        query = insert(block_layout_table).values(values)
+                        session.execute(query)
+                        added_items += 1
 
                     # Add block parametrs for other block layout managers
                     values["dimensions"] = slide_layout_block.get("dimensions")
                     values["precompiled_image_info"] = slide_layout_block.get("precompiled_image_info")
                     values["presentation_palette"] = slide_layout_presentation_palette
 
-                    added_data.append(values)
+                    data.append(values)
+
+            logger.info(f"BlockLayoutManager: send {len(data)} block layouts to other managers.")
+            logger.info(f"BlockLayoutManager: insert {added_items} items.\n")
 
             session.commit()
-            return added_data
+            return data
 
         return super().execute(logic, session)
 
