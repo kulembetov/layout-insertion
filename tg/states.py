@@ -27,3 +27,4 @@ class DeletingProcessState(StatesGroup):
 class StartingProcessState(StatesGroup):
     inserting = State()
     updating = State()
+    deleting = State()

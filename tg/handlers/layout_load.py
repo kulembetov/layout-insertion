@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from db_work.executor import Executor
-from db_work.implemented import presentation_layout_manager, slide_layout_manager
+from db_work.implemented import presentation_layout_manager
 from log_utils import setup_logger
 from tg.states import LoadingProcessState, MiniatureState, OptionState, StartingProcessState
 from tg.utils import r_text, to_str_user
@@ -41,10 +41,11 @@ async def insert_choice(query: CallbackQuery, state: FSMContext):
 
     cb_data = query.data
     str_user = to_str_user(query.from_user)
+    layout_name = await state.get_value("layout_name")
 
     match cb_data:
         case "yes":
-            logger.info(f"Пользователь {str_user} хочет добавить шаблон.")
+            logger.info(f"Пользователь {str_user} хочет добавить шаблон <{layout_name}>.")
             await query.message.edit_text("Добавление одобрено\\.", reply_markup=None)
 
             await state.update_data(query_from="insert")
@@ -75,10 +76,11 @@ async def update_choice(query: CallbackQuery, state: FSMContext):
 
     cb_data = query.data
     str_user = to_str_user(query.from_user)
+    layout_name = await state.get_value("layout_name")
 
     match cb_data:
         case "yes":
-            logger.info(f"Пользователь {str_user} хочет обновить шаблон.")
+            logger.info(f"Пользователь {str_user} хочет обновить шаблон <{layout_name}>.")
             await query.message.edit_text("Обновление одобрено\\.", reply_markup=None)
 
             await state.update_data(query_from="update")
@@ -120,9 +122,10 @@ async def insert_logic(query: CallbackQuery, state: FSMContext):
         extension=miniature_extension,
         layout_name=layout_name,
     )
-    executor.insert(layout_name, user_role="USER")
+    executor.insert_or_update(layout_name, user_role="USER")
 
     await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно добавлен\\.")
+    logger.info(f"Пользователь {str_user} добавил шаблон <{layout_name}>.")
 
     await state.clear()
     await query.answer()
@@ -135,12 +138,21 @@ async def update_logic(query: CallbackQuery, state: FSMContext):
     str_user = to_str_user(query.from_user)
     logger.info(f"Пользователь {str_user} начал процесс обновления.")
 
-    layout_name, layout_id = await state.get_value("layout_name"), await state.get_value("layout_id")
+    data = await state.get_data()
+    miniature_path = data.get("miniature_path")
+    miniature_extension = data.get("miniature_extension")
+    layout_name = data.get("layout_name")
 
-    res = slide_layout_manager.insert_or_update(layout_id)
+    executor = Executor(
+        path=miniature_path,
+        extension=miniature_extension,
+        layout_name=layout_name,
+    )
+    res = executor.insert_or_update(layout_name, user_role="USER")
 
     await query.message.answer(f"Шаблон *{r_text(layout_name)}* успешно обновлен\\.")
     await query.message.answer(f"Результаты обновления: {r_text(str(res))}")
+    logger.info(f"Пользователь {str_user} обновил шаблон <{layout_name}>.")
 
     await state.clear()
     await query.answer()
