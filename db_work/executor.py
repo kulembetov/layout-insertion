@@ -14,13 +14,14 @@ class Executor:
         # Времено
         update = True
         find_name = presentation_layout_manager.select_layout_by_name(layout_name)
-        if find_name is not True:
+        print(find_name)
+        if find_name is None:
             update = False
         print(f"Update: {update} \n")
 
-        # if update is True:
-        #     layout_data = presentation_layout_manager.select_layout_by_name(layout_name)
-        #     new_presentation_layout_id = layout_data[0] if layout_data else None
+        if update is True:
+            layout_data = presentation_layout_manager.select_layout_by_name(layout_name)
+            presentation_layout_id = layout_data[0] if layout_data else None
 
         # Create new Presentation Layout
         if update is False:
@@ -78,7 +79,7 @@ if __name__ == "__main__":
 
     miniature_path = "miniature_path"
     miniature_extension = "miniature_extension"
-    layout_name = "layout_name1"
+    layout_name = "new_pattern"
 
     executor = Executor(
         path=miniature_path,
