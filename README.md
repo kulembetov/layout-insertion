@@ -224,7 +224,7 @@ All these tables are created and maintained in your company's presentation datab
 **All Commands (Cross-Platform):**
 ```bash
 # 1. Extract from Figma
-poetry run python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+poetry run python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 -1 --output-dir my_output
 
 # 2. Insert into PresentationPalette
 # manual mode
@@ -269,7 +269,7 @@ poetry run python generate_image_options_sql.py
 poetry shell
 
 # Then run all commands without poetry run prefix
-python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 -1 --output-dir my_output
 python insert_presentation_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
 python match_block_layout_presentation_palette.py
@@ -744,7 +744,7 @@ poetry run pre-commit run --files figma.py slide_insertion.py
 **Все команды (кроссплатформенные):**
 ```bash
 # 1. Извлечение из Figma
-poetry run python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+poetry run python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 -1 --output-dir my_output
 
 # 2. Вставка в PresentationPalette
 # ручной режим
@@ -789,7 +789,7 @@ poetry run python generate_image_options_sql.py
 poetry shell
 
 # Затем запускать все команды без префикса poetry run
-python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 -1 --output-dir my_output
+python figma.py --mode slides --slides 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 -1 --output-dir my_output
 python insert_presentation_palette.py --json my_output/sql_generator_input.json --mode auto --db database.ini --csv presentation_palette_mapping.csv
 python insert_block_layout_config.py --json my_output/sql_generator_input.json --mode auto --db database.ini
 python match_block_layout_presentation_palette.py
