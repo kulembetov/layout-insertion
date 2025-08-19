@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from collections.abc import Sequence
 from typing import Any
 
 import uuid_utils as uuid
@@ -84,9 +85,8 @@ def get_slide_layout_data_from_cache(presentation_layout_id: str) -> list[dict[A
     return slide_layout_frame_data
 
 
-# Выделить в класс
 class SlideLayoutUtils:
-    """Slide Layout Utils"""
+    """Slide Layout Utils."""
 
     def __init__(self):
         self.miniatures_base_path = constants.MINIATURES_BASE_PATH
@@ -112,3 +112,74 @@ class SlideLayoutUtils:
         """Convert camelCase or PascalCase to snake_case."""
         s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
         return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
+
+
+class BlockLayoutUtils:
+    """Block Layout Utils."""
+
+    def __init__(self):
+        self.miniatures_base_path = constants.MINIATURES_BASE_PATH
+
+    def normalize_name(self, name: str) -> str:
+        """
+        Normalize a block or slide name using centralized cleaning rules.
+        """
+        return DataCleaner.clean_block_name(name)
+
+
+class CleaningRule:
+    """Base class for cleaning rules."""
+
+    def apply(self, text: str) -> str:
+        """Apply the cleaning rule to the text."""
+        raise NotImplementedError
+
+
+class RegexCleaningRule(CleaningRule):
+    """Cleaning rule that uses regex substitution."""
+
+    def __init__(self, pattern: str, replacement: str = "", flags: int = 0):
+        self.pattern = pattern
+        self.replacement = replacement
+        self.flags = flags
+
+    def apply(self, text: str) -> str:
+        return re.sub(self.pattern, self.replacement, text, flags=self.flags)
+
+
+class StripCleaningRule(CleaningRule):
+    """Cleaning rule that strips whitespace and specific characters."""
+
+    def __init__(self, chars: str | None = None):
+        self.chars = chars
+
+    def apply(self, text: str) -> str:
+        return text.strip(self.chars)
+
+
+class DataCleaner:
+    """Centralized, extensible data cleaning system."""
+
+    NAME_RULES = [
+        RegexCleaningRule(r"\s*background_\d+", "", re.IGNORECASE),
+        RegexCleaningRule(r"\s*z-index\s*\d+.*", "", re.IGNORECASE),
+        RegexCleaningRule(r"_\d+$", ""),
+        RegexCleaningRule(r"\s+", " "),
+        StripCleaningRule(),
+    ]
+
+    @staticmethod
+    def clean_with_rules(text: str, rules: Sequence[CleaningRule]) -> str:
+        """Apply a list of cleaning rules in sequence."""
+        if not text:
+            return ""
+
+        result = text
+        for rule in rules:
+            result = rule.apply(result)
+        return result
+
+    @classmethod
+    def clean_block_name(cls, name: str) -> str:
+        """Clean a block name using standard rules."""
+        return cls.clean_with_rules(name, cls.NAME_RULES)

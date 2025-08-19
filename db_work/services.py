@@ -5,13 +5,13 @@ import uuid
 from datetime import datetime
 from typing import Any, cast
 
-from sqlalchemy import delete, insert, null, select, update
+from sqlalchemy import delete, func, insert, null, select, update
 from sqlalchemy.engine.row import Row
 from sqlalchemy.sql.elements import ColumnElement
 
 from db_work import constants
 from db_work.database import BaseManager
-from db_work.utils import SlideLayoutUtils, generate_uuid, get_slide_layout_data_from_cache
+from db_work.utils import BlockLayoutUtils, SlideLayoutUtils, generate_uuid, get_slide_layout_data_from_cache
 from log_utils import logs, setup_logger
 
 logger = setup_logger(__name__)
@@ -1588,6 +1588,56 @@ class BlockLayoutLimitManagers(BaseManager):
 
             session.commit()
             return added_data
+
+        return super().execute(logic, session)
+
+
+class BlockLayoutFigureManagers(BaseManager):
+    """Insert an entry in Figure Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = "Figure"
+
+    def insert(self, block_layouts: list[dict]) -> list[dict]:
+        """Insert a field in BlockLayoutDimensions Table."""
+
+        figure_table, session = self.open_session(self.table)
+
+        data = []
+
+        def logic():
+            nonlocal data
+
+            for block_layout in block_layouts:
+                block_layout_id = block_layout.get("id")
+                block_layout_name = block_layout.get("name")
+                block_layout_type = block_layout.get("sql_type")
+
+                clean_block_name = BlockLayoutUtils().normalize_name(name=block_layout_name)
+
+                if block_layout_type == "figure":
+                    match = re.search(r"\(([^)]+)\)", clean_block_name)
+                    if match:
+                        figure_name = match.group(1)
+                        figure_name = re.sub(r"_\d+", "", figure_name)
+                    else:
+                        figure_name = clean_block_name
+
+                    values = {
+                        "id": generate_uuid(),
+                        "name": figure_name,
+                        "createdAt": func.now(),
+                        "blockLayoutId": block_layout_id,
+                    }
+
+                    query = insert(figure_table).values(values)
+                    session.execute(query)
+
+                    data.append(values)
+
+            session.commit()
+            return data
 
         return super().execute(logic, session)
 

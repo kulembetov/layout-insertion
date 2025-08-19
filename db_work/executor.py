@@ -1,5 +1,6 @@
 from db_work.implemented import (
     block_layout_dimensions_manager,
+    block_layout_figure_manager,
     block_layout_limit_manager,
     block_layout_manager,
     block_layout_styles_manager,
@@ -91,6 +92,11 @@ class Executor:
         block_layout_limit = block_layout_limit_manager.insert(block_layout_data)
         if block_layout_limit:
             print(f"block_layout_limit {len(block_layout_limit)}")
+
+        # Create new figures for every block layout
+        block_layout_figure = block_layout_figure_manager.insert(block_layout_data)
+        if block_layout_figure:
+            print(f"block_layout_figure {len(block_layout_figure)}")
 
 
 executor = Executor()
