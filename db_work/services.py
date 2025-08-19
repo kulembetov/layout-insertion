@@ -1678,6 +1678,76 @@ class BlockLayoutFigureManagers(BaseManager):
         return super().execute(logic, session)
 
 
+class BlockLayoutConfigManager(BaseManager):
+    """Insert a row in BlockLayoutConfig Table."""
+
+    # Возможно сюда нужно будет добавить логику на update
+
+    def __init__(self):
+        super().__init__()
+        self.table = "BlockLayoutConfig"
+
+    def insert(self, block_layouts: list[dict]) -> list[dict]:
+        """Insert a row in BlockLayoutConfig Table."""
+
+        block_layout_config_table, session = self.open_session(self.table)
+
+        def logic():
+            def safe_get(d: dict, key: str):
+                return d.get(key, None) if d else None
+
+            added_data = []
+            if not block_layouts:
+                return added_data
+
+            slide_config: dict[str, dict[str, list[dict[str, str]]]] = block_layouts[0].get("slide_config", {})
+            presentation_palette = block_layouts[0].get("presentation_palette", [])
+            if not slide_config or not presentation_palette:
+                return added_data
+
+            for color in presentation_palette:
+                values = {
+                    "id": generate_uuid(),
+                    "text": self._collect(safe_get(slide_config.get("text"), color)),
+                    "slideTitle": self._collect(safe_get(slide_config.get("slideTitle"), color)),
+                    "blockTitle": self._collect(safe_get(slide_config.get("blockTitle"), color)),
+                    "email": self._collect(safe_get(slide_config.get("email"), color)),
+                    "date": self._collect(safe_get(slide_config.get("date"), color)),
+                    "name": self._collect(safe_get(slide_config.get("name"), color)),
+                    "percentage": self._collect(safe_get(slide_config.get("percentage"), color)),
+                    "figure": self._collect(safe_get(slide_config.get("figure"), color)),
+                    "icon": self._collect(safe_get(slide_config.get("icon"), color)),
+                    "background": self._collect(safe_get(slide_config.get("background"), color)),
+                    "subTitle": self._collect(safe_get(slide_config.get("subTitle"), color)),
+                    "number": self._collect(safe_get(slide_config.get("number"), color)),
+                    "logo": self._collect(safe_get(slide_config.get("logo"), color)),
+                    "font": self._collect(safe_get(slide_config.get("font"), color), is_font=True),
+                }
+
+                added_data.append(values)
+                query = insert(block_layout_config_table).values(values)
+                session.execute(query)
+
+            session.commit()
+            return added_data
+
+        return super().execute(logic, session)
+
+    @staticmethod
+    def _collect(list_info: list[dict[str, str]], is_font=False) -> list[str] | None:
+        if not list_info:
+            return None
+        fonts = set()
+        colors = []
+        for dict_info in list_info:
+            if dict_info.get("fontFamily"):
+                fonts.add(dict_info["fontFamily"])
+            if dict_info.get("color"):
+                colors.append(dict_info["color"])
+
+        return sorted(list(fonts)) if is_font else colors
+
+
 # poetry run python -m db_work.services
 
 # if __name__ == "__main__":

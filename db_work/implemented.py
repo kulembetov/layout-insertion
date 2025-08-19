@@ -1,4 +1,5 @@
 from db_work.services import (
+    BlockLayoutConfigManager,
     BlockLayoutDimensionsManagers,
     BlockLayoutFigureManagers,
     BlockLayoutLimitManagers,
@@ -34,3 +35,4 @@ precompiled_image_manager = PrecompiledImageManager()
 block_layout_limit_manager = BlockLayoutLimitManagers()
 block_layout_styles_manager = BlockLayoutStylesManagers()
 block_layout_figure_manager = BlockLayoutFigureManagers()
+block_layout_config_manager = BlockLayoutConfigManager()
