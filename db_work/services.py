@@ -328,6 +328,7 @@ class PresentationLayoutManager(BaseManager):
         затем удаляет все записи в строго определённом порядке, исключающем ошибки внешних ключей:
 
         Порядок удаления:
+        0. Обнуление parentLayoutId в UserBlockLayout (сохранение пользовательских данных)
         1. SlideConfigSequence
         2. SlideLayoutIndexConfig
         3. BlockLayoutIndexConfig
@@ -367,7 +368,21 @@ class PresentationLayoutManager(BaseManager):
 
         def logic():
             try:
-                # Удаляем в правильном порядке согласно зависимостям внешних ключей
+
+                slide_layout_ids = [slide["id"] for slide in structure["slideLayouts"]]
+
+                if slide_layout_ids:
+
+                    user_slide_layout_table, _ = self.open_session("UserSlideLayout")
+                    user_slide_layouts_query = select(user_slide_layout_table.c.id).where(user_slide_layout_table.c.parentLayoutId.in_(slide_layout_ids))
+                    user_slide_layouts = session.execute(user_slide_layouts_query).fetchall()
+                    user_slide_layout_ids = [usl.id for usl in user_slide_layouts]
+                    if user_slide_layout_ids:
+                        user_block_layout_table, _ = self.open_session("UserBlockLayout")
+                        update_query = update(user_block_layout_table).where(user_block_layout_table.c.userSlideLayoutId.in_(user_slide_layout_ids)).values(parentLayoutId=None)
+
+                        session.execute(update_query)
+                        session.commit()
 
                 # 1. SlideConfigSequence (связаны с PresentationPalette)
                 for palette in structure["presentationPalettes"]:
@@ -954,6 +969,7 @@ class SlideLayoutManager(BaseManager):
         затем удаляет все записи в строго определённом порядке, исключающем ошибки внешних ключей:
 
         Порядок удаления:
+        0. Обнуление parentLayoutId в UserBlockLayout (сохранение пользовательских данных)
         1. SlideLayoutIndexConfig
         2. BlockLayoutIndexConfig
         3. Figure
@@ -988,6 +1004,26 @@ class SlideLayoutManager(BaseManager):
         def logic():
             try:
                 deleted_slides = []
+
+                # Получаем все SlideLayout ID для удаления
+                slide_layout_ids = [slide["slideLayout"] for slide in structure["slideLayouts"]]
+
+                if slide_layout_ids:
+
+                    user_slide_layout_table, _ = self.open_session("UserSlideLayout")
+                    user_slide_layouts_query = select(user_slide_layout_table.c.id).where(user_slide_layout_table.c.parentLayoutId.in_(slide_layout_ids))
+                    user_slide_layouts = session.execute(user_slide_layouts_query).fetchall()
+
+                    user_slide_layout_ids = [usl.id for usl in user_slide_layouts]
+
+                    if user_slide_layout_ids:
+                        # Обнуляем parentLayoutId в UserBlockLayout для пользовательских блоков
+                        user_block_layout_table, _ = self.open_session("UserBlockLayout")
+                        update_query = update(user_block_layout_table).where(user_block_layout_table.c.userSlideLayoutId.in_(user_slide_layout_ids)).values(parentLayoutId=None)
+
+                        result = session.execute(update_query)
+                        updated_count = result.rowcount
+                        print(f"Обнулено parentLayoutId в {updated_count} записях UserBlockLayout")
 
                 # Удаляем в правильном порядке согласно зависимостям внешних ключей
 
