@@ -1734,7 +1734,7 @@ class BlockLayoutConfigManager(BaseManager):
         return super().execute(logic, session)
 
     @staticmethod
-    def _collect(list_info: list[dict[str, str]], is_font=False) -> list[str] | None:
+    def _collect(list_info: list[dict[str, str]] | None, is_font=False) -> list[str] | None:
         if not list_info:
             return None
         fonts = set()
