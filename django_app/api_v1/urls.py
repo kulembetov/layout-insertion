@@ -12,6 +12,8 @@ urlpatterns = [
     path("figma/get/presentation_full_data/<uuid:id>", ReceiveFigmaPresentationLayoutFullData.as_view()),
     path("figma/delete/presentation/<uuid:id>", DeletePresentationLayout.as_view()),
     # Slide Layout endpoints
-    path("figma/get/slide_full_data/<uuid:id>", ReceiveSlideLayoutFullData.as_view()),
-    path("figma/delete/slide/<uuid:id>", DeleteSlideLayout.as_view()),
+    path("figma/get/slide_full_data/<uuid:id>", ReceiveSlideLayoutFullData.as_view()),  # GET для одного слайда
+    path("figma/get/slide_full_data/", ReceiveSlideLayoutFullData.as_view()),  # POST для нескольких слайдов
+    path("figma/delete/slide/<uuid:id>", DeleteSlideLayout.as_view()),  # DELETE для одного слайда
+    path("figma/delete/slide/", DeleteSlideLayout.as_view()),  # POST для нескольких слайдов
 ]

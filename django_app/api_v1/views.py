@@ -185,13 +185,14 @@ class DeletePresentationLayout(APIView):
 
 
 class ReceiveSlideLayoutFullData(APIView):
-    """API endpoint to retrieve slide layout structure by ID with all related tables.
+    """API endpoint to retrieve slide layout structure by IDs with all related tables.
 
-    GET method returns structure with IDs only for understanding table relationships.
+    Supports both single ID via URL parameter and multiple IDs via POST request body.
     """
 
     @logs(logger, on=True)
     def get(self, request, id=None) -> Response:
+        """GET method for single slide layout ID via URL parameter."""
         if not id:
             return Response(data={"message": "Slide layout ID is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -200,8 +201,8 @@ class ReceiveSlideLayoutFullData(APIView):
         slide_manager = SlideLayoutManager()
 
         try:
-            # Получаем структуру связей slide layout
-            structure_data = slide_manager.get_slide_layout_structure(str(id))
+            # Получаем структуру связей slide layout (передаем как список)
+            structure_data = slide_manager.get_slide_layout_structure([str(id)])
 
             if structure_data is None:
                 return Response(data={"message": f"Slide layout with ID {id} not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -213,12 +214,42 @@ class ReceiveSlideLayoutFullData(APIView):
             logger.error(f"Error retrieving slide layout structure: {str(e)}")
             return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @logs(logger, on=True)
+    def post(self, request) -> Response:
+        """POST method for multiple slide layout IDs via request body."""
+        slide_ids = request.data.get("slide_ids", [])
+
+        if not slide_ids or not isinstance(slide_ids, list):
+            return Response(data={"message": "slide_ids array is required in request body"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Retrieving structure for {len(slide_ids)} slide layouts")
+
+        slide_manager = SlideLayoutManager()
+
+        try:
+            # Получаем структуру связей slide layouts
+            structure_data = slide_manager.get_slide_layout_structure(slide_ids)
+
+            if structure_data is None:
+                return Response(data={"message": "No slide layouts found"}, status=status.HTTP_404_NOT_FOUND)
+
+            logger.info(f"Successfully retrieved structure for {len(slide_ids)} slide layouts")
+            return Response(data=structure_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error retrieving slide layouts structure: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class DeleteSlideLayout(APIView):
-    """API endpoint to delete a slide layout with all related data."""
+    """API endpoint to delete slide layouts with all related data.
+
+    Supports both single ID via URL parameter and multiple IDs via POST request body.
+    """
 
     @logs(logger, on=True)
     def delete(self, request, id=None) -> Response:
+        """DELETE method for single slide layout ID via URL parameter."""
         if not id:
             return Response(data={"message": "Slide layout ID is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -227,16 +258,43 @@ class DeleteSlideLayout(APIView):
         slide_manager = SlideLayoutManager()
 
         try:
-            # Выполняем удаление
-            deletion_result = slide_manager.delete_slide_layout_structure(str(id))
+            # Выполняем удаление (передаем как список)
+            deletion_result = slide_manager.delete_slide_layout_structure([str(id)])
 
-            if deletion_result:
+            if deletion_result["success"]:
                 logger.info(f"Successfully deleted slide layout ID: {id}")
-                return Response(data={"message": f"Slide layout {id} and all related data successfully deleted", "deleted_slide_id": str(id)}, status=status.HTTP_200_OK)
+                return Response(data={"message": f"Slide layout {id} and all related data successfully deleted", "deletion_result": deletion_result}, status=status.HTTP_200_OK)
             else:
                 logger.error(f"Failed to delete slide layout ID: {id}")
-                return Response(data={"message": f"Failed to delete slide layout {id}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response(data={"message": f"Failed to delete slide layout {id}", "deletion_result": deletion_result}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except Exception as e:
             logger.error(f"Error deleting slide layout {id}: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @logs(logger, on=True)
+    def post(self, request) -> Response:
+        """POST method for multiple slide layout IDs via request body."""
+        slide_ids = request.data.get("slide_ids", [])
+
+        if not slide_ids or not isinstance(slide_ids, list):
+            return Response(data={"message": "slide_ids array is required in request body"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Deleting {len(slide_ids)} slide layouts")
+
+        slide_manager = SlideLayoutManager()
+
+        try:
+            # Выполняем удаление
+            deletion_result = slide_manager.delete_slide_layout_structure(slide_ids)
+
+            if deletion_result["success"]:
+                logger.info(f"Successfully deleted {deletion_result['total_deleted']} slide layouts")
+                return Response(data={"message": f"Successfully deleted {deletion_result['total_deleted']} out of {deletion_result['total_requested']} slide layouts", "deletion_result": deletion_result}, status=status.HTTP_200_OK)
+            else:
+                logger.error(f"Failed to delete slide layouts: {deletion_result['message']}")
+                return Response(data={"message": f"Failed to delete slide layouts: {deletion_result['message']}", "deletion_result": deletion_result}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            logger.error(f"Error deleting slide layouts: {str(e)}")
             return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
