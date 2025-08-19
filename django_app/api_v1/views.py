@@ -182,3 +182,61 @@ class DeletePresentationLayout(APIView):
         except Exception as e:
             logger.error(f"Error deleting presentation layout {id}: {str(e)}")
             return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ReceiveSlideLayoutFullData(APIView):
+    """API endpoint to retrieve slide layout structure by ID with all related tables.
+
+    GET method returns structure with IDs only for understanding table relationships.
+    """
+
+    @logs(logger, on=True)
+    def get(self, request, id=None) -> Response:
+        if not id:
+            return Response(data={"message": "Slide layout ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Retrieving structure for slide layout ID: {id}")
+
+        slide_manager = SlideLayoutManager()
+
+        try:
+            # Получаем структуру связей slide layout
+            structure_data = slide_manager.get_slide_layout_structure(str(id))
+
+            if structure_data is None:
+                return Response(data={"message": f"Slide layout with ID {id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            logger.info(f"Successfully retrieved structure for slide layout ID: {id}")
+            return Response(data=structure_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error retrieving slide layout structure: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeleteSlideLayout(APIView):
+    """API endpoint to delete a slide layout with all related data."""
+
+    @logs(logger, on=True)
+    def delete(self, request, id=None) -> Response:
+        if not id:
+            return Response(data={"message": "Slide layout ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Deleting slide layout ID: {id}")
+
+        slide_manager = SlideLayoutManager()
+
+        try:
+            # Выполняем удаление
+            deletion_result = slide_manager.delete_slide_layout_structure(str(id))
+
+            if deletion_result:
+                logger.info(f"Successfully deleted slide layout ID: {id}")
+                return Response(data={"message": f"Slide layout {id} and all related data successfully deleted", "deleted_slide_id": str(id)}, status=status.HTTP_200_OK)
+            else:
+                logger.error(f"Failed to delete slide layout ID: {id}")
+                return Response(data={"message": f"Failed to delete slide layout {id}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            logger.error(f"Error deleting slide layout {id}: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
