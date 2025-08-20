@@ -646,11 +646,34 @@ class PresentationPaletteManager(BaseManager):
         super().__init__()
         self.table = "PresentationPalette"
 
-    def insert(self):
+    def insert(self, slides_layouts: list[dict], layout_id: str) -> list[dict]:
         presentation_palette_table, session = self.open_session(self.table)
 
         def logic():
-            return None
+            if len(slides_layouts) == 0:
+                print("slides_layouts Пустой")
+                return []
+
+            presentation_palette_colors: list[str] = slides_layouts[0].get("presentationPaletteColors", [])
+
+            if not presentation_palette_colors:
+                return []
+
+            added_data = []
+            for color in presentation_palette_colors:
+                values = {
+                    "id": generate_uuid(),
+                    "presentationLayoutId": layout_id,
+                    "color": color,
+                }
+                added_data.append(values)
+
+                query = insert(presentation_palette_table).values(values)
+                session.execute(query)
+
+            session.commit()
+
+            return added_data
 
         return super().execute(logic, session)
 

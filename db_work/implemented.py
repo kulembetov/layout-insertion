@@ -11,6 +11,7 @@ from db_work.services import (
     PrecompiledImageManager,
     PresentationLayoutManager,
     PresentationLayoutStylesManager,
+    PresentationPaletteManager,
     SlideLayoutAdditionalInfoManager,
     SlideLayoutDimensionsManager,
     SlideLayoutManager,
@@ -22,6 +23,7 @@ presentation_layout_manager = PresentationLayoutManager()
 color_settings_manager = ColorSettingsManager()
 presentation_layout_styles_manager = PresentationLayoutStylesManager()
 layout_roles_manager = LayoutRolesManager()
+presentation_palette_manager = PresentationPaletteManager()
 
 # Slide Layout Managers
 slide_layout_manager = SlideLayoutManager()

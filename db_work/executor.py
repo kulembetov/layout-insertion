@@ -11,6 +11,7 @@ from db_work.implemented import (
     precompiled_image_manager,
     presentation_layout_manager,
     presentation_layout_styles_manager,
+    presentation_palette_manager,
     slide_layout_additional_info_manager,
     slide_layout_dimensions_manager,
     slide_layout_manager,
@@ -73,6 +74,11 @@ class Executor:
         # Create new slide layout addition info for every new slide layout
         slide_layout_additional_info_manager.insert_or_update(slide_layouts=slide_layouts_data)
 
+        # PresentationPaletteColors
+        presentation_palette_data = presentation_palette_manager.insert(slide_layouts_data, presentation_layout_id)
+        if presentation_palette_data:
+            print(f"presentation_palette_data {len(presentation_palette_data)}")
+
         # Block Layout ===========================================
         # Create new block layouts
         block_layout_data = block_layout_manager.insert(slide_layouts_data)
@@ -131,7 +137,6 @@ if __name__ == "__main__":
         layout_name=layout_name,
     )
     executor.insert_or_update(layout_name, user_role="USER")
-
 
 # # classic
 # '019006b0-03af-7b04-a66f-8d31b0a08769'
