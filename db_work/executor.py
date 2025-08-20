@@ -1,4 +1,5 @@
 from db_work.implemented import (
+    block_layout_config_manager,
     block_layout_dimensions_manager,
     block_layout_figure_manager,
     block_layout_index_config_manager,
@@ -100,10 +101,16 @@ class Executor:
             print(f"block_layout_figure {len(block_layout_figure)}")
 
         # Create new configs for every block layout
+        block_layout_config = block_layout_config_manager.insert(block_layout_data)
+        if block_layout_config:
+            print(f"block_layout_config {len(block_layout_config)}")
+        else:
+            print(block_layout_config)
+
+        # Create new index configs for every block layout
         block_layout_index_config = block_layout_index_config_manager.insert(block_layout_data)
         if block_layout_index_config:
             print(f"block_layout_index_config {len(block_layout_index_config)}")
-            print(block_layout_index_config)
 
 
 executor = Executor()
@@ -116,7 +123,7 @@ if __name__ == "__main__":
 
     miniature_path = "miniature_path"
     miniature_extension = "miniature_extension"
-    layout_name = "new_pattern"
+    layout_name = "new_pattern12231312"
 
     executor = Executor(
         path=miniature_path,
