@@ -1401,16 +1401,20 @@ class BlockLayoutManager(BaseManager):
                     values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
                     values_for_block_layout_table = values
 
-                    existing_query = select(block_layout_table).where(block_layout_table.c.slideLayoutId == slide_layout_id and block_layout_table.c.blockLayoutType == block_layout_type)
-                    result = session.execute(existing_query).first()
+                    # existing_query = select(block_layout_table).where(block_layout_table.c.slideLayoutId == slide_layout_id and block_layout_table.c.blockLayoutType == block_layout_type)
+                    # result = session.execute(existing_query).first()
 
-                    if result:
-                        updated_items += 1
+                    # if result:
+                    #     updated_items += 1
 
-                    else:
-                        query = insert(block_layout_table).values(values_for_block_layout_table)
-                        session.execute(query)
-                        added_items += 1
+                    # else:
+                    #     query = insert(block_layout_table).values(values_for_block_layout_table)
+                    #     session.execute(query)
+                    #     added_items += 1
+
+                    query = insert(block_layout_table).values(values_for_block_layout_table)
+                    session.execute(query)
+                    added_items += 1
 
                     # Add block parametrs for other block layout managers
                     values["dimensions"] = slide_layout_block.get("dimensions")
