@@ -641,6 +641,20 @@ class PresentationLayoutManager(BaseManager):
         return summary
 
 
+class PresentationPaletteManager(BaseManager):
+    def __init__(self):
+        super().__init__()
+        self.table = "PresentationPalette"
+
+    def insert(self):
+        presentation_palette_table, session = self.open_session(self.table)
+
+        def logic():
+            return None
+
+        return super().execute(logic, session)
+
+
 class ColorSettingsManager(BaseManager):
     """Interacts With The ColorSettings Table."""
 
@@ -720,7 +734,7 @@ class SlideLayoutManager(BaseManager):
 
     @logs(logger, on=True)
     def insert_or_update(self, presentation_layout_id: str | None) -> list[dict[Any, Any]]:
-        """Create or update fieds in SliedeLayout table."""
+        """Create or update fields in SlideLayout table."""
 
         slide_layout_table, session = self.open_session(self.table)
         data = []
@@ -1352,7 +1366,6 @@ class BlockLayoutManager(BaseManager):
                 slide_layout_presentation_palette = slide_layout.get("presentationPaletteColors")
 
                 for slide_layout_block in slide_layout_blocks:
-
                     block_layout_type = slide_layout_block.get("sql_type")
                     id = generate_uuid()
 
