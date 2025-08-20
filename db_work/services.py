@@ -1340,6 +1340,12 @@ class SlideLayoutDimensionsManager(BaseManager):
 class BlockLayoutManager(BaseManager):
     """Insert a entry in BlockLayoutManager Table."""
 
+    # логика обновления
+    # Получать поле для конкретного block layout
+    # Сравнить есть ли отличие с существующим словарем values
+    # Если есть blockLayoutType для slideLayoutId, то ничего не делать.
+    # Если нет, то сделать insert.
+
     def __init__(self):
         super().__init__()
         self.table = "BlockLayout"
@@ -1372,9 +1378,16 @@ class BlockLayoutManager(BaseManager):
                     values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
                     values_for_block_layout_table = values
 
-                    query = insert(block_layout_table).values(values_for_block_layout_table)
-                    session.execute(query)
-                    added_items += 1
+                    existing_query = select(block_layout_table).where(block_layout_table.c.slideLayoutId == slide_layout_id and block_layout_table.c.blockLayoutType == block_layout_type)
+                    result = session.execute(existing_query).first()
+
+                    if result:
+                        updated_items += 1
+
+                    else:
+                        query = insert(block_layout_table).values(values_for_block_layout_table)
+                        session.execute(query)
+                        added_items += 1
 
                     # Add block parametrs for other block layout managers
                     values["dimensions"] = slide_layout_block.get("dimensions")
@@ -1389,7 +1402,7 @@ class BlockLayoutManager(BaseManager):
             session.commit()
 
             logger.info(f"BlockLayoutManager: insert {added_items} items.")
-            logger.info(f"BlockLayoutManager: update {updated_items} items.\n")
+            logger.info(f"BlockLayoutManager: exists {updated_items} and doesn't need to be added.\n")
 
             return data
 
@@ -1819,30 +1832,3 @@ class BlockLayoutIndexConfigManagers(BaseManager):
 
 
 # poetry run python -m db_work.services
-
-# if __name__ == "__main__":
-
-
-# pattern
-# class BlockLayoutDimensionsManagers(BaseManager):
-#     """Insert a field in BlockLayoutDimensionsManagers Table."""
-
-#     # Возможно сюда нужно будет добавить логику на update
-
-#     def __init__(self):
-#         super().__init__()
-#         self.table = "BlockLayoutDimensions"
-
-#     def insert(self, slide_layouts: list[dict]) -> list[dict]:
-#         """Insert a field in BlockLayoutDimensions Table."""
-
-#         block_layout_dimensions_table, session = self.open_session(self.table)
-
-#         added_data = []
-
-#         def logic():
-#             nonlocal added_data
-
-#             return added_data
-
-#         return super().execute(logic, session)
