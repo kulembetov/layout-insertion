@@ -1846,6 +1846,49 @@ class BlockLayoutIndexConfigManager(BaseManager):
         return super().execute(logic, session)
 
 
+class SlideLayoutIndexConfigManager(BaseManager):
+    """Insert a row in SlideLayoutIndexConfig Table."""
+
+    # Возможно сюда нужно будет добавить логику на update
+
+    def __init__(self):
+        super().__init__()
+        self.table = "SlideLayoutIndexConfig"
+
+    def insert(self, slide_layouts: list[dict]) -> list[dict]:
+        """Insert a row in SlideLayoutIndexConfig Table."""
+
+        slide_layout_index_config_table, session = self.open_session(self.table)
+
+        def logic():
+            added_data = []
+            if not slide_layouts:
+                return added_data
+
+            presentation_palette_id = ...
+            block_layout_index_config_id = ...
+            block_layout_config_id = ...
+
+            for slide_layout in slide_layouts:
+                values = {
+                    "id": generate_uuid(),
+                    "presentationPaletteId": presentation_palette_id,
+                    "configNumber": 0,
+                    "slideLayoutId": slide_layout.get("id"),
+                    "blockLayoutIndexConfigId": block_layout_index_config_id,
+                    "blockLayoutConfigId": block_layout_config_id,
+                }
+
+                added_data.append(values)
+                query = insert(slide_layout_index_config_table).values(values)
+                session.execute(query)
+
+            session.commit()
+            return added_data
+
+        return super().execute(logic, session)
+
+
 class BlockLayoutToDeleteManager(BaseManager):
     """Insert an entry in BlockLayout Table."""
 
