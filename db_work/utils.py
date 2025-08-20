@@ -126,6 +126,12 @@ class BlockLayoutUtils:
         """
         return DataCleaner.clean_block_name(name)
 
+    def extract_index(self, name: str, block_type: str | None = None) -> int | None:
+        """
+        Extracts an index from a block name using all known patterns.
+        """
+        return DataCleaner.extract_index(name, block_type)
+
 
 class CleaningRule:
     """Base class for cleaning rules."""
@@ -183,3 +189,32 @@ class DataCleaner:
     def clean_block_name(cls, name: str) -> str:
         """Clean a block name using standard rules."""
         return cls.clean_with_rules(name, cls.NAME_RULES)
+
+    @classmethod
+    def extract_index(cls, name: str, block_type: str | None = None) -> int | None:
+        """Extract numeric index from name using various patterns."""
+        if not name:
+            return None
+
+        paren_match = re.search(r"\(([^)]+)\)", name)
+        if paren_match:
+            inner = paren_match.group(1)
+            idx_match = re.search(r"_(\d+)", inner)
+            if idx_match:
+                return int(idx_match.group(1))
+
+        if block_type:
+            pattern = rf"{block_type}[_\s-]*(\d+)"
+            match = re.search(pattern, name, re.IGNORECASE)
+            if match:
+                return int(match.group(1))
+
+        match = re.search(r"_(\d+)$", name)
+        if match:
+            return int(match.group(1))
+
+        match = re.search(r"percentage\s*(\d+)", name, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+        return None

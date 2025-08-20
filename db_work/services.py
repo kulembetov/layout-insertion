@@ -1678,6 +1678,64 @@ class BlockLayoutFigureManagers(BaseManager):
         return super().execute(logic, session)
 
 
+class BlockLayoutIndexConfigManagers(BaseManager):
+    """Insert an entry in BlockLayoutIndexConfig Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = "BlockLayoutIndexConfig"
+
+    def insert(self, block_layouts: list[dict]) -> list[dict]:
+        """Insert an entry in BlockLayoutIndexConfig Table."""
+
+        block_layout_index_config_table, session = self.open_session(self.table)
+
+        data = []
+
+        def logic():
+            nonlocal data
+
+            for block_layout in block_layouts:
+                block_layout_id = block_layout.get("id")
+                block_layout_name = block_layout.get("name")
+                block_layout_type = block_layout.get("sql_type")
+                # print(block_layout_name)
+                # block_layout_index = BlockLayoutUtils().extract_index(name=block_layout_name, block_type=block_layout_type) # 1302
+                match = re.search(r"z-index\s*(\d+)", block_layout_name)
+                if match:
+                    block_layout_index = int(match.group(1))
+                else:
+                    block_layout_index = None
+
+                print(block_layout_index)
+                index_font_id = 0
+
+                if block_layout_type in ["table", "infographik", "image"]:
+                    continue
+
+                if block_layout_index is not None:
+                    block_id_to_index_config_id: dict[str, list[str]] = {}
+                    block_id_to_index_config_id[block_layout_id] = []
+
+                    index_color_id = block_layout_index
+
+                values = {
+                    "id": generate_uuid(),
+                    "blockLayoutId": block_layout_id,
+                    "indexColorId": index_color_id,
+                    "indexFontId": index_font_id,
+                }
+                query = insert(block_layout_index_config_table).values(values)
+                session.execute(query)
+
+                data.append(values)
+
+            session.commit()
+            return data
+
+        return super().execute(logic, session)
+
+
 # poetry run python -m db_work.services
 
 # if __name__ == "__main__":

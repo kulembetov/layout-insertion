@@ -1,6 +1,7 @@
 from db_work.implemented import (
     block_layout_dimensions_manager,
     block_layout_figure_manager,
+    block_layout_index_config_manager,
     block_layout_limit_manager,
     block_layout_manager,
     block_layout_styles_manager,
@@ -97,6 +98,12 @@ class Executor:
         block_layout_figure = block_layout_figure_manager.insert(block_layout_data)
         if block_layout_figure:
             print(f"block_layout_figure {len(block_layout_figure)}")
+
+        # Create new configs for every block layout
+        block_layout_index_config = block_layout_index_config_manager.insert(block_layout_data)
+        if block_layout_index_config:
+            print(f"block_layout_index_config {len(block_layout_index_config)}")
+            print(block_layout_index_config)
 
 
 executor = Executor()
