@@ -668,17 +668,17 @@ class PresentationPaletteManager(BaseManager):
         presentation_palette_table, session = self.open_session(self.table)
 
         def logic():
-            if len(slides_layouts) == 0:
-                print("slides_layouts Пустой")
-                return []
+            data: list[dict] = []
+            palette_ids: dict[str, str] = {}
+
+            if not slides_layouts:
+                return data, palette_ids
 
             presentation_palette_colors: list[str] = slides_layouts[0].get("presentationPaletteColors", [])
 
             if not presentation_palette_colors:
-                return []
+                return data, palette_ids
 
-            added_data: list[dict] = []
-            palette_ids: dict[str, str] = {}
             for color in presentation_palette_colors:
                 values = {
                     "id": generate_uuid(),
@@ -686,15 +686,15 @@ class PresentationPaletteManager(BaseManager):
                     "color": color,
                 }
                 palette_ids[color] = values["id"]
-                added_data.append(values)
+                data.append(values)
 
                 query = insert(presentation_palette_table).values(values)
                 session.execute(query)
 
             session.commit()
-            logger.info(f"PresentationPaletteManager: insert {len(added_data)} items.\n")
+            logger.info(f"PresentationPaletteManager: insert {len(data)} items.\n")
             # logger.info(f"PresentationPaletteManager: update {updated_data} items.\n")
-            return added_data, palette_ids
+            return data, palette_ids
 
         return super().execute(logic, session)
 
@@ -787,24 +787,18 @@ class SlideLayoutManager(BaseManager):
         """Insert or update an entry in SlideLayout table."""
 
         slide_layout_table, session = self.open_session(self.table)
-        data = []
-        value_id = None
-        updated_slide_layouts = 0
-        added_slide_layouts = 0
 
         def logic():
-            nonlocal data
-            nonlocal value_id
-            nonlocal updated_slide_layouts
-            nonlocal added_slide_layouts
+            data = []
+            updated_slide_layouts = 0
+            added_slide_layouts = 0
 
             query = select(slide_layout_table).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
             postgres_data = session.execute(query).fetchall()
             values = get_slide_layout_data_from_cache(presentation_layout_id)
 
             for value in values:
-                value_for_slide_layout = value
-                keys_to_remove = ("dimensions", "blocks", "slide_type", "columns", "presentationPaletteColors")
+                keys_to_remove = ("dimensions", "blocks", "slide_type", "columns", "presentationPaletteColors", "slideConfig")
                 value_for_slide_layout = {k: v for k, v in value.items() if k not in keys_to_remove}
 
                 uuid_data_item = {k: v if k != "id" else generate_uuid() for k, v in value_for_slide_layout.items()}
@@ -831,6 +825,7 @@ class SlideLayoutManager(BaseManager):
                         value_id = compared_row.id
 
                 else:
+
                     new_entry = dict(uuid_data_item)
                     new_entry["id"] = generate_uuid()
                     query = insert(slide_layout_table).values(**new_entry)
@@ -1221,10 +1216,8 @@ class SlideLayoutStylesManager(BaseManager):
 
         slide_layout_styles_table, session = self.open_session(self.table)
 
-        added_data = []
-
         def logic():
-            nonlocal added_data
+            data = []
 
             for item in slide_layouts:
                 existing_query = select(slide_layout_styles_table.c.slideLayoutId).where(slide_layout_styles_table.c.slideLayoutId == item.get("id"))
@@ -1232,14 +1225,14 @@ class SlideLayoutStylesManager(BaseManager):
 
                 if not result:
                     values = {"slideLayoutId": item.get("id")}
-                    added_data.append(values)
+                    data.append(values)
 
                     query = insert(slide_layout_styles_table).values(values)
                     session.execute(query)
 
             session.commit()
-            logger.info(f"SlideLayoutStylesManager: insert {len(added_data)} items. \n")
-            return added_data
+            logger.info(f"SlideLayoutStylesManager: insert {len(data)} items. \n")
+            return data
 
         return super().execute(logic, session)
 
@@ -1256,14 +1249,10 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
 
         slide_layout_additional_info, session = self.open_session(self.table)
 
-        added_data = []
-        updated_items = 0
-        added_items = 0
-
         def logic():
-            nonlocal added_data
-            nonlocal updated_items
-            nonlocal added_items
+            data = []
+            updated_items = 0
+            added_items = 0
 
             if slide_layouts:
                 for slide_layout in slide_layouts:
@@ -1306,7 +1295,7 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                     if result is None:
                         query = insert(slide_layout_additional_info).values(values)
                         session.execute(query)
-                        added_data.append(values)
+                        data.append(values)
                         added_items += 1
 
                     else:
@@ -1316,7 +1305,7 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                         if should_update:
                             update_query = update(slide_layout_additional_info).where(slide_layout_additional_info.c.slideLayoutId == slide_layout_id).values(**values)
                             session.execute(update_query)
-                            added_data.append(values)
+                            data.append(values)
                             updated_items += 1
 
                 session.commit()
@@ -1324,7 +1313,7 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
             logger.info(f"SlideLayoutAdditionalInfoManager: insert {added_items} items.")
             logger.info(f"SlideLayoutAdditionalInfoManager: update {updated_items} items.\n")
 
-            return added_data
+            return data
 
         return super().execute(logic, session)
 
@@ -1341,14 +1330,10 @@ class SlideLayoutDimensionsManager(BaseManager):
 
         slide_layout_dimensions, session = self.open_session(self.table)
 
-        added_data = []
-        updated_items = 0
-        added_items = 0
-
         def logic():
-            nonlocal added_data
-            nonlocal updated_items
-            nonlocal added_items
+            data = []
+            updated_items = 0
+            added_items = 0
 
             for item in slide_layouts:
 
@@ -1361,7 +1346,7 @@ class SlideLayoutDimensionsManager(BaseManager):
                 result = session.execute(existing_query).one_or_none()
 
                 if result is None:
-                    added_data.append(values)
+                    data.append(values)
                     query = insert(slide_layout_dimensions).values(values)
                     session.execute(query)
                     added_items += 1
@@ -1373,7 +1358,7 @@ class SlideLayoutDimensionsManager(BaseManager):
                     if should_update:
                         update_query = update(slide_layout_dimensions).where(slide_layout_dimensions.c.slideLayoutId == slide_layout_id).values(**values)
                         session.execute(update_query)
-                        added_data.append(values)
+                        data.append(values)
                         updated_items += 1
 
             session.commit()
@@ -1381,7 +1366,7 @@ class SlideLayoutDimensionsManager(BaseManager):
             logger.info(f"SlideLayoutDimensionsManager: insert {added_items} items.")
             logger.info(f"SlideLayoutDimensionsManager: update {updated_items} items.\n")
 
-            return added_data
+            return data
 
         return super().execute(logic, session)
 
@@ -1398,14 +1383,9 @@ class BlockLayoutManager(BaseManager):
 
         block_layout_table, session = self.open_session(self.table)
 
-        data = []
-        added_items = 0
-        values = {}
-
         def logic():
-            nonlocal data
-            nonlocal added_items
-            nonlocal values
+            data = []
+            added_items = 0
 
             for slide_layout in slide_layouts:
                 slide_layout_id = slide_layout.get("id")
@@ -1503,7 +1483,7 @@ class PrecompiledImageManager(BaseManager):
         precompiled_image_table, session = self.open_session(self.table)
 
         def logic():
-            added_data = []
+            data = []
 
             for block_layout in block_layouts:
                 precompiled_image_info = block_layout.get("precompiled_image_info")
@@ -1519,13 +1499,13 @@ class PrecompiledImageManager(BaseManager):
                             "color": color,
                         }
 
-                        added_data.append(values)
+                        data.append(values)
                         query = insert(precompiled_image_table).values(values)
                         session.execute(query)
 
             session.commit()
-            logger.info(f"PrecompiledImageManager: insert {len(added_data)} items.\n")
-            return added_data
+            logger.info(f"PrecompiledImageManager: insert {len(data)} items.\n")
+            return data
 
         return super().execute(logic, session)
 
@@ -1559,12 +1539,8 @@ class BlockLayoutStylesManager(BaseManager):
 
         block_layout_styles_table, session = self.open_session(self.table)
 
-        added_data = []
-        values = {}
-
         def logic():
-            nonlocal added_data
-            nonlocal values
+            data = []
 
             default_color = constants.DEFAULT_COLOR
             color_settings_id = constants.DEFAULT_COLOR_SETTINGS_ID
@@ -1573,7 +1549,6 @@ class BlockLayoutStylesManager(BaseManager):
                 block_layout_styles = block_layout.get("styles")
                 border_radius = block_layout_styles.get("borderRadius")
 
-                weight = block_layout_styles.get("weight")
                 weight = block_layout_styles.get("weight")
                 weight = float(weight) if isinstance(weight, str) and weight.isdigit() else None
                 weight = null() if weight is None else weight
@@ -1617,13 +1592,13 @@ class BlockLayoutStylesManager(BaseManager):
                     "cropScale": 1,
                 }
 
-                added_data.append(values)
+                data.append(values)
                 query = insert(block_layout_styles_table).values(values)
                 session.execute(query)
 
             session.commit()
-            logger.info(f"BlockLayoutStylesManager: insert {len(added_data)} items.\n")
-            return added_data
+            logger.info(f"BlockLayoutStylesManager: insert {len(data)} items.\n")
+            return data
 
         return super().execute(logic, session)
 
@@ -1641,10 +1616,8 @@ class BlockLayoutLimitManager(BaseManager):
 
         block_layout_limit_table, session = self.open_session(self.table)
 
-        added_data = []
-
         def logic():
-            nonlocal added_data
+            data = []
 
             min_words_config = self.block_layout_min_words
 
@@ -1664,11 +1637,11 @@ class BlockLayoutLimitManager(BaseManager):
 
                 query = insert(block_layout_limit_table).values(values)
                 session.execute(query)
-                added_data.append(values)
+                data.append(values)
 
             session.commit()
-            logger.info(f"BlockLayoutLimitManager: insert {len(added_data)} items.\n")
-            return added_data
+            logger.info(f"BlockLayoutLimitManager: insert {len(data)} items.\n")
+            return data
 
         return super().execute(logic, session)
 
@@ -1740,16 +1713,16 @@ class BlockLayoutConfigManager(BaseManager):
             def safe_get(d: dict, key: str):
                 return d.get(key, None) if d else None
 
-            added_data = []
+            data = []
             palette_block_ids: dict[str, dict[str, str]] = {}
 
             if not block_layouts:
-                return added_data, palette_block_ids
+                return data, palette_block_ids
 
             slide_config: dict[str, dict[str, list[dict[str, str]]]] = block_layouts[0].get("slideConfig", {})
             presentation_palette = block_layouts[0].get("presentation_palette", [])
             if not slide_config or not presentation_palette:
-                return added_data, palette_block_ids
+                return data, palette_block_ids
 
             for color in presentation_palette:
                 palette_block_ids[color] = {}
@@ -1773,13 +1746,13 @@ class BlockLayoutConfigManager(BaseManager):
                 palette_block_ids[color]["presentation_palette"] = palette_ids[color]
                 palette_block_ids[color]["block_layout_config_id"] = values["id"]
 
-                added_data.append(values)
+                data.append(values)
                 query = insert(block_layout_config_table).values(values)
                 session.execute(query)
 
             session.commit()
-            logger.info(f"BlockLayoutConfigManager: insert {len(added_data)} items.\n")
-            return added_data, palette_block_ids
+            logger.info(f"BlockLayoutConfigManager: insert {len(data)} items.\n")
+            return data, palette_block_ids
 
         return super().execute(logic, session)
 
@@ -1861,47 +1834,46 @@ class SlideLayoutIndexConfigManager(BaseManager):
         super().__init__()
         self.table = "SlideLayoutIndexConfig"
 
-    def insert(self, slide_layouts: list[dict], block_index_ids: dict[str, str], palette_block_ids: dict[str, dict[str, str]], block_layouts: list[dict]) -> list[dict]:
+    def insert(self, block_layouts: list[dict], block_index_ids: dict[str, str], palette_block_ids: dict[str, dict[str, str]]) -> list[dict]:
         """Insert an entry in SlideLayoutIndexConfig Table."""
 
         slide_layout_index_config_table, session = self.open_session(self.table)
 
         def logic():
-            added_data = []
-            if not slide_layouts:
-                return added_data
+            data = []
+            if not block_layouts:
+                return data
 
             for id_info in palette_block_ids.values():
 
                 presentation_palette_id = id_info["presentation_palette"]
                 block_layout_config_id = id_info["block_layout_config_id"]
 
-                # for slide_layout in slide_layouts:
-                #     slide_layout_id = slide_layout.get("id")
-                #     slide_layout_blocks = slide_layout.get("blocks")
-
-                #     for block_layout in slide_layout_blocks:
-                #         block_layout_id = block_layout.get("id")
-
                 for block_layout in block_layouts:
                     slide_layout_id = block_layout.get("slide_layout_id")
                     block_layout_id = block_layout.get("id")
+
+                    block_layout_index_config_id = block_index_ids.get(block_layout_id)
+
+                    if not block_layout_index_config_id:
+                        continue
 
                     values = {
                         "id": generate_uuid(),
                         "presentationPaletteId": presentation_palette_id,
                         "configNumber": 0,
                         "slideLayoutId": slide_layout_id,
-                        "blockLayoutIndexConfigId": block_index_ids[block_layout_id],
+                        "blockLayoutIndexConfigId": block_layout_index_config_id,
                         "blockLayoutConfigId": block_layout_config_id,
                     }
 
-                    added_data.append(values)
+                    data.append(values)
                     query = insert(slide_layout_index_config_table).values(values)
                     session.execute(query)
 
             session.commit()
-            return added_data
+            logger.info(f"SlideLayoutIndexConfigManager: insert {len(data)} items.\n")
+            return data
 
         return super().execute(logic, session)
 

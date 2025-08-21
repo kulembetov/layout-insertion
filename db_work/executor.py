@@ -96,13 +96,13 @@ class Executor:
         data, block_index_ids = block_layout_index_config_manager.insert(block_layout_data)
 
         # Insert new index configs for every slide layout
-        slide_layout_index_config_manager.insert(slide_layouts_data, block_index_ids, palette_block_ids, block_layout_data)
+        slide_layout_index_config_manager.insert(block_layout_data, block_index_ids, palette_block_ids)
 
 
 if __name__ == "__main__":
     miniature_path = "miniature_path"
     miniature_extension = "miniature_extension"
-    layout_name = "New_1"
+    layout_name = "example_name"
 
     executor = Executor(
         path=miniature_path,

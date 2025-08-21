@@ -31,8 +31,8 @@ class BaseManager:
         try:
             return logic()
 
-        except (DBAPIError, Exception) as exc:
-            logger.error(f"Произошла ошибка в {logic.__name__}: {exc}")
+        except (DBAPIError, Exception):
+            logger.exception(f"Произошла ошибка в {logic.__qualname__}")
             session.rollback()
             return None
 
