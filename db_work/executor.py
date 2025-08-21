@@ -100,14 +100,11 @@ class Executor:
 executor = Executor()
 
 if __name__ == "__main__":
-    layout_name = "qweryuiyhgf544ss65hsss6b"
+    layout_name = "nwnwnwnnwnwnwwnwn"
     user_role = "USER"
-
-    # executor.insert_or_update(layout_name, user_role=user_role)
 
     miniature_path = "miniature_path"
     miniature_extension = "miniature_extension"
-    layout_name = "New_pattern12345631"
 
     executor = Executor(
         path=miniature_path,

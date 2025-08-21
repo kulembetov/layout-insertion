@@ -1741,7 +1741,7 @@ class BlockLayoutConfigManager(BaseManager):
             if not block_layouts:
                 return added_data
 
-            slide_config: dict[str, dict[str, list[dict[str, str]]]] = block_layouts[0].get("slide_config", {})
+            slide_config: dict[str, dict[str, list[dict[str, str]]]] = block_layouts[0].get("slideConfig", {})
             presentation_palette = block_layouts[0].get("presentation_palette", [])
             if not slide_config or not presentation_palette:
                 return added_data
