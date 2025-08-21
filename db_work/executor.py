@@ -14,6 +14,7 @@ from db_work.implemented import (
     presentation_palette_manager,
     slide_layout_additional_info_manager,
     slide_layout_dimensions_manager,
+    slide_layout_index_config_manager,
     slide_layout_manager,
     slide_layout_styles_manager,
 )
@@ -66,9 +67,8 @@ class Executor:
         slide_layout_additional_info_manager.insert_or_update(slide_layouts=slide_layouts_data)
 
         # Insert or update slide layout addition info for every slide layout
-        presentation_palette_data = presentation_palette_manager.insert(slide_layouts_data, presentation_layout_id)
-        if presentation_palette_data:
-            print(f"presentation_palette_data {len(presentation_palette_data)}")
+        presentation_palette_data, palette_ids = presentation_palette_manager.insert(slide_layouts_data, presentation_layout_id)
+        print(f"palette_ids\n {palette_ids}")
 
         # Block Layout ===========================================
         # Insert new block layouts
@@ -90,11 +90,15 @@ class Executor:
         block_layout_figure_manager.insert(block_layout_data)
 
         # Insert new configs for every block layout
-        i = block_layout_config_manager.insert(block_layout_data)
-        print(i)
+        data, palette_block_ids = block_layout_config_manager.insert(block_layout_data, palette_ids)
+        print(f"block_layout_config_manager {len(data)}")
 
         # Insert new index configs for every block layout
-        block_layout_index_config_manager.insert(block_layout_data)
+        data, block_index_ids = block_layout_index_config_manager.insert(block_layout_data)
+
+        # Insert new index configs for every slide layout
+        test_data = slide_layout_index_config_manager.insert(slide_layouts_data, block_index_ids, palette_block_ids)
+        print(f"slide_layout_index_config_manager {len(test_data)}")
 
 
 executor = Executor()

@@ -14,6 +14,7 @@ from db_work.services import (
     PresentationPaletteManager,
     SlideLayoutAdditionalInfoManager,
     SlideLayoutDimensionsManager,
+    SlideLayoutIndexConfigManager,
     SlideLayoutManager,
     SlideLayoutStylesManager,
 )
@@ -30,6 +31,7 @@ slide_layout_manager = SlideLayoutManager()
 slide_layout_styles_manager = SlideLayoutStylesManager()
 slide_layout_additional_info_manager = SlideLayoutAdditionalInfoManager()
 slide_layout_dimensions_manager = SlideLayoutDimensionsManager()
+slide_layout_index_config_manager = SlideLayoutIndexConfigManager()
 
 # Block Layout Managers
 block_layout_manager = BlockLayoutManager()

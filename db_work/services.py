@@ -662,7 +662,7 @@ class PresentationPaletteManager(BaseManager):
         super().__init__()
         self.table = "PresentationPalette"
 
-    def insert(self, slides_layouts: list[dict], layout_id: str) -> list[dict]:
+    def insert(self, slides_layouts: list[dict], layout_id: str) -> tuple[list[dict], dict[str, str]]:
         """Inserts an entry in PresentationPalette table."""
 
         presentation_palette_table, session = self.open_session(self.table)
@@ -677,13 +677,15 @@ class PresentationPaletteManager(BaseManager):
             if not presentation_palette_colors:
                 return []
 
-            added_data = []
+            added_data: list[dict] = []
+            palette_ids: dict[str, str] = {}
             for color in presentation_palette_colors:
                 values = {
                     "id": generate_uuid(),
                     "presentationLayoutId": layout_id,
                     "color": color,
                 }
+                palette_ids[color] = values["id"]
                 added_data.append(values)
 
                 query = insert(presentation_palette_table).values(values)
@@ -692,7 +694,7 @@ class PresentationPaletteManager(BaseManager):
             session.commit()
             logger.info(f"PresentationPaletteManager: insert {len(added_data)} items.\n")
             # logger.info(f"PresentationPaletteManager: update {updated_data} items.\n")
-            return added_data
+            return added_data, palette_ids
 
         return super().execute(logic, session)
 
@@ -1728,7 +1730,7 @@ class BlockLayoutConfigManager(BaseManager):
         super().__init__()
         self.table = "BlockLayoutConfig"
 
-    def insert(self, block_layouts: list[dict]) -> list[dict]:
+    def insert(self, block_layouts: list[dict], palette_ids: dict[str, str]) -> tuple[list[dict], dict[str, dict[str, str]]]:
         """Insert an entry in BlockLayoutConfig Table."""
 
         block_layout_config_table, session = self.open_session(self.table)
@@ -1738,13 +1740,15 @@ class BlockLayoutConfigManager(BaseManager):
                 return d.get(key, None) if d else None
 
             added_data = []
+            palette_block_ids: dict[str, dict[str, str]] = {}
+
             if not block_layouts:
-                return added_data
+                return added_data, palette_block_ids
 
             slide_config: dict[str, dict[str, list[dict[str, str]]]] = block_layouts[0].get("slideConfig", {})
             presentation_palette = block_layouts[0].get("presentation_palette", [])
             if not slide_config or not presentation_palette:
-                return added_data
+                return added_data, palette_block_ids
 
             for color in presentation_palette:
                 values = {
@@ -1764,6 +1768,8 @@ class BlockLayoutConfigManager(BaseManager):
                     "logo": self._collect(safe_get(slide_config.get("logo"), color)),
                     "font": self._collect(safe_get(slide_config.get("font"), color), is_font=True),
                 }
+                palette_block_ids[color]["presentation_palette"] = palette_ids[color]
+                palette_block_ids[color]["block_layout_config_id"] = values["id"]
 
                 added_data.append(values)
                 query = insert(block_layout_config_table).values(values)
@@ -1771,7 +1777,7 @@ class BlockLayoutConfigManager(BaseManager):
 
             session.commit()
             logger.info(f"BlockLayoutConfigManager: insert {len(added_data)} items.\n")
-            return added_data
+            return added_data, palette_block_ids
 
         return super().execute(logic, session)
 
@@ -1797,15 +1803,14 @@ class BlockLayoutIndexConfigManager(BaseManager):
         super().__init__()
         self.table = "BlockLayoutIndexConfig"
 
-    def insert(self, block_layouts: list[dict]) -> list[dict]:
+    def insert(self, block_layouts: list[dict]) -> tuple[list[dict], dict[str, str]]:
         """Insert an entry in BlockLayoutIndexConfig Table."""
 
         block_layout_index_config_table, session = self.open_session(self.table)
 
-        data = []
-
         def logic():
-            nonlocal data
+            data = []
+            block_index_ids: dict[str, str] = {}
 
             for block_layout in block_layouts:
                 block_layout_id = block_layout.get("id")
@@ -1828,35 +1833,34 @@ class BlockLayoutIndexConfigManager(BaseManager):
 
                     index_color_id = block_layout_index
 
-                values = {
-                    "id": generate_uuid(),
-                    "blockLayoutId": block_layout_id,
-                    "indexColorId": index_color_id,
-                    "indexFontId": index_font_id,
-                }
-                query = insert(block_layout_index_config_table).values(values)
-                session.execute(query)
+                    values = {
+                        "id": generate_uuid(),
+                        "blockLayoutId": block_layout_id,
+                        "indexColorId": index_color_id,
+                        "indexFontId": index_font_id,
+                    }
+                    block_index_ids[block_layout_id] = values["id"]
+                    data.append(values)
 
-                data.append(values)
+                    query = insert(block_layout_index_config_table).values(values)
+                    session.execute(query)
 
             session.commit()
             logger.info(f"BlockLayoutIndexConfigManager: insert {len(data)} items.\n")
-            return data
+            return data, block_index_ids
 
         return super().execute(logic, session)
 
 
 class SlideLayoutIndexConfigManager(BaseManager):
-    """Insert a row in SlideLayoutIndexConfig Table."""
-
-    # Возможно сюда нужно будет добавить логику на update
+    """Interacts with the SlideLayoutIndexConfig Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "SlideLayoutIndexConfig"
 
-    def insert(self, slide_layouts: list[dict]) -> list[dict]:
-        """Insert a row in SlideLayoutIndexConfig Table."""
+    def insert(self, slide_layouts: list[dict], block_index_ids: dict[str, str], palette_block_ids: dict[str, dict[str, str]]) -> list[dict]:
+        """Insert an entry in SlideLayoutIndexConfig Table."""
 
         slide_layout_index_config_table, session = self.open_session(self.table)
 
@@ -1865,23 +1869,29 @@ class SlideLayoutIndexConfigManager(BaseManager):
             if not slide_layouts:
                 return added_data
 
-            presentation_palette_id = ...
-            block_layout_index_config_id = ...
-            block_layout_config_id = ...
+            for id_info in palette_block_ids.values():
+                presentation_palette_id = id_info["presentation_palette_id"]
+                block_layout_config_id = id_info["block_layout_config_id"]
 
-            for slide_layout in slide_layouts:
-                values = {
-                    "id": generate_uuid(),
-                    "presentationPaletteId": presentation_palette_id,
-                    "configNumber": 0,
-                    "slideLayoutId": slide_layout.get("id"),
-                    "blockLayoutIndexConfigId": block_layout_index_config_id,
-                    "blockLayoutConfigId": block_layout_config_id,
-                }
+                for slide_layout in slide_layouts:
+                    slide_layout_id = slide_layout.get("id")
+                    slide_layout_blocks = slide_layout.get("blocks")
 
-                added_data.append(values)
-                query = insert(slide_layout_index_config_table).values(values)
-                session.execute(query)
+                    for block_layout in slide_layout_blocks:
+                        block_layout_id = block_layout.get("id")
+
+                        values = {
+                            "id": generate_uuid(),
+                            "presentationPaletteId": presentation_palette_id,
+                            "configNumber": 0,
+                            "slideLayoutId": slide_layout_id,
+                            "blockLayoutIndexConfigId": block_index_ids[block_layout_id],
+                            "blockLayoutConfigId": block_layout_config_id,
+                        }
+
+                        added_data.append(values)
+                        query = insert(slide_layout_index_config_table).values(values)
+                        session.execute(query)
 
             session.commit()
             return added_data
