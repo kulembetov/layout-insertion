@@ -1,6 +1,6 @@
 from django.urls import path
 
-from django_app.api_v1.views import DeletePresentationLayout, DeleteSlideLayout, FilterFigmaJson, ReceiveFigmaJsonAPIView, ReceiveFigmaPresentationLayout, ReceiveFigmaPresentationLayoutFullData, ReceiveFigmaPresentationLayoutSlides, ReceiveSlideLayoutFullData
+from django_app.api_v1.views import DeleteBlockLayout, DeletePresentationLayout, DeleteSlideLayout, FilterFigmaJson, ReceiveBlockLayoutFullData, ReceiveFigmaJsonAPIView, ReceiveFigmaPresentationLayout, ReceiveFigmaPresentationLayoutFullData, ReceiveFigmaPresentationLayoutSlides, ReceiveSlideLayoutFullData
 
 urlpatterns = [
     # Figma API endpoints
@@ -16,4 +16,9 @@ urlpatterns = [
     path("figma/get/slide_full_data/", ReceiveSlideLayoutFullData.as_view()),  # POST для нескольких слайдов
     path("figma/delete/slide/<uuid:id>", DeleteSlideLayout.as_view()),  # DELETE для одного слайда
     path("figma/delete/slide/", DeleteSlideLayout.as_view()),  # POST для нескольких слайдов
+    # Block Layout endpoints
+    path("figma/get/block_full_data/<uuid:id>", ReceiveBlockLayoutFullData.as_view()),  # GET для одного блока
+    path("figma/get/block_full_data/", ReceiveBlockLayoutFullData.as_view()),  # POST для нескольких блоков
+    path("figma/delete/block/<uuid:id>", DeleteBlockLayout.as_view()),  # DELETE для одного блока
+    path("figma/delete/block/", DeleteBlockLayout.as_view()),  # POST для нескольких блоков
 ]
