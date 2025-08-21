@@ -6,7 +6,6 @@ from db_work.implemented import (
     block_layout_limit_manager,
     block_layout_manager,
     block_layout_styles_manager,
-    block_layout_to_delete_manager,
     color_settings_manager,
     layout_roles_manager,
     precompiled_image_manager,
@@ -36,9 +35,9 @@ class Executor:
         if presentation_layout_id is None:
             update = False
         else:
-            block_layouts_ids = block_layout_to_delete_manager.find_existing_block_layouts(presentation_layout_id)
-            block_layout_to_delete_manager.delete_block_layout_structure(block_layouts_ids)
-            # Ром, вызови тут метод, который удалит талицы начиная от block layout
+            # block_layouts_ids = block_layout_to_delete_manager.find_existing_block_layouts(presentation_layout_id)
+            # block_layout_to_delete_manager.delete_block_layout_structure(block_layouts_ids)
+            ...
 
         # Presentation Layout ===========================================
 
@@ -92,14 +91,12 @@ class Executor:
 
         # Insert new configs for every block layout
         data, palette_block_ids = block_layout_config_manager.insert(block_layout_data, palette_ids)
-        print(f"block_layout_config_manager {len(data)}")
 
         # Insert new index configs for every block layout
         data, block_index_ids = block_layout_index_config_manager.insert(block_layout_data)
 
         # Insert new index configs for every slide layout
-        test_data = slide_layout_index_config_manager.insert(slide_layouts_data, block_index_ids, palette_block_ids)
-        print(f"slide_layout_index_config_manager {len(test_data)}")
+        slide_layout_index_config_manager.insert(slide_layouts_data, block_index_ids, palette_block_ids, block_layout_data)
 
 
 if __name__ == "__main__":

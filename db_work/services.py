@@ -1432,6 +1432,7 @@ class BlockLayoutManager(BaseManager):
                     values["presentation_palette"] = slide_layout_presentation_palette
                     values["styles"] = slide_layout_block.get("styles")
                     values["slideConfig"] = slide_layout.get("slideConfig")
+                    values["slide_layout_id"] = slide_layout_id
                     data.append(values)
 
             session.commit()
@@ -1751,6 +1752,7 @@ class BlockLayoutConfigManager(BaseManager):
                 return added_data, palette_block_ids
 
             for color in presentation_palette:
+                palette_block_ids[color] = {}
                 values = {
                     "id": generate_uuid(),
                     "text": self._collect(safe_get(slide_config.get("text"), color)),
@@ -1859,7 +1861,7 @@ class SlideLayoutIndexConfigManager(BaseManager):
         super().__init__()
         self.table = "SlideLayoutIndexConfig"
 
-    def insert(self, slide_layouts: list[dict], block_index_ids: dict[str, str], palette_block_ids: dict[str, dict[str, str]]) -> list[dict]:
+    def insert(self, slide_layouts: list[dict], block_index_ids: dict[str, str], palette_block_ids: dict[str, dict[str, str]], block_layouts: list[dict]) -> list[dict]:
         """Insert an entry in SlideLayoutIndexConfig Table."""
 
         slide_layout_index_config_table, session = self.open_session(self.table)
@@ -1870,7 +1872,8 @@ class SlideLayoutIndexConfigManager(BaseManager):
                 return added_data
 
             for id_info in palette_block_ids.values():
-                presentation_palette_id = id_info["presentation_palette_id"]
+
+                presentation_palette_id = id_info["presentation_palette"]
                 block_layout_config_id = id_info["block_layout_config_id"]
 
                 for slide_layout in slide_layouts:
