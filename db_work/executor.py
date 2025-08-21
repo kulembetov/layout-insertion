@@ -70,7 +70,6 @@ class Executor:
 
         # Insert or update slide layout addition info for every slide layout
         presentation_palette_data, palette_ids = presentation_palette_manager.insert(slide_layouts_data, presentation_layout_id)
-        print(f"palette_ids\n {palette_ids}")
 
         # Block Layout ===========================================
         # Insert new block layouts

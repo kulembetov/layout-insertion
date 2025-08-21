@@ -848,7 +848,6 @@ class SlideLayoutManager(BaseManager):
             logger.info(f"SlideLayoutManager: send {len(data)} slide layouts to other managers.")
             logger.info(f"SlideLayoutManager: insert {added_slide_layouts} items.")
             logger.info(f"SlideLayoutManager: update {updated_slide_layouts} items.\n")
-
             return data
 
         return super().execute(logic, session)
@@ -1432,6 +1431,7 @@ class BlockLayoutManager(BaseManager):
                     values["words"] = slide_layout_block.get("words")
                     values["presentation_palette"] = slide_layout_presentation_palette
                     values["styles"] = slide_layout_block.get("styles")
+                    values["slideConfig"] = slide_layout.get("slideConfig")
                     data.append(values)
 
             session.commit()

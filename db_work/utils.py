@@ -22,7 +22,7 @@ def extract_frame_data(data: dict) -> list[dict]:
         nonlocal results
 
         if isinstance(obj, dict):
-            if all(key in obj for key in ["slide_number", "frame_name", "imagesCount", "sentences", "forGeneration", "slide_type", "dimensions", "columns", "presentationPaletteColors"]):
+            if all(key in obj for key in ["slide_number", "frame_name", "imagesCount", "sentences", "forGeneration", "slide_type", "dimensions", "columns", "presentationPaletteColors", "slideConfig"]):
                 result_dict = {
                     "number": obj.get("slide_number"),
                     "name": obj.get("frame_name").split()[0],
@@ -35,6 +35,7 @@ def extract_frame_data(data: dict) -> list[dict]:
                     "slide_type": obj.get("slide_type"),
                     "columns": obj.get("columns"),
                     "presentationPaletteColors": obj.get("presentationPaletteColors"),
+                    "slideConfig": obj.get("slideConfig"),
                 }
                 results.append(result_dict)
 
