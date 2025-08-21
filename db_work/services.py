@@ -32,6 +32,18 @@ class PresentationLayoutManager(BaseManager):
         def logic():
             query = select(presentation_layout_table).where(cast(ColumnElement[bool], presentation_layout_table.c.name == name))
             result = session.execute(query).fetchone()
+
+            if result:
+                logger.info(f"PresentationLayoutManager: {name} is found in database. Start updating.\n")
+                logger.info("Skip working PresentationLayoutManager.")
+                logger.info("Skip working ColorSettingsManager.")
+                logger.info("Skip working PresentationLayoutStylesManager.")
+                logger.info("Skip working LayoutRolesManager.")
+                logger.info("Skip working PresentationPaletteManager.\n")
+
+            else:
+                logger.info(f"PresentationLayoutManager: {name} isn't found in database. Start inserting.\n")
+
             return result
 
         return super().execute(logic, session)
@@ -61,6 +73,8 @@ class PresentationLayoutManager(BaseManager):
             session.execute(query)
             session.commit()
             return uid
+
+        logger.info(f"PresentationLayoutManager: insert new presentation layout - {name}.\n")
 
         return super().execute(logic, session)
 
@@ -676,7 +690,8 @@ class PresentationPaletteManager(BaseManager):
                 session.execute(query)
 
             session.commit()
-
+            logger.info(f"PresentationPaletteManager: insert {len(added_data)} items.\n")
+            # logger.info(f"PresentationPaletteManager: update {updated_data} items.\n")
             return added_data
 
         return super().execute(logic, session)
@@ -703,6 +718,8 @@ class ColorSettingsManager(BaseManager):
 
             return new_color_id if new_color_id else None
 
+        logger.info("ColorSettingsManager: insert new color settings.\n")
+
         return super().execute(logic, session)
 
 
@@ -726,6 +743,8 @@ class PresentationLayoutStylesManager(BaseManager):
             session.commit()
             return uid
 
+        logger.info("PresentationLayoutStylesManager: insert new presentation layout styles.\n")
+
         return super().execute(logic, session)
 
 
@@ -747,6 +766,8 @@ class LayoutRolesManager(BaseManager):
             session.execute(query)
             session.commit()
             return presentation_layout_id, user_role
+
+        logger.info("LayoutRolesManager: insert new layout role.\n")
 
         return super().execute(logic, session)
 
@@ -1413,7 +1434,7 @@ class BlockLayoutManager(BaseManager):
 
             session.commit()
 
-            logger.info(f"BlockLayoutManager: insert {added_items} items.")
+            logger.info(f"BlockLayoutManager: insert {added_items} items.\n")
             return data
 
         return super().execute(logic, session)
@@ -1457,7 +1478,7 @@ class BlockLayoutDimensionsManager(BaseManager):
                 session.execute(query)
                 added_items += 1
 
-            logger.info(f"BlockLayoutDimensionsManagers: insert {added_items} items.")
+            logger.info(f"BlockLayoutDimensionsManagers: insert {added_items} items.\n")
 
             data.append(values)
             session.commit()
@@ -1500,6 +1521,7 @@ class PrecompiledImageManager(BaseManager):
                         session.execute(query)
 
             session.commit()
+            logger.info(f"PrecompiledImageManager: insert {len(added_data)} items.\n")
             return added_data
 
         return super().execute(logic, session)
@@ -1597,6 +1619,7 @@ class BlockLayoutStylesManager(BaseManager):
                 session.execute(query)
 
             session.commit()
+            logger.info(f"BlockLayoutStylesManager: insert {len(added_data)} items.\n")
             return added_data
 
         return super().execute(logic, session)
@@ -1641,6 +1664,7 @@ class BlockLayoutLimitManager(BaseManager):
                 added_data.append(values)
 
             session.commit()
+            logger.info(f"BlockLayoutLimitManager: insert {len(added_data)} items.\n")
             return added_data
 
         return super().execute(logic, session)
@@ -1691,6 +1715,7 @@ class BlockLayoutFigureManager(BaseManager):
                     data.append(values)
 
             session.commit()
+            logger.info(f"BlockLayoutFigureManager: insert {len(data)} items.\n")
             return data
 
         return super().execute(logic, session)
@@ -1745,6 +1770,7 @@ class BlockLayoutConfigManager(BaseManager):
                 session.execute(query)
 
             session.commit()
+            logger.info(f"BlockLayoutConfigManager: insert {len(added_data)} items.\n")
             return added_data
 
         return super().execute(logic, session)
@@ -1814,6 +1840,7 @@ class BlockLayoutIndexConfigManager(BaseManager):
                 data.append(values)
 
             session.commit()
+            logger.info(f"BlockLayoutIndexConfigManager: insert {len(data)} items.\n")
             return data
 
         return super().execute(logic, session)

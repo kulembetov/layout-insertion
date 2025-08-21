@@ -28,95 +28,73 @@ class Executor:
     def insert_or_update(self, layout_name: str, user_role: str):
         """Insert New Presentation Layout And Fill Related Table."""
 
-        # Presentation Layout ===========================================
-        # Времено
         update = True
-        find_name = presentation_layout_manager.select_layout_by_name(layout_name)
-        print(find_name)
-        if find_name is None:
+        layout_data = presentation_layout_manager.select_layout_by_name(layout_name)
+        presentation_layout_id = layout_data[0] if layout_data else None
+        if presentation_layout_id is None:
             update = False
-        print(f"Update: {update} \n")
+        else:
+            ...
+            # Ром, вызови тут метод, который удалит талицы начиная от block layout
 
-        if update is True:
-            layout_data = presentation_layout_manager.select_layout_by_name(layout_name)
-            presentation_layout_id = layout_data[0] if layout_data else None
+        # Presentation Layout ===========================================
 
-        # Create new Presentation Layout
         if update is False:
+            # Insert new Presentation Layout
             presentation_layout_id = presentation_layout_manager.insert(name=layout_name)
-            print(f"presentation_layout_id {presentation_layout_id} \n")
 
-        # Create user role for new presentation layout
-        if update is False:
-            new_role = layout_roles_manager.insert(presentation_layout_id=presentation_layout_id, user_role=user_role)
-            print(f"new_role {new_role} \n")
+            # Insert user role for new presentation layout
+            layout_roles_manager.insert(presentation_layout_id=presentation_layout_id, user_role=user_role)
 
-        # Crate new color id
-        if update is False:
+            # Insert new color id
             color_id = color_settings_manager.insert()
-            print(f"new_color_id {color_id} \n")
 
-        # Create new presentation layout styles
-        if update is False:
-            presentation_layout_styles_id = presentation_layout_styles_manager.insert(presentation_layout_id=presentation_layout_id, color_settings_id=color_id)
-            print(f"new_presentation_layout_styles_id {presentation_layout_styles_id} \n")
+            # Insert new presentation layout styles
+            presentation_layout_styles_manager.insert(presentation_layout_id=presentation_layout_id, color_settings_id=color_id)
 
         # Slide Layout ===========================================
-        # Create new slide layouts or update existing slide layouts.
+        # Insert or update existing slide layouts.
         slide_layouts_data = slide_layout_manager.insert_or_update(presentation_layout_id=presentation_layout_id)
 
-        # Create new slide_layout_styles for every new slide layout
+        # Insert or update slide layout styles for every  slide layout
         slide_layout_styles_manager.insert_or_upate(slide_layouts=slide_layouts_data)
 
-        # Create new slide layout dimensions for every new slide layout
+        # Insert or update slide layout dimensions for every slide layout
         slide_layout_dimensions_manager.insert_or_update(slide_layouts=slide_layouts_data)
 
-        # Create new slide layout addition info for every new slide layout
+        # Insert or update slide layout addition info for every slide layout
         slide_layout_additional_info_manager.insert_or_update(slide_layouts=slide_layouts_data)
 
-        # PresentationPaletteColors
+        # Insert or update slide layout addition info for every slide layout
         presentation_palette_data = presentation_palette_manager.insert(slide_layouts_data, presentation_layout_id)
         if presentation_palette_data:
             print(f"presentation_palette_data {len(presentation_palette_data)}")
 
         # Block Layout ===========================================
-        # Create new block layouts
+        # Insert new block layouts
         block_layout_data = block_layout_manager.insert(slide_layouts_data)
 
-        # Create new block layout dimensions
+        # Insert new block layout dimensions
         block_layout_dimensions_manager.insert(block_layout_data)
 
-        # Create new precompiled images for every new block layout
-        new_precompiled_images = precompiled_image_manager.insert(block_layout_data, **self.tg_params)
-        if new_precompiled_images:
-            print(f"new_precompiled_images {len(new_precompiled_images)}")
+        # Insert new precompiled images for every new block layout
+        precompiled_image_manager.insert(block_layout_data, **self.tg_params)
 
-        # Create new styles for every new block layout
-        block_layout_styles = block_layout_styles_manager.insert(block_layout_data)
-        if block_layout_styles:
-            print(f"block_layout_styles {len(block_layout_styles)}")
+        # Insert new styles for every new block layout
+        block_layout_styles_manager.insert(block_layout_data)
 
-        # Create new limits for every block layout
-        block_layout_limit = block_layout_limit_manager.insert(block_layout_data)
-        if block_layout_limit:
-            print(f"block_layout_limit {len(block_layout_limit)}")
+        # Insert new limits for every block layout
+        block_layout_limit_manager.insert(block_layout_data)
 
-        # Create new figures for every block layout
-        block_layout_figure = block_layout_figure_manager.insert(block_layout_data)
-        if block_layout_figure:
-            print(f"block_layout_figure {len(block_layout_figure)}")
+        # Insert new figures for every block layout
+        block_layout_figure_manager.insert(block_layout_data)
 
-        # Create new configs for every block layout
-        block_layout_config = block_layout_config_manager.insert(block_layout_data)
-        if block_layout_config:
-            print(f"block_layout_config {len(block_layout_config)}")
-        else:
-            print(block_layout_config)
+        # Insert new configs for every block layout
+        i = block_layout_config_manager.insert(block_layout_data)
+        print(i)
 
-        # Create new index configs for every block layout
-        block_layout_index_config = block_layout_index_config_manager.insert(block_layout_data)
-        if block_layout_index_config:
-            print(f"block_layout_index_config {len(block_layout_index_config)}")
+        # Insert new index configs for every block layout
+        block_layout_index_config_manager.insert(block_layout_data)
 
 
 executor = Executor()
@@ -129,7 +107,7 @@ if __name__ == "__main__":
 
     miniature_path = "miniature_path"
     miniature_extension = "miniature_extension"
-    layout_name = "New_pattern123456"
+    layout_name = "New_pattern12345631"
 
     executor = Executor(
         path=miniature_path,
@@ -137,8 +115,3 @@ if __name__ == "__main__":
         layout_name=layout_name,
     )
     executor.insert_or_update(layout_name, user_role="USER")
-
-# # classic
-# '019006b0-03af-7b04-a66f-8d31b0a08769'
-# # raif
-# '0197c55e-1c1b-7760-9525-f51752cf23e2'
