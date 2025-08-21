@@ -300,6 +300,7 @@ class ColorUtils:
                 g = int(round(c.get("g", 0) * 255))
                 b = int(round(c.get("b", 0) * 255))
                 a = fill.get("opacity", c.get("a", 1))
+                a = round(a, 2)
                 if a < 1:
                     hex_or_gradient_color = f"#{r:02x}{g:02x}{b:02x}{int(a * 255):02x}"
                 else:
@@ -347,6 +348,7 @@ class ColorUtils:
             g = int(round(color.get("g", 0) * 255))
             b = int(round(color.get("b", 0) * 255))
             a = color.get("a", 1)
+            a = round(a, 2)
 
             if a < 1:
                 hex_color = f"#{r:02x}{g:02x}{b:02x}{int(a * 255):02x}"
@@ -559,7 +561,7 @@ class FigmaExtractor:
         if "opacity" in node:
             opacity = node["opacity"]
             if isinstance(opacity, (int, float)):
-                return int(opacity) if opacity == 1.0 else float(opacity)
+                return int(opacity) if opacity == 1.0 else round(float(opacity), 2)
 
         fills_raw = node.get("fills")
         if isinstance(fills_raw, list):
@@ -570,7 +572,7 @@ class FigmaExtractor:
                     if visible and fill_type == "SOLID":
                         opacity_raw = fill.get("opacity", 1.0)
                         if isinstance(opacity_raw, (int, float)):
-                            return int(opacity_raw) if opacity_raw == 1.0 else float(opacity_raw)
+                            return int(opacity_raw) if opacity_raw == 1.0 else round(float(opacity_raw), 2)
 
         return 1
 
