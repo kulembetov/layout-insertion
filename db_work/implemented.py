@@ -6,6 +6,7 @@ from db_work.services import (
     BlockLayoutLimitManager,
     BlockLayoutManager,
     BlockLayoutStylesManager,
+    BlockLayoutToDeleteManager,
     ColorSettingsManager,
     LayoutRolesManager,
     PrecompiledImageManager,
@@ -40,3 +41,4 @@ block_layout_styles_manager = BlockLayoutStylesManager()
 block_layout_figure_manager = BlockLayoutFigureManager()
 block_layout_config_manager = BlockLayoutConfigManager()
 block_layout_index_config_manager = BlockLayoutIndexConfigManager()
+block_layout_to_delete_manager = BlockLayoutToDeleteManager()

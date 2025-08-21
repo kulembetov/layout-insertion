@@ -2114,3 +2114,22 @@ class BlockLayoutToDeleteManager(BaseManager):
                 }
 
         return super().execute(logic, session)
+
+    def find_existing_block_layouts(self, presentation_layout_id: str) -> list[str]:
+
+        # Find slide layout ids
+        slide_layout_table, session = self.open_session("SlideLayout")
+        query = select(slide_layout_table.c.id).where(slide_layout_table.c.presentationLayoutId == presentation_layout_id)
+        result = session.execute(query).fetchall()
+        slide_layout_ids = [str(row[0]) for row in result]
+
+        block_layout_ids = []
+
+        # Find block layouts ids
+        block_layout_table, session = self.open_session("BlockLayout")
+        for slide_layout_id in slide_layout_ids:
+            query = select(block_layout_table.c.id).where(block_layout_table.c.slideLayoutId == slide_layout_id)
+            result = session.execute(query).fetchall()
+            block_layout_ids.extend([str(row[0]) for row in result])
+
+        return block_layout_ids
