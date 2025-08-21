@@ -25,7 +25,7 @@ class PresentationLayoutManager(BaseManager):
         self.table = "PresentationLayout"
 
     def select_layout_by_name(self, name: str) -> Row | None:
-        """Find a row in 'PresentationLayout' by name."""
+        """Find an entry in 'PresentationLayout' by name."""
 
         presentation_layout_table, session = self.open_session(self.table)
 
@@ -37,7 +37,7 @@ class PresentationLayoutManager(BaseManager):
         return super().execute(logic, session)
 
     def select_layout_by_uid(self, str_uid: str) -> Row | None:
-        """Find a row in 'PresentationLayout' by uid."""
+        """Find an entry in 'PresentationLayout' by uid."""
 
         presentation_layout_table, session = self.open_session(self.table)
 
@@ -50,7 +50,7 @@ class PresentationLayoutManager(BaseManager):
         return super().execute(logic, session)
 
     def insert(self, name: str) -> str | None:
-        """Insert New Layout."""
+        """Inserts an entry in PresentationLayout table."""
 
         presentation_layout_table, session = self.open_session(self.table)
 
@@ -642,11 +642,15 @@ class PresentationLayoutManager(BaseManager):
 
 
 class PresentationPaletteManager(BaseManager):
+    """Interacts With The PresentationPalette Table."""
+
     def __init__(self):
         super().__init__()
         self.table = "PresentationPalette"
 
     def insert(self, slides_layouts: list[dict], layout_id: str) -> list[dict]:
+        """Inserts an entry in PresentationPalette table."""
+
         presentation_palette_table, session = self.open_session(self.table)
 
         def logic():
@@ -686,7 +690,7 @@ class ColorSettingsManager(BaseManager):
         self.table = "ColorSettings"
 
     def insert(self) -> str | None:
-        """Insert new color id."""
+        """Inserts an entry in ColorSettings table."""
 
         color_settings_table, session = self.open_session(self.table)
 
@@ -710,7 +714,7 @@ class PresentationLayoutStylesManager(BaseManager):
         self.table = "PresentationLayoutStyles"
 
     def insert(self, presentation_layout_id: str | None, color_settings_id: str | None) -> str | None:
-        """Inserts ColorSettingsID and PresentationLayoutID into PresentationLayoutStyles."""
+        """Inserts an entry in PresentationLayoutStyles table."""
 
         presentation_layout_styles_table, session = self.open_session(self.table)
 
@@ -733,7 +737,7 @@ class LayoutRolesManager(BaseManager):
         self.table = "LayoutRoles"
 
     def insert(self, presentation_layout_id: str | None, user_role: str) -> tuple[str] | None:
-        """Insert a field in LayoutRoles Table."""
+        """Insert an entry in LayoutRoles Table."""
 
         layout_roles_table, session = self.open_session(self.table)
 
@@ -757,7 +761,7 @@ class SlideLayoutManager(BaseManager):
 
     @logs(logger, on=True)
     def insert_or_update(self, presentation_layout_id: str | None) -> list[dict[Any, Any]]:
-        """Create or update fields in SlideLayout table."""
+        """Insert or update an entry in SlideLayout table."""
 
         slide_layout_table, session = self.open_session(self.table)
         data = []
@@ -1219,14 +1223,14 @@ class SlideLayoutStylesManager(BaseManager):
 
 
 class SlideLayoutAdditionalInfoManager(BaseManager):
-    """Insert or update data in SlideLayoutAdditionalInfo Table."""
+    """Interacts With The SlideLayoutAdditionalInfo Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "SlideLayoutAdditionalInfo"
 
     def insert_or_update(self, slide_layouts: list[dict]) -> list[dict]:
-        """Insert a field in SlideLayoutAdditionalInfo Table."""
+        """Insert or update an entry in SlideLayoutAdditionalInfo Table."""
 
         slide_layout_additional_info, session = self.open_session(self.table)
 
@@ -1304,14 +1308,14 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
 
 
 class SlideLayoutDimensionsManager(BaseManager):
-    """Insert a field in SlideLayoutDimensions Table."""
+    """Interacts With The SlideLayoutDimensions Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "SlideLayoutDimensions"
 
     def insert_or_update(self, slide_layouts: list[dict]) -> list[dict]:
-        """Insert a field in SlideLayoutDimensions Table."""
+        """Insert or update an entry in SlideLayoutDimensions Table."""
 
         slide_layout_dimensions, session = self.open_session(self.table)
 
@@ -1361,32 +1365,24 @@ class SlideLayoutDimensionsManager(BaseManager):
 
 
 class BlockLayoutManager(BaseManager):
-    """Insert a entry in BlockLayoutManager Table."""
-
-    # логика обновления
-    # Получать поле для конкретного block layout
-    # Сравнить есть ли отличие с существующим словарем values
-    # Если есть blockLayoutType для slideLayoutId, то ничего не делать.
-    # Если нет, то сделать insert.
+    """Interacts With The BlockLayout Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "BlockLayout"
 
     def insert(self, slide_layouts: list[dict]) -> list[dict]:
-        """Insert a field in BlockLayout Table."""
+        """Insert an entry in BlockLayout Table."""
 
         block_layout_table, session = self.open_session(self.table)
 
         data = []
         added_items = 0
-        updated_items = 0
         values = {}
 
         def logic():
             nonlocal data
             nonlocal added_items
-            nonlocal updated_items
             nonlocal values
 
             for slide_layout in slide_layouts:
@@ -1400,17 +1396,6 @@ class BlockLayoutManager(BaseManager):
 
                     values = {"id": id, "blockLayoutType": block_layout_type, "slideLayoutId": slide_layout_id}
                     values_for_block_layout_table = values
-
-                    # existing_query = select(block_layout_table).where(block_layout_table.c.slideLayoutId == slide_layout_id and block_layout_table.c.blockLayoutType == block_layout_type)
-                    # result = session.execute(existing_query).first()
-
-                    # if result:
-                    #     updated_items += 1
-
-                    # else:
-                    #     query = insert(block_layout_table).values(values_for_block_layout_table)
-                    #     session.execute(query)
-                    #     added_items += 1
 
                     query = insert(block_layout_table).values(values_for_block_layout_table)
                     session.execute(query)
@@ -1429,22 +1414,20 @@ class BlockLayoutManager(BaseManager):
             session.commit()
 
             logger.info(f"BlockLayoutManager: insert {added_items} items.")
-            logger.info(f"BlockLayoutManager: exists {updated_items} and doesn't need to be added.\n")
-
             return data
 
         return super().execute(logic, session)
 
 
-class BlockLayoutDimensionsManagers(BaseManager):
-    """Insert a field in BlockLayoutDimensionsManagers Table."""
+class BlockLayoutDimensionsManager(BaseManager):
+    """Interacts With The BlockLayoutDimensions Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "BlockLayoutDimensions"
 
-    def insert_or_update(self, block_layouts: list[dict]) -> list[dict]:
-        """Insert or update an entry in BlockLayoutDimensions Table."""
+    def insert(self, block_layouts: list[dict]) -> list[dict]:
+        """Insert an entry in BlockLayoutDimensions Table."""
 
         block_layout_dimensions_table, session = self.open_session(self.table)
 
@@ -1470,25 +1453,11 @@ class BlockLayoutDimensionsManagers(BaseManager):
                     "rotation": block_layout_dimensions.get("r", 0),
                 }
 
-                existing_query = select(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block_layout_id)
-                result = session.execute(existing_query).one_or_none()
-
-                if result is None:
-                    query = insert(block_layout_dimensions_table).values(values)
-                    session.execute(query)
-                    added_items += 1
-
-                else:
-                    existing_values = dict(result._mapping)
-                    should_update = any(existing_values[key] != value for key, value in values.items())
-
-                    if should_update:
-                        update_query = update(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block_layout_id).values(**values)
-                        session.execute(update_query)
-                        updated_items += 1
+                query = insert(block_layout_dimensions_table).values(values)
+                session.execute(query)
+                added_items += 1
 
             logger.info(f"BlockLayoutDimensionsManagers: insert {added_items} items.")
-            logger.info(f"BlockLayoutDimensionsManagers: update {updated_items} items.\n")
 
             data.append(values)
             session.commit()
@@ -1498,16 +1467,14 @@ class BlockLayoutDimensionsManagers(BaseManager):
 
 
 class PrecompiledImageManager(BaseManager):
-    """Insert a row in PrecompiledImage Table."""
-
-    # Возможно сюда нужно будет добавить логику на update
+    """Interacts With The PrecompiledImageManager Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "PrecompiledImage"
 
     def insert(self, block_layouts: list[dict], **tg_params: dict[str, str]) -> list[dict]:
-        """Insert a row in PrecompiledImage Table."""
+        """Insert an entry in PrecompiledImage Table."""
 
         precompiled_image_table, session = self.open_session(self.table)
 
@@ -1555,17 +1522,15 @@ class PrecompiledImageManager(BaseManager):
         return f"{base_url}{path}/layouts/{layout_name}/{block_name}_{color[1:]}.{ext}"
 
 
-class BlockLayoutStylesManagers(BaseManager):
-    """Insert a field in BlockLayoutStyles Table."""
-
-    # Возможно сюда нужно будет добвать логику на update
+class BlockLayoutStylesManager(BaseManager):
+    """Interacts With The BlockLayoutStyles Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "BlockLayoutStyles"
 
     def insert(self, block_layouts: list[dict]) -> list[dict]:
-        """Insert a field in BlockLayoutStyles Table."""
+        """Insert an entry in BlockLayoutStyles Table."""
 
         block_layout_styles_table, session = self.open_session(self.table)
 
@@ -1637,8 +1602,8 @@ class BlockLayoutStylesManagers(BaseManager):
         return super().execute(logic, session)
 
 
-class BlockLayoutLimitManagers(BaseManager):
-    """Insert an entry in BlockLayoutLimit Table."""
+class BlockLayoutLimitManager(BaseManager):
+    """Interacts With The BlockLayoutLimit Table."""
 
     def __init__(self):
         super().__init__()
@@ -1681,15 +1646,15 @@ class BlockLayoutLimitManagers(BaseManager):
         return super().execute(logic, session)
 
 
-class BlockLayoutFigureManagers(BaseManager):
-    """Insert an entry in Figure Table."""
+class BlockLayoutFigureManager(BaseManager):
+    """Interacts With The Figure Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "Figure"
 
     def insert(self, block_layouts: list[dict]) -> list[dict]:
-        """Insert a field in BlockLayoutDimensions Table."""
+        """Insert an entry in BlockLayoutDimensions Table."""
 
         figure_table, session = self.open_session(self.table)
 
@@ -1732,16 +1697,14 @@ class BlockLayoutFigureManagers(BaseManager):
 
 
 class BlockLayoutConfigManager(BaseManager):
-    """Insert a row in BlockLayoutConfig Table."""
-
-    # Возможно сюда нужно будет добавить логику на update
+    """Interacts With The BlockLayoutConfig Table."""
 
     def __init__(self):
         super().__init__()
         self.table = "BlockLayoutConfig"
 
     def insert(self, block_layouts: list[dict]) -> list[dict]:
-        """Insert a row in BlockLayoutConfig Table."""
+        """Insert an entry in BlockLayoutConfig Table."""
 
         block_layout_config_table, session = self.open_session(self.table)
 
@@ -1801,8 +1764,8 @@ class BlockLayoutConfigManager(BaseManager):
         return sorted(list(fonts)) if is_font else colors
 
 
-class BlockLayoutIndexConfigManagers(BaseManager):
-    """Insert an entry in BlockLayoutIndexConfig Table."""
+class BlockLayoutIndexConfigManager(BaseManager):
+    """Interacts With The BlockLayoutIndexConfig Table."""
 
     def __init__(self):
         super().__init__()
@@ -1822,8 +1785,6 @@ class BlockLayoutIndexConfigManagers(BaseManager):
                 block_layout_id = block_layout.get("id")
                 block_layout_name = block_layout.get("name")
                 block_layout_type = block_layout.get("sql_type")
-                # print(block_layout_name)
-                # block_layout_index = BlockLayoutUtils().extract_index(name=block_layout_name, block_type=block_layout_type) # 1302
                 match = re.search(r"z-index\s*(\d+)", block_layout_name)
                 if match:
                     block_layout_index = int(match.group(1))
@@ -1856,276 +1817,3 @@ class BlockLayoutIndexConfigManagers(BaseManager):
             return data
 
         return super().execute(logic, session)
-
-
-class BlockLayoutToDeleteManager(BaseManager):
-    """Insert an entry in BlockLayout Table."""
-
-    def __init__(self):
-        super().__init__()
-        self.table = "BlockLayout"
-
-    def get_block_layout_structure(self, block_layout_ids: list[str]) -> dict | None:
-        """Получить полную структуру связей BlockLayout со всеми зависимыми таблицами.
-
-        Args:
-            block_layout_ids: Список ID блоков
-
-        Returns:
-            dict | None: Полная структура связей с ID или None, если не найдено
-        """
-        if not block_layout_ids:
-            return None
-
-        block_layout_table, session = self.open_session("BlockLayout")
-
-        def logic():
-            # 1. Проверяем существование BlockLayout
-            query = select(block_layout_table).where(block_layout_table.c.id.in_(block_layout_ids))
-            block_layouts = session.execute(query).fetchall()
-
-            if not block_layouts:
-                return None
-
-            result = {
-                "blockLayouts": [],
-                "blockLayoutIndexConfigs": [],
-                "slideLayoutIndexConfigs": [],
-                "metadata": {
-                    "extracted_at": datetime.now().isoformat(),
-                    "block_layout_ids": block_layout_ids,
-                    "total_blocks": len(block_layouts),
-                },
-            }
-
-            # Сначала собираем данные по каждому блоку
-            collected_block_index_config_ids: list[str] = []
-
-            for bl in block_layouts:
-                block_id = bl.id
-                block_data = {
-                    "blockLayout": block_id,
-                    "blockLayoutDimensions": None,
-                    "blockLayoutStyles": None,
-                    "blockLayoutLimit": None,
-                    "figures": [],
-                    "precompiledImages": [],
-                }
-
-                # BlockLayoutDimensions (1:1)
-                block_layout_dimensions_table, _ = self.open_session("BlockLayoutDimensions")
-                dim_q = select(block_layout_dimensions_table.c.blockLayoutId).where(block_layout_dimensions_table.c.blockLayoutId == block_id)
-                dim_r = session.execute(dim_q).fetchone()
-                if dim_r:
-                    block_data["blockLayoutDimensions"] = dim_r.blockLayoutId
-
-                # BlockLayoutStyles (1:1)
-                block_layout_styles_table, _ = self.open_session("BlockLayoutStyles")
-                style_q = select(block_layout_styles_table.c.blockLayoutId).where(block_layout_styles_table.c.blockLayoutId == block_id)
-                style_r = session.execute(style_q).fetchone()
-                if style_r:
-                    block_data["blockLayoutStyles"] = style_r.blockLayoutId
-
-                # BlockLayoutLimit (1:1)
-                block_layout_limit_table, _ = self.open_session("BlockLayoutLimit")
-                limit_q = select(block_layout_limit_table.c.blockLayoutId).where(block_layout_limit_table.c.blockLayoutId == block_id)
-                limit_r = session.execute(limit_q).fetchone()
-                if limit_r:
-                    block_data["blockLayoutLimit"] = limit_r.blockLayoutId
-
-                # Figure (1:N)
-                figure_table, _ = self.open_session("Figure")
-                figs_q = select(figure_table.c.id).where(figure_table.c.blockLayoutId == block_id)
-                figs = session.execute(figs_q).fetchall()
-                block_data["figures"] = [r.id for r in figs]
-
-                # PrecompiledImage (1:N)
-                precompiled_image_table, _ = self.open_session("PrecompiledImage")
-                imgs_q = select(precompiled_image_table.c.id).where(precompiled_image_table.c.blockLayoutId == block_id)
-                imgs = session.execute(imgs_q).fetchall()
-                block_data["precompiledImages"] = [r.id for r in imgs]
-
-                # BlockLayoutIndexConfig (N:1 относительно BlockLayout)
-                block_layout_index_config_table, _ = self.open_session("BlockLayoutIndexConfig")
-                blic_q = select(
-                    block_layout_index_config_table.c.id,
-                    block_layout_index_config_table.c.blockLayoutId,
-                    block_layout_index_config_table.c.indexColorId,
-                    block_layout_index_config_table.c.indexFontId,
-                ).where(block_layout_index_config_table.c.blockLayoutId == block_id)
-                blic_rows = session.execute(blic_q).fetchall()
-                for row in blic_rows:
-                    result["blockLayoutIndexConfigs"].append(
-                        {
-                            "id": row.id,
-                            "blockLayoutId": row.blockLayoutId,
-                            "indexColorId": row.indexColorId,
-                            "indexFontId": row.indexFontId,
-                        }
-                    )
-                    collected_block_index_config_ids.append(row.id)
-
-                result["blockLayouts"].append(block_data)
-
-            # SlideLayoutIndexConfig, связанные через blockLayoutIndexConfigId
-            if collected_block_index_config_ids:
-                slide_layout_index_config_table, _ = self.open_session("SlideLayoutIndexConfig")
-                slic_q = select(
-                    slide_layout_index_config_table.c.id,
-                    slide_layout_index_config_table.c.slideLayoutId,
-                    slide_layout_index_config_table.c.presentationPaletteId,
-                    slide_layout_index_config_table.c.blockLayoutIndexConfigId,
-                    slide_layout_index_config_table.c.blockLayoutConfigId,
-                ).where(slide_layout_index_config_table.c.blockLayoutIndexConfigId.in_(collected_block_index_config_ids))
-                slic_rows = session.execute(slic_q).fetchall()
-                for row in slic_rows:
-                    result["slideLayoutIndexConfigs"].append(
-                        {
-                            "id": row.id,
-                            "slideLayoutId": row.slideLayoutId,
-                            "presentationPaletteId": row.presentationPaletteId,
-                            "blockLayoutIndexConfigId": row.blockLayoutIndexConfigId,
-                            "blockLayoutConfigId": row.blockLayoutConfigId,
-                        }
-                    )
-
-            return result
-
-        return super().execute(logic, session)
-
-    def delete_block_layout_structure(self, block_layout_ids: list[str]) -> dict:
-        """Удалить полную структуру BlockLayout со всеми связанными данными в правильном порядке.
-
-        Порядок удаления:
-        0. Обнуление parentLayoutId в UserBlockLayout (сохранение пользовательских данных)
-        1. SlideLayoutIndexConfig (по blockLayoutIndexConfigId)
-        2. BlockLayoutIndexConfig
-        3. Figure
-        4. PrecompiledImage
-        5. BlockLayoutLimit
-        6. BlockLayoutDimensions
-        7. BlockLayoutStyles
-        8. BlockLayout
-
-        Args:
-            block_layout_ids: Список ID блоков для удаления
-
-        Returns:
-            dict: Результат удаления
-        """
-        if not block_layout_ids:
-            return {
-                "success": False,
-                "message": "Список ID блоков пуст",
-                "deleted_blocks": [],
-                "failed_blocks": [],
-            }
-
-        # Получаем структуру
-        structure = self.get_block_layout_structure(block_layout_ids)
-        if not structure:
-            return {
-                "success": False,
-                "message": "Блоки не найдены",
-                "deleted_blocks": [],
-                "failed_blocks": block_layout_ids,
-            }
-
-        block_layout_table, session = self.open_session("BlockLayout")
-
-        def logic():
-            try:
-                deleted_blocks: list[str] = []
-
-                # 0. Обнуляем ссылки в пользовательских блоках (если такие есть)
-                user_block_layout_table, _ = self.open_session("UserBlockLayout")
-                try:
-                    update_query = update(user_block_layout_table).where(user_block_layout_table.c.parentLayoutId.in_(block_layout_ids)).values(parentLayoutId=None)
-                    session.execute(update_query)
-                except Exception:
-                    # Таблицы может не существовать в некоторых окружениях — пропускаем молча
-                    pass
-
-                # 1. SlideLayoutIndexConfig
-                if structure.get("slideLayoutIndexConfigs"):
-                    slide_layout_index_config_table, _ = self.open_session("SlideLayoutIndexConfig")
-                    for config in structure["slideLayoutIndexConfigs"]:
-                        del_q = delete(slide_layout_index_config_table).where(slide_layout_index_config_table.c.id == config["id"])
-                        session.execute(del_q)
-
-                # 2. BlockLayoutIndexConfig
-                if structure.get("blockLayoutIndexConfigs"):
-                    block_layout_index_config_table, _ = self.open_session("BlockLayoutIndexConfig")
-                    for config in structure["blockLayoutIndexConfigs"]:
-                        del_q = delete(block_layout_index_config_table).where(block_layout_index_config_table.c.id == config["id"])
-                        session.execute(del_q)
-
-                # 3-8. По каждому блоку
-                for block in structure["blockLayouts"]:
-                    block_id = block["blockLayout"]
-
-                    # 3. Figure
-                    if block["figures"]:
-                        figure_table, _ = self.open_session("Figure")
-                        for figure_id in block["figures"]:
-                            del_q = delete(figure_table).where(figure_table.c.id == figure_id)
-                            session.execute(del_q)
-
-                    # 4. PrecompiledImage
-                    if block["precompiledImages"]:
-                        precompiled_image_table, _ = self.open_session("PrecompiledImage")
-                        for image_id in block["precompiledImages"]:
-                            del_q = delete(precompiled_image_table).where(precompiled_image_table.c.id == image_id)
-                            session.execute(del_q)
-
-                    # 5. BlockLayoutLimit
-                    if block["blockLayoutLimit"]:
-                        block_layout_limit_table, _ = self.open_session("BlockLayoutLimit")
-                        del_q = delete(block_layout_limit_table).where(block_layout_limit_table.c.blockLayoutId == block_id)
-                        session.execute(del_q)
-
-                    # 6. BlockLayoutDimensions
-                    if block["blockLayoutDimensions"]:
-                        block_layout_dimensions_table, _ = self.open_session("BlockLayoutDimensions")
-                        del_q = delete(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block_id)
-                        session.execute(del_q)
-
-                    # 7. BlockLayoutStyles
-                    if block["blockLayoutStyles"]:
-                        block_layout_styles_table, _ = self.open_session("BlockLayoutStyles")
-                        del_q = delete(block_layout_styles_table).where(block_layout_styles_table.c.blockLayoutId == block_id)
-                        session.execute(del_q)
-
-                    # 8. Сам BlockLayout
-                    del_q = delete(block_layout_table).where(block_layout_table.c.id == block_id)
-                    session.execute(del_q)
-                    deleted_blocks.append(block_id)
-
-                session.commit()
-
-                return {
-                    "success": True,
-                    "message": f"Успешно удалено {len(deleted_blocks)} блоков",
-                    "deleted_blocks": deleted_blocks,
-                    "failed_blocks": [],
-                    "total_requested": len(block_layout_ids),
-                    "total_deleted": len(deleted_blocks),
-                }
-
-            except Exception as e:
-                session.rollback()
-                error_msg = f"Ошибка при удалении BlockLayout структуры: {e}"
-                print(error_msg)
-                return {
-                    "success": False,
-                    "message": error_msg,
-                    "deleted_blocks": [],
-                    "failed_blocks": block_layout_ids,
-                    "total_requested": len(block_layout_ids),
-                    "total_deleted": 0,
-                }
-
-        return super().execute(logic, session)
-
-
-# poetry run python -m db_work.services

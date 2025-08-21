@@ -1,11 +1,11 @@
 from db_work.services import (
     BlockLayoutConfigManager,
-    BlockLayoutDimensionsManagers,
-    BlockLayoutFigureManagers,
-    BlockLayoutIndexConfigManagers,
-    BlockLayoutLimitManagers,
+    BlockLayoutDimensionsManager,
+    BlockLayoutFigureManager,
+    BlockLayoutIndexConfigManager,
+    BlockLayoutLimitManager,
     BlockLayoutManager,
-    BlockLayoutStylesManagers,
+    BlockLayoutStylesManager,
     ColorSettingsManager,
     LayoutRolesManager,
     PrecompiledImageManager,
@@ -33,10 +33,10 @@ slide_layout_dimensions_manager = SlideLayoutDimensionsManager()
 
 # Block Layout Managers
 block_layout_manager = BlockLayoutManager()
-block_layout_dimensions_manager = BlockLayoutDimensionsManagers()
+block_layout_dimensions_manager = BlockLayoutDimensionsManager()
 precompiled_image_manager = PrecompiledImageManager()
-block_layout_limit_manager = BlockLayoutLimitManagers()
-block_layout_styles_manager = BlockLayoutStylesManagers()
-block_layout_figure_manager = BlockLayoutFigureManagers()
+block_layout_limit_manager = BlockLayoutLimitManager()
+block_layout_styles_manager = BlockLayoutStylesManager()
+block_layout_figure_manager = BlockLayoutFigureManager()
 block_layout_config_manager = BlockLayoutConfigManager()
-block_layout_index_config_manager = BlockLayoutIndexConfigManagers()
+block_layout_index_config_manager = BlockLayoutIndexConfigManager()
