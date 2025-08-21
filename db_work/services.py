@@ -1876,25 +1876,29 @@ class SlideLayoutIndexConfigManager(BaseManager):
                 presentation_palette_id = id_info["presentation_palette"]
                 block_layout_config_id = id_info["block_layout_config_id"]
 
-                for slide_layout in slide_layouts:
-                    slide_layout_id = slide_layout.get("id")
-                    slide_layout_blocks = slide_layout.get("blocks")
+                # for slide_layout in slide_layouts:
+                #     slide_layout_id = slide_layout.get("id")
+                #     slide_layout_blocks = slide_layout.get("blocks")
 
-                    for block_layout in slide_layout_blocks:
-                        block_layout_id = block_layout.get("id")
+                #     for block_layout in slide_layout_blocks:
+                #         block_layout_id = block_layout.get("id")
 
-                        values = {
-                            "id": generate_uuid(),
-                            "presentationPaletteId": presentation_palette_id,
-                            "configNumber": 0,
-                            "slideLayoutId": slide_layout_id,
-                            "blockLayoutIndexConfigId": block_index_ids[block_layout_id],
-                            "blockLayoutConfigId": block_layout_config_id,
-                        }
+                for block_layout in block_layouts:
+                    slide_layout_id = block_layout.get("slide_layout_id")
+                    block_layout_id = block_layout.get("id")
 
-                        added_data.append(values)
-                        query = insert(slide_layout_index_config_table).values(values)
-                        session.execute(query)
+                    values = {
+                        "id": generate_uuid(),
+                        "presentationPaletteId": presentation_palette_id,
+                        "configNumber": 0,
+                        "slideLayoutId": slide_layout_id,
+                        "blockLayoutIndexConfigId": block_index_ids[block_layout_id],
+                        "blockLayoutConfigId": block_layout_config_id,
+                    }
+
+                    added_data.append(values)
+                    query = insert(slide_layout_index_config_table).values(values)
+                    session.execute(query)
 
             session.commit()
             return added_data
