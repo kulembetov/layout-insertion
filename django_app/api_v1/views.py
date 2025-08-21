@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from db_work.services import PresentationLayoutManager, SlideLayoutManager
+from db_work.services import BlockLayoutToDeleteManager, PresentationLayoutManager, SlideLayoutManager
 from django_app.api_v1.services.filters.filter_settings import FilterMode
 from django_app.api_v1.utils.helpers import json_dump
 from log_utils import logs, setup_logger
@@ -148,6 +148,118 @@ class ReceiveFigmaPresentationLayoutFullData(APIView):
 
         except Exception as e:
             logger.error(f"Error retrieving presentation layout structure: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ReceiveBlockLayoutFullData(APIView):
+    """API endpoint to retrieve block layout structure by IDs with all related tables.
+
+    Supports both single ID via URL parameter and multiple IDs via POST request body.
+    """
+
+    @logs(logger, on=True)
+    def get(self, request, id=None) -> Response:
+        """GET method for single block layout ID via URL parameter."""
+        if not id:
+            return Response(data={"message": "Block layout ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Retrieving structure for block layout ID: {id}")
+
+        manager = BlockLayoutToDeleteManager()
+
+        try:
+            structure_data = manager.get_block_layout_structure([str(id)])
+
+            if structure_data is None:
+                return Response(data={"message": f"Block layout with ID {id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            logger.info(f"Successfully retrieved structure for block layout ID: {id}")
+            return Response(data=structure_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error retrieving block layout structure: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @logs(logger, on=True)
+    def post(self, request) -> Response:
+        """POST method for multiple block layout IDs via request body."""
+        block_ids = request.data.get("block_ids", [])
+
+        if not block_ids or not isinstance(block_ids, list):
+            return Response(data={"message": "block_ids array is required in request body"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Retrieving structure for {len(block_ids)} block layouts")
+
+        manager = BlockLayoutToDeleteManager()
+
+        try:
+            structure_data = manager.get_block_layout_structure(block_ids)
+
+            if structure_data is None:
+                return Response(data={"message": "No block layouts found"}, status=status.HTTP_404_NOT_FOUND)
+
+            logger.info(f"Successfully retrieved structure for {len(block_ids)} block layouts")
+            return Response(data=structure_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error retrieving block layouts structure: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeleteBlockLayout(APIView):
+    """API endpoint to delete block layouts with all related data.
+
+    Supports both single ID via URL parameter and multiple IDs via POST request body.
+    """
+
+    @logs(logger, on=True)
+    def delete(self, request, id=None) -> Response:
+        """DELETE method for single block layout ID via URL parameter."""
+        if not id:
+            return Response(data={"message": "Block layout ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Deleting block layout ID: {id}")
+
+        manager = BlockLayoutToDeleteManager()
+
+        try:
+            deletion_result = manager.delete_block_layout_structure([str(id)])
+
+            if deletion_result["success"]:
+                logger.info(f"Successfully deleted block layout ID: {id}")
+                return Response(data={"message": f"Block layout {id} and all related data successfully deleted", "deletion_result": deletion_result}, status=status.HTTP_200_OK)
+            else:
+                logger.error(f"Failed to delete block layout ID: {id}")
+                return Response(data={"message": f"Failed to delete block layout {id}", "deletion_result": deletion_result}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            logger.error(f"Error deleting block layout {id}: {str(e)}")
+            return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @logs(logger, on=True)
+    def post(self, request) -> Response:
+        """POST method for multiple block layout IDs via request body."""
+        block_ids = request.data.get("block_ids", [])
+
+        if not block_ids or not isinstance(block_ids, list):
+            return Response(data={"message": "block_ids array is required in request body"}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info(f"Deleting {len(block_ids)} block layouts")
+
+        manager = BlockLayoutToDeleteManager()
+
+        try:
+            deletion_result = manager.delete_block_layout_structure(block_ids)
+
+            if deletion_result["success"]:
+                logger.info(f"Successfully deleted {deletion_result['total_deleted']} block layouts")
+                return Response(data={"message": f"Successfully deleted {deletion_result['total_deleted']} out of {deletion_result['total_requested']} block layouts", "deletion_result": deletion_result}, status=status.HTTP_200_OK)
+            else:
+                logger.error(f"Failed to delete block layouts: {deletion_result['message']}")
+                return Response(data={"message": f"Failed to delete block layouts: {deletion_result['message']}", "deletion_result": deletion_result}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            logger.error(f"Error deleting block layouts: {str(e)}")
             return Response(data={"message": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

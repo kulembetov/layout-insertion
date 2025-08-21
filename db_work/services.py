@@ -1858,4 +1858,274 @@ class BlockLayoutIndexConfigManagers(BaseManager):
         return super().execute(logic, session)
 
 
+class BlockLayoutToDeleteManager(BaseManager):
+    """Insert an entry in BlockLayout Table."""
+
+    def __init__(self):
+        super().__init__()
+        self.table = "BlockLayout"
+
+    def get_block_layout_structure(self, block_layout_ids: list[str]) -> dict | None:
+        """Получить полную структуру связей BlockLayout со всеми зависимыми таблицами.
+
+        Args:
+            block_layout_ids: Список ID блоков
+
+        Returns:
+            dict | None: Полная структура связей с ID или None, если не найдено
+        """
+        if not block_layout_ids:
+            return None
+
+        block_layout_table, session = self.open_session("BlockLayout")
+
+        def logic():
+            # 1. Проверяем существование BlockLayout
+            query = select(block_layout_table).where(block_layout_table.c.id.in_(block_layout_ids))
+            block_layouts = session.execute(query).fetchall()
+
+            if not block_layouts:
+                return None
+
+            result = {
+                "blockLayouts": [],
+                "blockLayoutIndexConfigs": [],
+                "slideLayoutIndexConfigs": [],
+                "metadata": {
+                    "extracted_at": datetime.now().isoformat(),
+                    "block_layout_ids": block_layout_ids,
+                    "total_blocks": len(block_layouts),
+                },
+            }
+
+            # Сначала собираем данные по каждому блоку
+            collected_block_index_config_ids: list[str] = []
+
+            for bl in block_layouts:
+                block_id = bl.id
+                block_data = {
+                    "blockLayout": block_id,
+                    "blockLayoutDimensions": None,
+                    "blockLayoutStyles": None,
+                    "blockLayoutLimit": None,
+                    "figures": [],
+                    "precompiledImages": [],
+                }
+
+                # BlockLayoutDimensions (1:1)
+                block_layout_dimensions_table, _ = self.open_session("BlockLayoutDimensions")
+                dim_q = select(block_layout_dimensions_table.c.blockLayoutId).where(block_layout_dimensions_table.c.blockLayoutId == block_id)
+                dim_r = session.execute(dim_q).fetchone()
+                if dim_r:
+                    block_data["blockLayoutDimensions"] = dim_r.blockLayoutId
+
+                # BlockLayoutStyles (1:1)
+                block_layout_styles_table, _ = self.open_session("BlockLayoutStyles")
+                style_q = select(block_layout_styles_table.c.blockLayoutId).where(block_layout_styles_table.c.blockLayoutId == block_id)
+                style_r = session.execute(style_q).fetchone()
+                if style_r:
+                    block_data["blockLayoutStyles"] = style_r.blockLayoutId
+
+                # BlockLayoutLimit (1:1)
+                block_layout_limit_table, _ = self.open_session("BlockLayoutLimit")
+                limit_q = select(block_layout_limit_table.c.blockLayoutId).where(block_layout_limit_table.c.blockLayoutId == block_id)
+                limit_r = session.execute(limit_q).fetchone()
+                if limit_r:
+                    block_data["blockLayoutLimit"] = limit_r.blockLayoutId
+
+                # Figure (1:N)
+                figure_table, _ = self.open_session("Figure")
+                figs_q = select(figure_table.c.id).where(figure_table.c.blockLayoutId == block_id)
+                figs = session.execute(figs_q).fetchall()
+                block_data["figures"] = [r.id for r in figs]
+
+                # PrecompiledImage (1:N)
+                precompiled_image_table, _ = self.open_session("PrecompiledImage")
+                imgs_q = select(precompiled_image_table.c.id).where(precompiled_image_table.c.blockLayoutId == block_id)
+                imgs = session.execute(imgs_q).fetchall()
+                block_data["precompiledImages"] = [r.id for r in imgs]
+
+                # BlockLayoutIndexConfig (N:1 относительно BlockLayout)
+                block_layout_index_config_table, _ = self.open_session("BlockLayoutIndexConfig")
+                blic_q = select(
+                    block_layout_index_config_table.c.id,
+                    block_layout_index_config_table.c.blockLayoutId,
+                    block_layout_index_config_table.c.indexColorId,
+                    block_layout_index_config_table.c.indexFontId,
+                ).where(block_layout_index_config_table.c.blockLayoutId == block_id)
+                blic_rows = session.execute(blic_q).fetchall()
+                for row in blic_rows:
+                    result["blockLayoutIndexConfigs"].append(
+                        {
+                            "id": row.id,
+                            "blockLayoutId": row.blockLayoutId,
+                            "indexColorId": row.indexColorId,
+                            "indexFontId": row.indexFontId,
+                        }
+                    )
+                    collected_block_index_config_ids.append(row.id)
+
+                result["blockLayouts"].append(block_data)
+
+            # SlideLayoutIndexConfig, связанные через blockLayoutIndexConfigId
+            if collected_block_index_config_ids:
+                slide_layout_index_config_table, _ = self.open_session("SlideLayoutIndexConfig")
+                slic_q = select(
+                    slide_layout_index_config_table.c.id,
+                    slide_layout_index_config_table.c.slideLayoutId,
+                    slide_layout_index_config_table.c.presentationPaletteId,
+                    slide_layout_index_config_table.c.blockLayoutIndexConfigId,
+                    slide_layout_index_config_table.c.blockLayoutConfigId,
+                ).where(slide_layout_index_config_table.c.blockLayoutIndexConfigId.in_(collected_block_index_config_ids))
+                slic_rows = session.execute(slic_q).fetchall()
+                for row in slic_rows:
+                    result["slideLayoutIndexConfigs"].append(
+                        {
+                            "id": row.id,
+                            "slideLayoutId": row.slideLayoutId,
+                            "presentationPaletteId": row.presentationPaletteId,
+                            "blockLayoutIndexConfigId": row.blockLayoutIndexConfigId,
+                            "blockLayoutConfigId": row.blockLayoutConfigId,
+                        }
+                    )
+
+            return result
+
+        return super().execute(logic, session)
+
+    def delete_block_layout_structure(self, block_layout_ids: list[str]) -> dict:
+        """Удалить полную структуру BlockLayout со всеми связанными данными в правильном порядке.
+
+        Порядок удаления:
+        0. Обнуление parentLayoutId в UserBlockLayout (сохранение пользовательских данных)
+        1. SlideLayoutIndexConfig (по blockLayoutIndexConfigId)
+        2. BlockLayoutIndexConfig
+        3. Figure
+        4. PrecompiledImage
+        5. BlockLayoutLimit
+        6. BlockLayoutDimensions
+        7. BlockLayoutStyles
+        8. BlockLayout
+
+        Args:
+            block_layout_ids: Список ID блоков для удаления
+
+        Returns:
+            dict: Результат удаления
+        """
+        if not block_layout_ids:
+            return {
+                "success": False,
+                "message": "Список ID блоков пуст",
+                "deleted_blocks": [],
+                "failed_blocks": [],
+            }
+
+        # Получаем структуру
+        structure = self.get_block_layout_structure(block_layout_ids)
+        if not structure:
+            return {
+                "success": False,
+                "message": "Блоки не найдены",
+                "deleted_blocks": [],
+                "failed_blocks": block_layout_ids,
+            }
+
+        block_layout_table, session = self.open_session("BlockLayout")
+
+        def logic():
+            try:
+                deleted_blocks: list[str] = []
+
+                # 0. Обнуляем ссылки в пользовательских блоках (если такие есть)
+                user_block_layout_table, _ = self.open_session("UserBlockLayout")
+                try:
+                    update_query = update(user_block_layout_table).where(user_block_layout_table.c.parentLayoutId.in_(block_layout_ids)).values(parentLayoutId=None)
+                    session.execute(update_query)
+                except Exception:
+                    # Таблицы может не существовать в некоторых окружениях — пропускаем молча
+                    pass
+
+                # 1. SlideLayoutIndexConfig
+                if structure.get("slideLayoutIndexConfigs"):
+                    slide_layout_index_config_table, _ = self.open_session("SlideLayoutIndexConfig")
+                    for config in structure["slideLayoutIndexConfigs"]:
+                        del_q = delete(slide_layout_index_config_table).where(slide_layout_index_config_table.c.id == config["id"])
+                        session.execute(del_q)
+
+                # 2. BlockLayoutIndexConfig
+                if structure.get("blockLayoutIndexConfigs"):
+                    block_layout_index_config_table, _ = self.open_session("BlockLayoutIndexConfig")
+                    for config in structure["blockLayoutIndexConfigs"]:
+                        del_q = delete(block_layout_index_config_table).where(block_layout_index_config_table.c.id == config["id"])
+                        session.execute(del_q)
+
+                # 3-8. По каждому блоку
+                for block in structure["blockLayouts"]:
+                    block_id = block["blockLayout"]
+
+                    # 3. Figure
+                    if block["figures"]:
+                        figure_table, _ = self.open_session("Figure")
+                        for figure_id in block["figures"]:
+                            del_q = delete(figure_table).where(figure_table.c.id == figure_id)
+                            session.execute(del_q)
+
+                    # 4. PrecompiledImage
+                    if block["precompiledImages"]:
+                        precompiled_image_table, _ = self.open_session("PrecompiledImage")
+                        for image_id in block["precompiledImages"]:
+                            del_q = delete(precompiled_image_table).where(precompiled_image_table.c.id == image_id)
+                            session.execute(del_q)
+
+                    # 5. BlockLayoutLimit
+                    if block["blockLayoutLimit"]:
+                        block_layout_limit_table, _ = self.open_session("BlockLayoutLimit")
+                        del_q = delete(block_layout_limit_table).where(block_layout_limit_table.c.blockLayoutId == block_id)
+                        session.execute(del_q)
+
+                    # 6. BlockLayoutDimensions
+                    if block["blockLayoutDimensions"]:
+                        block_layout_dimensions_table, _ = self.open_session("BlockLayoutDimensions")
+                        del_q = delete(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block_id)
+                        session.execute(del_q)
+
+                    # 7. BlockLayoutStyles
+                    if block["blockLayoutStyles"]:
+                        block_layout_styles_table, _ = self.open_session("BlockLayoutStyles")
+                        del_q = delete(block_layout_styles_table).where(block_layout_styles_table.c.blockLayoutId == block_id)
+                        session.execute(del_q)
+
+                    # 8. Сам BlockLayout
+                    del_q = delete(block_layout_table).where(block_layout_table.c.id == block_id)
+                    session.execute(del_q)
+                    deleted_blocks.append(block_id)
+
+                session.commit()
+
+                return {
+                    "success": True,
+                    "message": f"Успешно удалено {len(deleted_blocks)} блоков",
+                    "deleted_blocks": deleted_blocks,
+                    "failed_blocks": [],
+                    "total_requested": len(block_layout_ids),
+                    "total_deleted": len(deleted_blocks),
+                }
+
+            except Exception as e:
+                session.rollback()
+                error_msg = f"Ошибка при удалении BlockLayout структуры: {e}"
+                print(error_msg)
+                return {
+                    "success": False,
+                    "message": error_msg,
+                    "deleted_blocks": [],
+                    "failed_blocks": block_layout_ids,
+                    "total_requested": len(block_layout_ids),
+                    "total_deleted": 0,
+                }
+
+        return super().execute(logic, session)
+
+
 # poetry run python -m db_work.services
