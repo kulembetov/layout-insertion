@@ -84,7 +84,7 @@ class Executor:
         block_layout_data = block_layout_manager.insert(slide_layouts_data)
 
         # Create new block layout dimensions
-        block_layout_dimensions_manager.insert_or_update(block_layout_data)
+        block_layout_dimensions_manager.insert(block_layout_data)
 
         # Create new precompiled images for every new block layout
         new_precompiled_images = precompiled_image_manager.insert(block_layout_data, **self.tg_params)
@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     miniature_path = "miniature_path"
     miniature_extension = "miniature_extension"
-    layout_name = "new_pattern12231312"
+    layout_name = "New_pattern123456"
 
     executor = Executor(
         path=miniature_path,
