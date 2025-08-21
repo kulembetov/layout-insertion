@@ -126,11 +126,11 @@ class BlockLayoutUtils:
         """
         return DataCleaner.clean_block_name(name)
 
-    def extract_index(self, name: str, block_type: str | None = None) -> int | None:
-        """
-        Extracts an index from a block name using all known patterns.
-        """
-        return DataCleaner.extract_index(name, block_type)
+    # def extract_index(self, name: str, block_type: str | None = None) -> int | None:
+    #     """
+    #     Extracts an index from a block name using all known patterns.
+    #     """
+    #     return DataCleaner.extract_index(name, block_type)
 
 
 class CleaningRule:

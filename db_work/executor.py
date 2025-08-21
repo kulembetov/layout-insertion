@@ -6,6 +6,7 @@ from db_work.implemented import (
     block_layout_limit_manager,
     block_layout_manager,
     block_layout_styles_manager,
+    block_layout_to_delete_manager,
     color_settings_manager,
     layout_roles_manager,
     precompiled_image_manager,
@@ -35,7 +36,8 @@ class Executor:
         if presentation_layout_id is None:
             update = False
         else:
-            ...
+            block_layouts_ids = block_layout_to_delete_manager.find_existing_block_layouts(presentation_layout_id)
+            block_layout_to_delete_manager.delete_block_layout_structure(block_layouts_ids)
             # Ром, вызови тут метод, который удалит талицы начиная от block layout
 
         # Presentation Layout ===========================================
@@ -101,14 +103,10 @@ class Executor:
         print(f"slide_layout_index_config_manager {len(test_data)}")
 
 
-executor = Executor()
-
 if __name__ == "__main__":
-    layout_name = "nwnwnwnnwnwnwwnwn"
-    user_role = "USER"
-
     miniature_path = "miniature_path"
     miniature_extension = "miniature_extension"
+    layout_name = "New_pattern123456312"
 
     executor = Executor(
         path=miniature_path,
