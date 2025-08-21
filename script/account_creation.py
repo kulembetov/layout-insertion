@@ -582,6 +582,7 @@ VALUES (%s, %s, %s)"""
 
         now = datetime.now()
         expired_at = now + timedelta(days=duration_months * 30)
+        active_until = expired_at
 
         if self.db.mode == ExecutionMode.MANUAL:
             print("Generating subscription SQL...")
@@ -673,8 +674,9 @@ VALUES (%s, %s, %s, %s, %s, %s)"""
                     ),
                 )
 
-                subscription_query = """INSERT INTO "Subscription" (id, "userId", "planId", "createdAt", "expiredAt", "isActive", "nextPaymentAt")
-VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+                subscription_query = """INSERT INTO "Subscription" (
+                    id, "userId", "planId", "createdAt", "expiredAt", "activeUntil", "promocodeId", "externalId"
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
                 self.add_sql_statement(
                     "Create Subscription record",
                     subscription_query,
@@ -684,8 +686,9 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)"""
                         plan["id"],
                         now,
                         expired_at,
-                        payment_status == PaymentStatus.SUCCEEDED.value,
-                        expired_at,
+                        active_until,
+                        None,
+                        None,
                     ),
                 )
 
