@@ -4,23 +4,31 @@ from __future__ import annotations
 from .block import BlockUtils
 from .block_filter import BlockFilterUtils
 from .block_type import BlockTypeUtils
-from .checker import Checker
+from .check import CheckUtils
 from .color import ColorUtils
+from .extractor import extractor
 from .figure import FigureUtils
 from .font import FontUtils
 from .helper import HelpUtils
+from .slide import SlideUtils
+from .slide_builder import slide_builder
 from .text import TextUtils
-from .validator import Validator
+from .validate import ValidateUtils
 
 __all__ = [
+    # Utils
     "BlockTypeUtils",
     "BlockUtils",
     "BlockFilterUtils",
-    "Checker",
+    "CheckUtils",
     "ColorUtils",
     "FontUtils",
     "HelpUtils",
+    "SlideUtils",
     "FigureUtils",
     "TextUtils",
-    "Validator",
+    "ValidateUtils",
+    # Entities
+    "extractor",
+    "slide_builder",
 ]

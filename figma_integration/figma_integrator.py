@@ -10,7 +10,7 @@ from .figma_extractor import FigmaExtractor
 from .filters import FilterConfig, FilterMode
 from .utils.block import BlockUtils
 from .utils.helper import HelpUtils
-from .utils.validator import Validator
+from .utils.validate import ValidateUtils
 
 logger = setup_logger(__name__)
 
@@ -66,7 +66,7 @@ class FigmaToSQLIntegrator(FigmaExtractor):
                 continue
 
             # Validate slide data
-            if not Validator.validate_slide_data(slide_raw):
+            if not ValidateUtils.validate_slide_data(slide_raw):
                 logger.warning(f"Invalid slide data for slide {slide_number_raw}")
                 continue
 
@@ -90,7 +90,7 @@ class FigmaToSQLIntegrator(FigmaExtractor):
             "folder_name": config.SLIDE_NUMBER_TO_FOLDER.get(slide_number, "other"),
             "imagesCount": slide_raw.get("imagesCount", 0),
             "blocks": [],
-            "auto_blocks": self._get_auto_blocks_for_slide(slide_raw, is_last),
+            "auto_blocks": self._get_auto_blocks_for_slide(),
             "sql_config": {
                 "needs_background": config.AUTO_BLOCKS.get("add_background", True),
                 "default_color": config.DEFAULT_COLOR,
@@ -107,7 +107,7 @@ class FigmaToSQLIntegrator(FigmaExtractor):
             for block_raw in blocks_raw:
                 if isinstance(block_raw, dict):
                     # Validate block data
-                    if not Validator.validate_block_data(block_raw):
+                    if not ValidateUtils.validate_block_data(block_raw):
                         logger.warning(f"Invalid block data in slide {slide_number}")
                         continue
 
@@ -116,7 +116,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
 
         return slide_input
 
-    def _create_block_input(self, block_raw: dict) -> dict[str, str | int | dict | list | bool]:
+    @staticmethod
+    def _create_block_input(block_raw: dict) -> dict[str, str | int | dict | list | bool]:
         """Create block input dictionary"""
         block_dict = BlockUtils.build_block_dict(block_raw)
 
@@ -135,7 +136,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
             "precompiled_image_info": block_dict.get("precompiled_image_info", {}),
         }
 
-    def _get_auto_blocks_for_slide(self, slide: dict[str, str | int | dict | list | bool], is_last: bool) -> dict[str, str | dict]:
+    @staticmethod
+    def _get_auto_blocks_for_slide() -> dict[str, str | dict]:
         """Get automatic blocks configuration for a slide"""
         auto_blocks: dict[str, str | dict] = {}
 
@@ -195,7 +197,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
         # Log completion
         self._log_completion(slides_count, len(sql_input), output_dir)
 
-    def _prepare_output_directory(self, output_dir: str) -> None:
+    @staticmethod
+    def _prepare_output_directory(output_dir: str) -> None:
         """Prepare output directory"""
         if os.path.exists(output_dir):
             import shutil
@@ -206,7 +209,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Output directory: {output_dir}")
 
-    def _save_extracted_data(self, figma_data: dict, output_dir: str) -> int:
+    @staticmethod
+    def _save_extracted_data(figma_data: dict, output_dir: str) -> int:
         """Save extracted Figma data and return slides count"""
         slides_raw = figma_data.get("slides", [])
         slides_count = len(slides_raw) if isinstance(slides_raw, list) else 0
@@ -216,7 +220,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
         print(f"Extracted {slides_count} slides from Figma.")
         return slides_count
 
-    def _save_sql_data(self, sql_input: list[dict], output_dir: str) -> None:
+    @staticmethod
+    def _save_sql_data(sql_input: list[dict], output_dir: str) -> None:
         """Save SQL generator input data"""
         HelpUtils.json_dump({"slides": sql_input}, f"{output_dir}/sql_generator_input.json")
 
@@ -269,7 +274,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
         lines.append("-- Run the SQL Generator with these parameters to create the actual SQL inserts")
         return "\n".join(lines)
 
-    def _format_block_for_sql(self, block: dict, block_index: int) -> list[str]:
+    @staticmethod
+    def _format_block_for_sql(block: dict, block_index: int) -> list[str]:
         """Format block information for SQL file"""
         lines = [
             f"-- Block {block_index}: {block['type']}",
@@ -367,7 +373,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
         instructions.append("")
         return instructions
 
-    def _format_block_instruction(self, block: dict, block_index: int) -> list[str]:
+    @staticmethod
+    def _format_block_instruction(block: dict, block_index: int) -> list[str]:
         """Format block for instruction file"""
         instructions = [
             f"  {block_index}. **{block['type']}** - {block['name']}",
@@ -397,7 +404,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
         instructions.append("")
         return instructions
 
-    def _log_completion(self, slides_count: int, sql_count: int, output_dir: str) -> None:
+    @staticmethod
+    def _log_completion(slides_count: int, sql_count: int, output_dir: str) -> None:
         """Log completion information"""
         logger.info("\nProcessing complete!")
         logger.info(f"   Extracted {slides_count} slides")
@@ -463,7 +471,7 @@ class FigmaToSQLIntegrator(FigmaExtractor):
 
         weight = int(weight_raw)
 
-        if Validator.validate_font_weight(weight):
+        if ValidateUtils.validate_font_weight(weight):
             weight_distribution = weight_analysis.get("weight_distribution", {})
             if isinstance(weight_distribution, dict):
                 current_count = weight_distribution.get(weight, 0)
@@ -471,7 +479,8 @@ class FigmaToSQLIntegrator(FigmaExtractor):
         else:
             self._add_invalid_weight(weight, slide, block, weight_analysis)
 
-    def _add_invalid_weight(self, weight: int, slide: dict, block: dict, weight_analysis: dict) -> None:
+    @staticmethod
+    def _add_invalid_weight(weight: int, slide: dict, block: dict, weight_analysis: dict) -> None:
         """Add invalid weight to the analysis"""
         slide_number = slide.get("slide_number", "unknown")
         block_name = block.get("name", "unknown")

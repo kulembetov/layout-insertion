@@ -4,7 +4,7 @@ import configuration as config
 from figma_integration.filters import FilterConfig, FilterMode
 from figma_integration.models import ExtractedBlock
 
-from .checker import Checker
+from .check import CheckUtils
 
 
 class BlockFilterUtils:
@@ -40,10 +40,17 @@ class BlockFilterUtils:
         marker: str | None = _marker[0] if _marker else None
 
         exclude_hidden = getattr(filter_config, "exclude_hidden", True) and get(config.FigmaKey.VISIBLE) is False
-        marker_check = not Checker.check_marker(marker, name)
-        z_index_requirement = getattr(filter_config, "require_z_index", True) and not Checker.check_z_index(name)
+        marker_check = not CheckUtils.check_marker(marker, name)
+        z_index_requirement = getattr(filter_config, "require_z_index", True) and not CheckUtils.check_z_index(name)
         if exclude_hidden or marker_check or z_index_requirement:
             return False
 
         mode = getattr(filter_config, "mode", FilterMode.ALL)
         return BlockFilterUtils._check_mode(mode, filter_config, get)
+
+    @staticmethod
+    def should_skip_full_image_block(sql_type: str, dimensions: dict[str, int], name: str) -> bool:
+        """Check if an image block should be skipped (full-size background images)."""
+        name_lower = name.lower()
+        is_precompiled = "precompiled" in name_lower
+        return sql_type == "image" and dimensions["x"] == 0 and dimensions["y"] == 0 and dimensions["w"] == config.FIGMA_CONFIG.TARGET_WIDTH and dimensions["h"] == config.FIGMA_CONFIG.TARGET_HEIGHT and not is_precompiled

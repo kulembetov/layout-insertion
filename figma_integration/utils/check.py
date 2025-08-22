@@ -1,7 +1,7 @@
 import configuration as config
 
 
-class Checker:
+class CheckUtils:
     @staticmethod
     def check_z_index(name: str) -> bool:
         """Checks if the frame name contains a Z-index."""

@@ -1,4 +1,5 @@
 import configuration as config
+from figma_integration.models import ExtractedBlock
 
 from .text import TextUtils
 
@@ -32,12 +33,12 @@ class BlockUtils:
             block_dict["words"] = block["words"]
         else:
             block_dict["words"] = TextUtils.count_words(text_content)
-        block_dict["figure_info"] = BlockUtils.extract_figure_info(block)
-        block_dict["precompiled_image_info"] = BlockUtils.extract_precompiled_image_info(block)
+        block_dict["figure_info"] = BlockUtils._extract_figure_info(block)
+        block_dict["precompiled_image_info"] = BlockUtils._extract_precompiled_image_info(block)
         return block_dict
 
     @staticmethod
-    def extract_figure_info(block):
+    def _extract_figure_info(block):
         """Extract and return figure_info dict for a figure block, or None if not a figure."""
         if getattr(block, "sql_type", None) != "figure":
             return None
@@ -48,7 +49,7 @@ class BlockUtils:
         return info
 
     @staticmethod
-    def extract_precompiled_image_info(block):
+    def _extract_precompiled_image_info(block):
         """Extract and return precompiled_image_info dict for a precompiled image block, or None if not applicable."""
         if getattr(block, "sql_type", None) != "image":
             return None
@@ -105,3 +106,22 @@ class BlockUtils:
     @staticmethod
     def is_node_type(node: dict, node_type: str) -> bool:
         return node.get("type") == node_type
+
+    @staticmethod
+    def create_extracted_block(node: dict, figma_type: str, sql_type: str, name: str, dimensions: dict, styles: dict, slide_number: int, parent_container: str, text_content: str | None, comments_map: dict[str, str] | None) -> ExtractedBlock:
+        """Create an ExtractedBlock instance with all required data."""
+        comment = comments_map.get(str(node["id"]), "") if comments_map else ""
+
+        return ExtractedBlock(
+            id=str(node["id"]),
+            figma_type=figma_type,
+            sql_type=sql_type,
+            name=name,
+            dimensions=dimensions,
+            styles=styles,
+            slide_number=slide_number,
+            parent_container=parent_container,
+            is_target=True,
+            text_content=text_content,
+            comment=comment,
+        )
