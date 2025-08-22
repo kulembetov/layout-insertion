@@ -1,8 +1,27 @@
+from collections.abc import Callable
+
+import configuration as config
 from figma_integration.filters import FilterConfig, FilterMode
 from figma_integration.models import ExtractedBlock
 
+from .checker import Checker
+
 
 class BlockFilterUtils:
+    @staticmethod
+    def _check_mode(mode: FilterMode, filter_config: FilterConfig, get: Callable) -> bool:
+        if mode == FilterMode.ALL:
+            return True
+        if mode == FilterMode.SLIDE_GROUP:
+            slide_number = get("slide_number") or get("slideNumber")
+            if slide_number is not None:
+                return slide_number in getattr(filter_config, "target_slides", [])
+        if mode == FilterMode.SLIDE_NAME:
+            slide_name = get(config.FigmaKey.NAME)
+            if slide_name is not None:
+                return slide_name in getattr(filter_config, "target_names", [])
+        return True
+
     @staticmethod
     def should_include(node_or_block: dict | ExtractedBlock, filter_config: FilterConfig) -> bool:
         """
@@ -16,26 +35,15 @@ class BlockFilterUtils:
                 return node_or_block.get(key, None)
             return getattr(node_or_block, key, None)
 
-        if getattr(filter_config, "exclude_hidden", True) and get("visible") is False:
+        name = get(config.FigmaKey.NAME) or ""
+        _marker: list[str] | None = getattr(filter_config, "target_statuses", None)
+        marker: str | None = _marker[0] if _marker else None
+
+        exclude_hidden = getattr(filter_config, "exclude_hidden", True) and get(config.FigmaKey.VISIBLE) is False
+        marker_check = not Checker.check_marker(marker, name)
+        z_index_requirement = getattr(filter_config, "require_z_index", True) and not Checker.check_z_index(name)
+        if exclude_hidden or marker_check or z_index_requirement:
             return False
-        marker = getattr(filter_config, "ready_to_dev_marker", None)
-        if marker:
-            name = get("name") or ""
-            if marker.lower() not in name.lower():
-                return False
-        if getattr(filter_config, "require_z_index", True):
-            name = get("name") or ""
-            if "z-index" not in name:
-                return False
-        mode = getattr(filter_config, "mode", None)
-        if mode == FilterMode.ALL:
-            return True
-        if mode == FilterMode.SLIDE_GROUP:
-            slide_number = get("slide_number") or get("slideNumber")
-            if slide_number is not None:
-                return slide_number in getattr(filter_config, "target_slides", [])
-        if mode == FilterMode.SLIDE_NAME:
-            slide_name = get("name")
-            if slide_name is not None:
-                return slide_name in getattr(filter_config, "target_names", [])
-        return True
+
+        mode = getattr(filter_config, "mode", FilterMode.ALL)
+        return BlockFilterUtils._check_mode(mode, filter_config, get)

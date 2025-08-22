@@ -5,7 +5,7 @@ from .text import TextUtils
 
 class BlockUtils:
     @staticmethod
-    def build_block_dict(block, slide_config: dict | None = None) -> dict:
+    def build_block_dict(block) -> dict:
         """
         Build a block dictionary from an ExtractedBlock or dict and optional slide_config.
         This is the single source of truth for block dict construction.
@@ -32,12 +32,12 @@ class BlockUtils:
             block_dict["words"] = block["words"]
         else:
             block_dict["words"] = TextUtils.count_words(text_content)
-        block_dict["figure_info"] = BlockUtils.extract_figure_info(block, slide_config)
-        block_dict["precompiled_image_info"] = BlockUtils.extract_precompiled_image_info(block, slide_config)
+        block_dict["figure_info"] = BlockUtils.extract_figure_info(block)
+        block_dict["precompiled_image_info"] = BlockUtils.extract_precompiled_image_info(block)
         return block_dict
 
     @staticmethod
-    def extract_figure_info(block, slide_config=None):
+    def extract_figure_info(block):
         """Extract and return figure_info dict for a figure block, or None if not a figure."""
         if getattr(block, "sql_type", None) != "figure":
             return None
@@ -48,7 +48,7 @@ class BlockUtils:
         return info
 
     @staticmethod
-    def extract_precompiled_image_info(block, slide_config=None):
+    def extract_precompiled_image_info(block):
         """Extract and return precompiled_image_info dict for a precompiled image block, or None if not applicable."""
         if getattr(block, "sql_type", None) != "image":
             return None

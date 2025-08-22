@@ -763,14 +763,14 @@ class FigmaExtractor:
             "frame_id": slide.frame_id,
             "dimensions": slide.dimensions,
             "folder_name": config.SLIDE_NUMBER_TO_FOLDER.get(slide.number, "other"),
-            "blocks": [self._block_to_dict(block, slide_config) for block in slide.blocks],
+            "blocks": [self._block_to_dict(block) for block in slide.blocks],
             "block_count": len(slide.blocks),
             "slideConfig": slide_config,
             "presentationPaletteColors": presentation_palette_colors,
         }
 
-    def _block_to_dict(self, block: ExtractedBlock, slide_config=None) -> dict[str, str | int | dict | list | bool]:
-        return BlockUtils.build_block_dict(block, slide_config)
+    def _block_to_dict(self, block: ExtractedBlock) -> dict[str, str | int | dict | list | bool]:
+        return BlockUtils.build_block_dict(block)
 
     def save_results(self, data: dict[str, str | dict | list | int], output_file: str | None = None) -> str:
         """Save extracted data to file"""

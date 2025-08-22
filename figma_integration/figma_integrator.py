@@ -10,7 +10,7 @@ from .figma_extractor import FigmaExtractor
 from .filters import FilterConfig, FilterMode
 from .utils.block import BlockUtils
 from .utils.helper import HelpUtils
-from .utils.validators import Validator
+from .utils.validator import Validator
 
 logger = setup_logger(__name__)
 
@@ -103,7 +103,7 @@ class FigmaToSQLIntegrator(FigmaExtractor):
         # Process blocks
         blocks_raw = slide_raw.get("blocks", [])
         if isinstance(blocks_raw, list):
-            slide_config = slide_raw.get("slideConfig", {})
+            slide_raw.get("slideConfig", {})
             for block_raw in blocks_raw:
                 if isinstance(block_raw, dict):
                     # Validate block data
@@ -111,14 +111,14 @@ class FigmaToSQLIntegrator(FigmaExtractor):
                         logger.warning(f"Invalid block data in slide {slide_number}")
                         continue
 
-                    block_input = self._create_block_input(block_raw, slide_config)
+                    block_input = self._create_block_input(block_raw)
                     slide_input["blocks"].append(block_input)
 
         return slide_input
 
-    def _create_block_input(self, block_raw: dict, slide_config: dict) -> dict[str, str | int | dict | list | bool]:
+    def _create_block_input(self, block_raw: dict) -> dict[str, str | int | dict | list | bool]:
         """Create block input dictionary"""
-        block_dict = BlockUtils.build_block_dict(block_raw, slide_config)
+        block_dict = BlockUtils.build_block_dict(block_raw)
 
         return {
             "id": block_dict.get("id", ""),

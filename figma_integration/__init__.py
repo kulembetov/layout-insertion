@@ -11,12 +11,13 @@ from .models import ExtractedBlock, ExtractedSlide
 from .utils.block import BlockUtils
 from .utils.block_filter import BlockFilterUtils
 from .utils.block_type import BlockTypeUtils
+from .utils.checker import Checker
 from .utils.color import ColorUtils
 from .utils.figure import FigureUtils
 from .utils.font import FontUtils
 from .utils.helper import HelpUtils
 from .utils.text import TextUtils
-from .utils.validators import Validator
+from .utils.validator import Validator
 
 __all__ = [
     # Main classes
@@ -33,6 +34,7 @@ __all__ = [
     "BlockTypeUtils",
     "BlockUtils",
     "BlockFilterUtils",
+    "Checker",
     "ColorUtils",
     "FontUtils",
     "HelpUtils",
