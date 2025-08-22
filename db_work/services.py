@@ -1526,7 +1526,17 @@ class PrecompiledImageManager(BaseManager):
         block_name = match.group(1)
         ext = tg_params["extension"]
 
-        return f"{base_url}{path}/layouts/{layout_name}/{block_name}_{color[1:]}.{ext}"
+        match path:
+            case "dev":
+                path = "presentsimple-dev-s3"
+            case "stage":
+                path = "presentsimple-stage-s3"
+            case "prod":
+                path = "presentsimple-prod-s3"
+            case _:
+                raise ValueError(f"Unexpected path value: {path}")
+
+        return f"{base_url}{path}/layouts/business/miniatures/{layout_name}/{block_name}_{color[1:]}.{ext}"
 
 
 class BlockLayoutStylesManager(BaseManager):
