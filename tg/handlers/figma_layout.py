@@ -2,6 +2,8 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
+from figma_integration.implemented import figma_api
+from figma_integration.utils.helper import HelpUtils
 from log_utils import setup_logger
 from tg.states import FigmaLayoutState, StartingProcessState
 from tg.utils import extract_file_id, is_valid_figma_url, r_text, to_str_user
@@ -23,7 +25,9 @@ async def layout_loading(message: Message, state: FSMContext) -> None:
         if file_id:
             logger.info(f"Extracted file id: {file_id}")
 
-            # call request to django app
+            figma_api.session.file_id = file_id  # type: ignore[misc]
+            data = figma_api.extract_data()
+            HelpUtils.json_dump(data, "output.json")
 
             str_user = to_str_user(message.from_user)
             logger.info(f"Пользователь {str_user} загрузил шаблон <{figma_url}>.")
