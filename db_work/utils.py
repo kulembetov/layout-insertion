@@ -164,8 +164,22 @@ class StripCleaningRule(CleaningRule):
         return text.strip(self.chars)
 
 
+class ColorUtils:
+    @staticmethod
+    def normalize_color(color: str) -> str | None:
+        """
+        Normalize a color string to a standard hex format (#aabbcc, lowercase).
+        Returns None if the color is invalid or empty.
+        """
+        return DataCleaner.normalize_color(color)
+
+
 class DataCleaner:
     """Centralized, extensible data cleaning system."""
+
+    COLOR_RULES = [
+        StripCleaningRule(),
+    ]
 
     NAME_RULES = [
         RegexCleaningRule(r"\s*background_\d+", "", re.IGNORECASE),
@@ -218,4 +232,21 @@ class DataCleaner:
         if match:
             return int(match.group(1))
 
+        return None
+
+    @classmethod
+    def normalize_color(cls, color: str) -> str | None:
+        """Normalize a color string to standard hex format."""
+        if not color or not isinstance(color, str):
+            return None
+
+        cleaned = cls.clean_with_rules(color, cls.COLOR_RULES).lower()
+
+        if cleaned.startswith("#"):
+            cleaned = cleaned.lstrip("#")
+        if re.fullmatch(r"[0-9a-f]{6}", cleaned):
+            return f"#{cleaned}"
+        if re.fullmatch(r"[0-9a-f]{3}", cleaned):
+            cleaned = "".join([c * 2 for c in cleaned])
+            return f"#{cleaned}"
         return None

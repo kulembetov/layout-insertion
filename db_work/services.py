@@ -11,7 +11,7 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from db_work import constants
 from db_work.database import BaseManager
-from db_work.utils import BlockLayoutUtils, SlideLayoutUtils, generate_uuid, get_slide_layout_data_from_cache
+from db_work.utils import BlockLayoutUtils, ColorUtils, SlideLayoutUtils, generate_uuid, get_slide_layout_data_from_cache
 from log_utils import logs, setup_logger
 
 logger = setup_logger(__name__)
@@ -1411,7 +1411,9 @@ class BlockLayoutManager(BaseManager):
                     values["words"] = slide_layout_block.get("words")
                     values["presentation_palette"] = slide_layout_presentation_palette
                     values["styles"] = slide_layout_block.get("styles")
+                    values["color"] = slide_layout_block.get("color")
                     values["slideConfig"] = slide_layout.get("slideConfig")
+                    values["needs_null_styles"] = slide_layout_block.get("needs_null_styles")
                     values["slide_layout_id"] = slide_layout_id
                     data.append(values)
 
@@ -1548,30 +1550,49 @@ class BlockLayoutStylesManager(BaseManager):
             for block_layout in block_layouts:
                 block_layout_styles = block_layout.get("styles")
                 border_radius = block_layout_styles.get("borderRadius")
+                needs_null_styles = block_layout.get("needs_null_styles")
+                # sql_type = block_layout.get("sql_type")
 
                 weight = block_layout_styles.get("weight")
                 weight = float(weight) if isinstance(weight, str) and weight.isdigit() else None
                 weight = null() if weight is None else weight
 
-                # color_value = block.styles.get("color")
-                # color_value = ColorUtils.normalize_color(color_value) if color_value else None
-                # if not color_value or not color_value.startswith("#") or len(color_value) not in (4, 7):
-                color_value = default_color
+                color_value = block_layout.get("color")
+                color_value = ColorUtils.normalize_color(color_value) if color_value else None
+                if not color_value or not color_value.startswith("#") or len(color_value) not in (4, 7):
+                    color_value = default_color
 
-                # if block.needs_null_styles:
+                if needs_null_styles:
+                    # if sql_type == 'background' or sql_type == 'figure':
+                    layout_values = {
+                        "blockLayoutId": block_layout.get("id"),
+                        "textVertical": null(),
+                        "textHorizontal": null(),
+                        "fontSize": null(),
+                        "weight": null(),
+                        "zIndex": block_layout_styles.get("zIndex", 1),
+                        "opacity": block_layout_styles.get("opacity"),
+                        "textTransform": null(),
+                        "borderRadius": border_radius,
+                        "colorSettingsId": color_settings_id,
+                        "color": color_value,
+                    }
+                else:
+                    layout_values = {
+                        "blockLayoutId": block_layout.get("id"),
+                        "textVertical": block_layout_styles.get("textVertical"),
+                        "textHorizontal": block_layout_styles.get("textHorizontal"),
+                        "fontSize": block_layout_styles.get("fontSize"),
+                        "weight": weight,
+                        "zIndex": block_layout_styles.get("zIndex", 1),
+                        "opacity": block_layout_styles.get("opacity"),
+                        "textTransform": block_layout_styles.get("textTransform"),
+                        "borderRadius": border_radius,
+                        "colorSettingsId": color_settings_id,
+                        "color": color_value,
+                    }
 
-                values = {
-                    "blockLayoutId": block_layout.get("id"),
-                    "textVertical": block_layout_styles.get("textVertical"),
-                    "textHorizontal": block_layout_styles.get("textHorizontal"),
-                    "fontSize": block_layout_styles.get("fontSize"),
-                    "weight": weight,
-                    "zIndex": block_layout_styles.get("zIndex"),
-                    "opacity": block_layout_styles.get("opacity"),
-                    "textTransform": block_layout_styles.get("textTransform"),
-                    "borderRadius": border_radius,
-                    "colorSettingsId": color_settings_id,
-                    "color": color_value,
+                defoltes = {
                     # Defoltes
                     "pathName": null(),
                     "italic": False,
@@ -1591,6 +1612,7 @@ class BlockLayoutStylesManager(BaseManager):
                     "cropOffsetY": 0,
                     "cropScale": 1,
                 }
+                values = layout_values | defoltes
 
                 data.append(values)
                 query = insert(block_layout_styles_table).values(values)
