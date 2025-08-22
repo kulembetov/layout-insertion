@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from db_work.services import BlockLayoutToDeleteManager, PresentationLayoutManager, SlideLayoutManager
-from django_app.api_v1.services.filters.filter_settings import FilterMode
-from django_app.api_v1.utils.helpers import json_dump
+from figma_integration.filters import FilterMode
+from figma_integration.utils.helper import HelpUtils
 from log_utils import logs, setup_logger
 
 logger = setup_logger(__name__)
@@ -15,7 +15,7 @@ class ReceiveFigmaJsonAPIView(APIView):
 
     @logs(logger, on=True)
     def get(self, request):
-        from .implemented import figma_instance
+        from figma_integration.implemented import figma_api
 
         try:
             file_id = request.data["file_id"]
@@ -23,10 +23,10 @@ class ReceiveFigmaJsonAPIView(APIView):
         except KeyError:
             return Response(data={"message": "Request doesn't contain 'file_id'. Bad request."}, status=status.HTTP_400_BAD_REQUEST)
 
-        figma_instance.file_id = file_id
-        data = figma_instance.extract()
+        figma_api.session.file_id = file_id
+        data = figma_api.extract_data()
 
-        json_dump(data, "output.json")
+        HelpUtils.json_dump(data, "output.json")
         return Response(data=data, status=status.HTTP_200_OK)
 
 
@@ -42,23 +42,24 @@ class FilterFigmaJson(APIView):
             return Response(data={"message": "Request doesn't contain 'file_id'. Bad request."}, status=status.HTTP_400_BAD_REQUEST)
 
         if request.data.get("filter"):
-            from .implemented import filter_figma_instance
+            from figma_integration.implemented import figma_filter_api
 
             filter_type: str = request.data.get("filter").get("type", "")
             filter_names: list[int | str] = request.data.get("filter").get("name", [])
 
-            filter_figma_instance.file_id = file_id
-            filter_figma_instance.filter_names = filter_names
+            figma_filter_api.session.file_id = file_id  # type: ignore[misc]
 
             match filter_type:
                 case FilterMode.SLIDE_GROUP.value:
-                    data = filter_figma_instance.extract_slide_group()
+                    slides: list[int] = [slide for slide in filter_names]  # type: ignore[misc]
+                    data = figma_filter_api.extract_slide_group(slides)
 
                 case FilterMode.SLIDE_NAME.value:
-                    data = filter_figma_instance.extract_slide_name()
+                    names: list[str] = [name for name in filter_names]  # type: ignore[misc]
+                    data = figma_filter_api.extract_slide_names(names)
 
                 case FilterMode.STATUS.value:
-                    data = filter_figma_instance.extract_status()
+                    data = figma_filter_api.extract_status()
 
                 case _:
                     raise ValueError(f"Unknown filter type: {filter_type}")
