@@ -67,23 +67,18 @@ class PrecompiledImagesConfig(TypedDict):
 
 
 PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
-    "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/raiffeisen",
+    "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/sbermarketing/images",
     "default_colors": [
-        "#bae4e4",  # мятно-бирюзовый
-        "#c6d6f2",  # холодно-синий
-        "#e0e8f5",  # небесно-голубой
-        "#e3dcf8",  # сиреневый
-        "#f0f0f0",  # светло-серый
-        "#f5e7e7",  # розово-бежевый
-        "#fce0d2",  # персиково-оранжевый
+        "#030d1d", # темный
+        "#eef3ff", # светлый
     ],
-    "prefix": ["Green", "Blue", "Sky", "Purple", "Gray", "Pink", "Orange"],
+    "prefix": ["Dark", 'Light'],
 }
 
 # ========================
 #  Defaults and Templates
 # ========================
-MINIATURES_BASE_PATH: str = "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/business/miniatures"
+MINIATURES_BASE_PATH: str = "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/sbermarketing/miniatures"
 DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"
 DEFAULT_COLOR: str = "#ffffff"
 MINIATURE_EXTENSION: str = ".png"
@@ -91,7 +86,7 @@ MINIATURE_EXTENSION: str = ".png"
 DEFAULT_VALUES: dict[str, object] = {
     "slide_layout_name": "grid_cards_horizontal",
     "slide_layout_number": 9,
-    "presentation_layout_id": "01989db8-b17d-78ec-b9d6-04e42c8bede2",
+    "presentation_layout_id": "01919910-cc3c-7404-bfce-a2ca8feb3538",
     "slide_layout_type": "classic",
     "num_blocks": 5,
 }

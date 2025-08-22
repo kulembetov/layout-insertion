@@ -494,21 +494,22 @@ class FigmaExtractor:
         return "z-index" in name
 
     def normalize_font_weight(self, weight: int | float | str | None) -> int:
-        """Normalize font weight to valid values from config"""
+        """Return font weight as-is for all valid values (100-900)"""
         if weight is None:
-            return config.VALID_FONT_WEIGHTS[1]
+            return 400  # Default normal weight
 
         try:
             weight_num = int(weight)
         except (ValueError, TypeError):
-            return config.VALID_FONT_WEIGHTS[1]
+            return 400  # Default normal weight
 
-        if weight_num <= 350:
-            return config.VALID_FONT_WEIGHTS[0]
-        elif weight_num <= 550:
-            return config.VALID_FONT_WEIGHTS[1]
-        else:
-            return config.VALID_FONT_WEIGHTS[2]
+        # Accept all standard font weight values
+        if weight_num in [100, 200, 300, 400, 500, 600, 700, 800, 900]:
+            return weight_num
+        
+        # Round to nearest valid weight for non-standard values
+        valid_weights = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+        return min(valid_weights, key=lambda x: abs(x - weight_num))
 
     def extract_text_styles(self, node: dict[str, str | int | float | bool | dict | list], sql_type: str) -> dict[str, str | int | float | bool | list]:
         """Extract text styling information with config defaults (no color)."""
@@ -544,6 +545,26 @@ class FigmaExtractor:
             if "fontWeight" in style_raw:
                 font_weight_raw = style_raw["fontWeight"]
                 styles["weight"] = self.normalize_font_weight(font_weight_raw)
+
+            # Extract line height from Figma API
+            if "lineHeightPx" in style_raw:
+                line_height_raw = style_raw["lineHeightPx"]
+                if isinstance(line_height_raw, (int, float)):
+                    styles["lineHeight"] = round(line_height_raw)
+            elif "lineHeightPercent" in style_raw:
+                line_height_percent_raw = style_raw["lineHeightPercent"]
+                if isinstance(line_height_percent_raw, (int, float)) and "fontSize" in styles:
+                    # Convert percentage to pixels based on font size
+                    font_size = styles["fontSize"]
+                    line_height_px = (line_height_percent_raw / 100.0) * font_size
+                    styles["lineHeight"] = round(line_height_px)
+            elif "lineHeightPercentFontSize" in style_raw:
+                line_height_percent_raw = style_raw["lineHeightPercentFontSize"]
+                if isinstance(line_height_percent_raw, (int, float)) and "fontSize" in styles:
+                    # Convert percentage to pixels based on font size
+                    font_size = styles["fontSize"]
+                    line_height_px = (line_height_percent_raw / 100.0) * font_size
+                    styles["lineHeight"] = round(line_height_px)
 
         styles["blur"] = self.extract_blur(node)
 
@@ -1517,15 +1538,11 @@ class FigmaToSQLIntegrator:
         else:
             weight = 400
 
-        valid_weights = config.VALID_FONT_WEIGHTS
-        if isinstance(valid_weights, list) and len(valid_weights) >= 3:
-            if weight not in valid_weights:
-                if weight <= 350:
-                    weight = valid_weights[0]
-                elif weight <= 550:
-                    weight = valid_weights[1]
-                else:
-                    weight = valid_weights[2]
+        # Accept all standard font weight values (100-900)
+        valid_weights = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+        if weight not in valid_weights:
+            # Round to nearest valid weight for non-standard values
+            weight = min(valid_weights, key=lambda x: abs(x - weight))
 
         text_vertical = figma_styles.get("textVertical", defaults.get("text_vertical", "top"))
         text_horizontal = figma_styles.get("textHorizontal", defaults.get("text_horizontal", "left"))
