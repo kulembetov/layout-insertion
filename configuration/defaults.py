@@ -25,7 +25,7 @@ DEFAULT_VALUES: Final[DefaultValues] = DefaultValues(
     slide_layout_name="grid_cards_horizontal",
     slide_layout_number=9,
     presentation_layout_id="01989db8-b17d-78ec-b9d6-04e42c8bede2",
-    slide_layout_type=str(SlideLayoutType.classic),
+    slide_layout_type=SlideLayoutType.classic.value,  # type: ignore
     num_blocks=5,
 )
 
@@ -34,7 +34,7 @@ SLIDE_LAYOUT_ADDITIONAL_INFO: Final[dict[str, object]] = {
     "percentesCount": 0,
     "maxSymbolsInBlock": 0,
     "hasHeaders": False,
-    "type": str(SlideLayoutType.classic),
+    "type": SlideLayoutType.classic.value,
     "infographicsType": None,
 }
 
