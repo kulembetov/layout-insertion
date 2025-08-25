@@ -1007,6 +1007,8 @@ class SlideLayoutManager(BaseManager):
             # Финализируем массив ColorSettings (убираем дублирование)
             result["colorSettings"] = list(color_settings_ids)
 
+            logger.info("Получил все связи по SlideLayouts. Начался процесс удаления.")
+
             return result
 
         return super().execute(logic, session)
@@ -1074,6 +1076,8 @@ class SlideLayoutManager(BaseManager):
                         updated_count = result.rowcount
                         print(f"Обнулено parentLayoutId в {updated_count} записях UserBlockLayout")
 
+                logger.info("Обнулено parentLayoutId в NULL записи в UserBlockLayout")
+
                 # Удаляем в правильном порядке согласно зависимостям внешних ключей
 
                 # 1. SlideLayoutIndexConfig (связующая таблица)
@@ -1082,6 +1086,7 @@ class SlideLayoutManager(BaseManager):
                     for config in structure["slideLayoutIndexConfigs"]:
                         delete_query = delete(slide_layout_index_config_table).where(slide_layout_index_config_table.c.id == config["id"])
                         session.execute(delete_query)
+                logger.info("Удалил таблицу SlideLayoutIndexConfig")
 
                 # 2. BlockLayoutIndexConfig
                 if structure["blockLayoutIndexConfigs"]:
@@ -1089,6 +1094,7 @@ class SlideLayoutManager(BaseManager):
                     for config in structure["blockLayoutIndexConfigs"]:
                         delete_query = delete(block_layout_index_config_table).where(block_layout_index_config_table.c.id == config["id"])
                         session.execute(delete_query)
+                logger.info("Удалил таблицу BlockLayoutIndexConfig")
 
                 # Обрабатываем каждый слайд
                 for slide in structure["slideLayouts"]:
@@ -1102,6 +1108,8 @@ class SlideLayoutManager(BaseManager):
                                 delete_query = delete(figure_table).where(figure_table.c.id == figure_id)
                                 session.execute(delete_query)
 
+                    logger.info("Удалил таблицу Figure")
+
                     # 4. PrecompiledImage (связаны с BlockLayout)
                     for block in slide["blockLayouts"]:
                         if block["precompiledImages"]:
@@ -1109,6 +1117,7 @@ class SlideLayoutManager(BaseManager):
                             for image_id in block["precompiledImages"]:
                                 delete_query = delete(precompiled_image_table).where(precompiled_image_table.c.id == image_id)
                                 session.execute(delete_query)
+                    logger.info("Удалил таблицу PrecompiledImage")
 
                     # 5. BlockLayoutLimit
                     for block in slide["blockLayouts"]:
@@ -1116,6 +1125,7 @@ class SlideLayoutManager(BaseManager):
                             block_layout_limit_table, _ = self.open_session("BlockLayoutLimit")
                             delete_query = delete(block_layout_limit_table).where(block_layout_limit_table.c.blockLayoutId == block["id"])
                             session.execute(delete_query)
+                    logger.info("Удалил таблицу BlockLayoutLimit")
 
                     # 6. BlockLayoutDimensions
                     for block in slide["blockLayouts"]:
@@ -1123,6 +1133,7 @@ class SlideLayoutManager(BaseManager):
                             block_layout_dimensions_table, _ = self.open_session("BlockLayoutDimensions")
                             delete_query = delete(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block["id"])
                             session.execute(delete_query)
+                    logger.info("Удалил таблицу BlockLayoutDimensions")
 
                     # 7. BlockLayoutStyles
                     for block in slide["blockLayouts"]:
@@ -1130,34 +1141,40 @@ class SlideLayoutManager(BaseManager):
                             block_layout_styles_table, _ = self.open_session("BlockLayoutStyles")
                             delete_query = delete(block_layout_styles_table).where(block_layout_styles_table.c.blockLayoutId == block["id"])
                             session.execute(delete_query)
+                    logger.info("Удалил таблицу BlockLayoutStyles")
 
                     # 8. BlockLayout
                     for block in slide["blockLayouts"]:
                         block_layout_table, _ = self.open_session("BlockLayout")
                         delete_query = delete(block_layout_table).where(block_layout_table.c.id == block["id"])
                         session.execute(delete_query)
+                    logger.info("Удалил таблицу BlockLayout")
 
                     # 9. SlideLayoutDimensions
                     if slide["slideLayoutDimensions"]:
                         slide_layout_dimensions_table, _ = self.open_session("SlideLayoutDimensions")
                         delete_query = delete(slide_layout_dimensions_table).where(slide_layout_dimensions_table.c.slideLayoutId == slide_layout_id)
                         session.execute(delete_query)
+                    logger.info("Удалил таблицу SlideLayoutDimensions")
 
                     # 10. SlideLayoutStyles
                     if slide["slideLayoutStyles"]:
                         slide_layout_styles_table, _ = self.open_session("SlideLayoutStyles")
                         delete_query = delete(slide_layout_styles_table).where(slide_layout_styles_table.c.slideLayoutId == slide_layout_id)
                         session.execute(delete_query)
+                    logger.info("Удалил таблицу SlideLayoutStyles")
 
                     # 11. SlideLayoutAdditionalInfo
                     if slide["slideLayoutAdditionalInfo"]:
                         slide_layout_additional_info_table, _ = self.open_session("SlideLayoutAdditionalInfo")
                         delete_query = delete(slide_layout_additional_info_table).where(slide_layout_additional_info_table.c.slideLayoutId == slide_layout_id)
                         session.execute(delete_query)
+                    logger.info("Удалил таблицу SlideLayoutAdditionalInfo")
 
                     # 12. Удаляем сам SlideLayout
                     delete_query = delete(slide_layout_table).where(slide_layout_table.c.id == slide_layout_id)
                     session.execute(delete_query)
+                    logger.info("Удалил таблицу SlideLayout")
 
                     deleted_slides.append(slide_layout_id)
 
@@ -1180,6 +1197,7 @@ class SlideLayoutManager(BaseManager):
                         if not pls_result and not bls_result:
                             delete_query = delete(color_settings_table).where(color_settings_table.c.id == color_settings_id)
                             session.execute(delete_query)
+                logger.info("Удалил таблицу ColorSettings")
 
                 # Коммитим все изменения
                 session.commit()
@@ -2031,6 +2049,7 @@ class BlockLayoutToDeleteManager(BaseManager):
                             "blockLayoutConfigId": row.blockLayoutConfigId,
                         }
                     )
+            logger.info("Получил все связи по BlockLayout. Начался процесс удаления.")
 
             return result
 
@@ -2085,6 +2104,7 @@ class BlockLayoutToDeleteManager(BaseManager):
                 try:
                     update_query = update(user_block_layout_table).where(user_block_layout_table.c.parentLayoutId.in_(block_layout_ids)).values(parentLayoutId=None)
                     session.execute(update_query)
+                    logger.info("Обнулил parentLayoutId")
                 except Exception:
                     # Таблицы может не существовать в некоторых окружениях — пропускаем молча
                     pass
@@ -2095,6 +2115,7 @@ class BlockLayoutToDeleteManager(BaseManager):
                     for config in structure["slideLayoutIndexConfigs"]:
                         del_q = delete(slide_layout_index_config_table).where(slide_layout_index_config_table.c.id == config["id"])
                         session.execute(del_q)
+                logger.info("Удалил таблицу SlideLayoutIndexConfig")
 
                 # 2. BlockLayoutIndexConfig
                 if structure.get("blockLayoutIndexConfigs"):
@@ -2102,6 +2123,7 @@ class BlockLayoutToDeleteManager(BaseManager):
                     for config in structure["blockLayoutIndexConfigs"]:
                         del_q = delete(block_layout_index_config_table).where(block_layout_index_config_table.c.id == config["id"])
                         session.execute(del_q)
+                logger.info("Удалил таблицу BlockLayoutIndexConfig")
 
                 # 3-8. По каждому блоку
                 for block in structure["blockLayouts"]:
@@ -2113,6 +2135,7 @@ class BlockLayoutToDeleteManager(BaseManager):
                         for figure_id in block["figures"]:
                             del_q = delete(figure_table).where(figure_table.c.id == figure_id)
                             session.execute(del_q)
+                    logger.info("Удалил таблицу Figure")
 
                     # 4. PrecompiledImage
                     if block["precompiledImages"]:
@@ -2120,29 +2143,34 @@ class BlockLayoutToDeleteManager(BaseManager):
                         for image_id in block["precompiledImages"]:
                             del_q = delete(precompiled_image_table).where(precompiled_image_table.c.id == image_id)
                             session.execute(del_q)
+                    logger.info("Удалил таблицу PrecompiledImage")
 
                     # 5. BlockLayoutLimit
                     if block["blockLayoutLimit"]:
                         block_layout_limit_table, _ = self.open_session("BlockLayoutLimit")
                         del_q = delete(block_layout_limit_table).where(block_layout_limit_table.c.blockLayoutId == block_id)
                         session.execute(del_q)
+                    logger.info("Удалил таблицу BlockLayoutLimit")
 
                     # 6. BlockLayoutDimensions
                     if block["blockLayoutDimensions"]:
                         block_layout_dimensions_table, _ = self.open_session("BlockLayoutDimensions")
                         del_q = delete(block_layout_dimensions_table).where(block_layout_dimensions_table.c.blockLayoutId == block_id)
                         session.execute(del_q)
+                    logger.info("Удалил таблицу BlockLayoutDimensions")
 
                     # 7. BlockLayoutStyles
                     if block["blockLayoutStyles"]:
                         block_layout_styles_table, _ = self.open_session("BlockLayoutStyles")
                         del_q = delete(block_layout_styles_table).where(block_layout_styles_table.c.blockLayoutId == block_id)
                         session.execute(del_q)
+                    logger.info("Удалил таблицу BlockLayoutStyles")
 
                     # 8. Сам BlockLayout
                     del_q = delete(block_layout_table).where(block_layout_table.c.id == block_id)
                     session.execute(del_q)
                     deleted_blocks.append(block_id)
+                    logger.info("Удалил таблицу BlockLayout")
 
                 session.commit()
 
