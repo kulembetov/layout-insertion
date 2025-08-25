@@ -298,7 +298,7 @@ class PresentationLayoutManager(BaseManager):
             # Финализируем массив ColorSettings (убираем дублирование)
             result["colorSettings"] = list(color_settings_ids)
 
-            logger.info("Получил все связи по PresentationLayout. Начался процесс удаления.")
+            logger.info("Получил все связи по PresentationLayout.")
 
             return result
 
@@ -1007,7 +1007,7 @@ class SlideLayoutManager(BaseManager):
             # Финализируем массив ColorSettings (убираем дублирование)
             result["colorSettings"] = list(color_settings_ids)
 
-            logger.info("Получил все связи по SlideLayouts. Начался процесс удаления.")
+            logger.info("Получил все связи по SlideLayouts.")
 
             return result
 
@@ -2049,7 +2049,7 @@ class BlockLayoutToDeleteManager(BaseManager):
                             "blockLayoutConfigId": row.blockLayoutConfigId,
                         }
                     )
-            logger.info("Получил все связи по BlockLayout. Начался процесс удаления.")
+            logger.info("Получил все связи по BlockLayout.")
 
             return result
 

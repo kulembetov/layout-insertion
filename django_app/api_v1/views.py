@@ -120,31 +120,6 @@ class ReceiveFigmaPresentationLayoutFullData(APIView):
 
             logger.info(f"Successfully retrieved structure for presentation layout ID: {id}")
 
-            # Получаем output_dir из query параметров (опционально)
-            output_dir = request.GET.get("output_dir", "my_output")
-
-            # Автоматически сохраняем структуру в файл
-            try:
-                filepath = presentation_manager.save_presentation_layout_structure_to_file(str(id), output_dir=output_dir)
-
-                if filepath:
-                    # Получаем информацию о файле
-                    import os
-
-                    file_size = os.path.getsize(filepath)
-                    filename = os.path.basename(filepath)
-
-                    # Добавляем информацию о сохраненном файле в ответ
-                    structure_data["file_info"] = {"filepath": filepath, "filename": filename, "file_size_bytes": file_size, "file_size_human": f"{file_size:,} байт", "saved_at": structure_data["metadata"]["extracted_at"]}
-
-                    logger.info(f"Structure automatically saved to file: {filepath}")
-                else:
-                    logger.warning("Failed to save structure to file, but continuing with response")
-
-            except Exception as file_error:
-                logger.warning(f"Failed to save to file: {str(file_error)}, continuing with response")
-                # Не прерываем выполнение, просто логируем ошибку сохранения
-
             return Response(data=structure_data, status=status.HTTP_200_OK)
 
         except Exception as e:
