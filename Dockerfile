@@ -45,7 +45,8 @@ COPY pyproject.toml poetry.lock* ./
 
 # Устанавливаем зависимости (без установки самого проекта)
 RUN python -m pip install --upgrade pip setuptools wheel && \
-    poetry install --no-interaction --no-ansi --sync --no-root
+    poetry install --no-interaction --no-ansi --no-root && \
+    poetry sync
 
 # Если проект должен быть установлен как пакет (скрипты/entry points), раскомментируй:
 # COPY . .
