@@ -100,8 +100,8 @@ class Executor:
 
 
 if __name__ == "__main__":
-    miniature_path = "miniature_path"
-    miniature_extension = "miniature_extension"
+    miniature_path = "dev"
+    miniature_extension = "png"
     layout_name = "example_name_1"
 
     executor = Executor(

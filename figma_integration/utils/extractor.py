@@ -94,6 +94,8 @@ class Extractor:
             "fontSize": default_style.font_size,
             "weight": default_style.weight,
             "textTransform": default_style.text_transform,
+            # "lineHeight": defaults.get("line_height", "120%"),
+            "lineHeight": "120%",
         }
         style_raw = node.get("style", {})
         if isinstance(style_raw, dict):
@@ -133,6 +135,15 @@ class Extractor:
                 styles["weight"] = self._normalize_font_weight(font_weight_raw)
 
         styles["blur"] = self._extract_blur(node)
+
+        line_height_percent_font_size = "lineHeightPercentFontSize"
+        if isinstance(style_raw, dict) and line_height_percent_font_size in style_raw:
+            line_height_percent_raw = style_raw[line_height_percent_font_size]
+            if isinstance(line_height_percent_raw, (int, float)):
+                styles["lineHeight"] = f"{round(line_height_percent_raw)}%"
+            else:
+                # styles["lineHeight"] = defaults.get("line_height", "120%")
+                styles["lineHeight"] = "120%"
 
         result: dict[str, str | int | float | bool | list] = {}
         for key, value in styles.items():

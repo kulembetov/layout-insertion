@@ -301,6 +301,7 @@ class FigmaExtractor:
 
                     blur_value = styles.get("blur", 0)
                     blur_info = f" | Blur: {blur_value}px" if isinstance(blur_value, (int, float)) and blur_value > 0 else ""
+                    # line_height_info = f" | LineHeight: {styles.get('lineHeight', 'N/A')}" if styles.get("lineHeight") else ""
                     logger.debug(f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{blur_info}")
 
         if BlockUtils.get_node_property(node, "children") and not (getattr(self.session.filter_config, "exclude_hidden", True) and BlockUtils.get_node_property(node, "visible") is False):

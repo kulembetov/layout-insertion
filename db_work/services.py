@@ -1571,6 +1571,8 @@ class BlockLayoutStylesManager(BaseManager):
                 border_radius = block_layout_styles.get("borderRadius")
                 needs_null_styles = block_layout.get("needs_null_styles")
                 # sql_type = block_layout.get("sql_type")
+                block_layout_line_height = block_layout_styles.get("lineHeight")
+                block_layout_line_height_str = f"'{block_layout_line_height}'" if block_layout_line_height else "'120%'"
 
                 weight = block_layout_styles.get("weight")
                 weight = float(weight) if isinstance(weight, str) and weight.isdigit() else None
@@ -1589,6 +1591,7 @@ class BlockLayoutStylesManager(BaseManager):
                         "textHorizontal": null(),
                         "fontSize": null(),
                         "weight": null(),
+                        "lineHeight": null(),
                         "zIndex": block_layout_styles.get("zIndex", 1),
                         "opacity": block_layout_styles.get("opacity"),
                         "textTransform": null(),
@@ -1603,6 +1606,7 @@ class BlockLayoutStylesManager(BaseManager):
                         "textHorizontal": block_layout_styles.get("textHorizontal"),
                         "fontSize": block_layout_styles.get("fontSize"),
                         "weight": weight,
+                        "lineHeight": block_layout_line_height_str,
                         "zIndex": block_layout_styles.get("zIndex", 1),
                         "opacity": block_layout_styles.get("opacity"),
                         "textTransform": block_layout_styles.get("textTransform"),
