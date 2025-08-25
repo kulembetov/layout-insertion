@@ -1545,7 +1545,7 @@ class PrecompiledImageManager(BaseManager):
             case _:
                 raise ValueError(f"Unexpected path value: {path}")
 
-        return f"{base_url}{path}/layouts/business/miniatures/{layout_name}/{block_name}_{color[1:]}.{ext}"
+        return f"{base_url}{path}/layouts/{layout_name}/miniatures/{block_name}_{color[1:]}.{ext}"
 
 
 class BlockLayoutStylesManager(BaseManager):
