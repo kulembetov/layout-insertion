@@ -15,19 +15,20 @@ class Extractor:
     def _normalize_font_weight(weight: int | float | str | None) -> int:
         """Normalize font weight to valid values from config"""
         if weight is None:
-            return config.VALID_FONT_WEIGHTS[1]
+            return 400  # Default normal weight
 
         try:
             weight_num = int(weight)
         except (ValueError, TypeError):
-            return config.VALID_FONT_WEIGHTS[1]
+            return 400  # Default normal weight
 
-        if weight_num <= 350:
-            return config.VALID_FONT_WEIGHTS[0]
-        elif weight_num <= 550:
-            return config.VALID_FONT_WEIGHTS[1]
-        else:
-            return config.VALID_FONT_WEIGHTS[2]
+        # Accept all standard font weight values
+        if weight_num in [100, 200, 300, 400, 500, 600, 700, 800, 900]:
+            return weight_num
+
+        # Round to nearest valid weight for non-standard values
+        valid_weights = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+        return min(valid_weights, key=lambda x: abs(x - weight_num))
 
     @staticmethod
     def _extract_z_index(name: str) -> int:
