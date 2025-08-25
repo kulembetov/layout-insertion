@@ -2212,11 +2212,22 @@ class BlockLayoutToDeleteManager(BaseManager):
 
         block_layout_ids = []
 
+        logger.info(f"Find existing slide layouts for delete: {len(slide_layout_ids)}.")
+
         # Find block layouts ids
         block_layout_table, session = self.open_session("BlockLayout")
+
+        count = 1
         for slide_layout_id in slide_layout_ids:
             query = select(block_layout_table.c.id).where(block_layout_table.c.slideLayoutId == slide_layout_id)
             result = session.execute(query).fetchall()
             block_layout_ids.extend([str(row[0]) for row in result])
+
+            logger.info(f"In existing slide layout № {count} found {len(result)} existing block layouts.")
+            logger.info(f"In existing slide layout № {count} found {len(result)} block layouts.")
+
+            count += 1
+
+        logger.info(f"Found {len(block_layout_ids)} block layouts.")
 
         return block_layout_ids
