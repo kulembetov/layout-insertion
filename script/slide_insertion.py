@@ -108,6 +108,7 @@ class BlockStyles(TypedDict):
     textHorizontal: str
     fontSize: int
     weight: int
+    lineHeight: str
     zIndex: int
     textTransform: str
     color: str
@@ -285,6 +286,7 @@ class BlockFactory:
                 "weight": None,
                 "zIndex": self.config.get_default_z_index("background"),
                 "textTransform": None,
+                "lineHeight": None,
                 "color": "#ffffff",
             },
             dimensions={
@@ -645,12 +647,14 @@ class BlockStylesCommand(SQLCommand):
                 color_value = default_color
             if block.needs_null_styles:
                 if block.is_background or block.is_figure:
-                    values.append(f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, null, {border_radius_str}, '{color_settings_id}')")
+                    values.append(f"    ('{block.id}', null, null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, null, {border_radius_str}, '{color_settings_id}')")
                 else:
-                    values.append(f"    ('{block.id}', null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, null, {border_radius_str}, '{color_settings_id}')")
+                    values.append(f"    ('{block.id}', null, null, null, null, null, {block.styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, null, {border_radius_str}, '{color_settings_id}')")
             else:
                 styles = block.styles
-                values.append(f"    ('{block.id}', '{styles.get('textVertical')}', '{styles.get('textHorizontal')}', {styles.get('fontSize')}, {styles.get('weight')}, {styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, '{styles.get('textTransform')}', {border_radius_str}, '{color_settings_id}')")
+                line_height = styles.get('lineHeight', '120%')
+                line_height_str = f"'{line_height}'" if line_height else "'120%'"
+                values.append(f"    ('{block.id}', '{styles.get('textVertical')}', '{styles.get('textHorizontal')}', {styles.get('fontSize')}, {styles.get('weight')}, {line_height_str}, {styles.get('zIndex', 1)}, '{color_value}', {block.opacity}, '{styles.get('textTransform')}', {border_radius_str}, '{color_settings_id}')")
         return ",\n".join(values)
 
 

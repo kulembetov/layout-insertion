@@ -520,14 +520,25 @@ class FigmaExtractor:
     def extract_text_styles(self, node: dict[str, str | int | float | bool | dict | list], sql_type: str) -> dict[str, str | int | float | bool | list]:
         """Extract text styling information with config defaults (no color)."""
         defaults = config.DEFAULT_STYLES.get(sql_type, config.DEFAULT_STYLES["default"])
+
+        # Log node data for lineHeight debugging
+        node_name = node.get("name", "unnamed")
+        node_id = node.get("id", "no-id")
+        node_type = node.get("type", "unknown")
+        LogUtils.log_block_event(f"[LineHeight] Processing LAYER: '{node_name}' (id: {node_id}, figmaType: {node_type}) -> blockType: {sql_type}")
+        LogUtils.log_block_event(f"[LineHeight] NOTE: Extracting styles from individual layer, NOT from slideColors table")
         styles = {
             "textVertical": defaults["text_vertical"],
             "textHorizontal": defaults["text_horizontal"],
             "fontSize": defaults["font_size"],
             "weight": defaults["weight"],
+            "lineHeight": defaults.get("line_height", "120%"),
             "textTransform": defaults["text_transform"],
         }
         style_raw = node.get("style", {})
+        LogUtils.log_block_event(f"[LineHeight] Raw style data from layer: {style_raw}")
+        LogUtils.log_block_event(f"[LineHeight] Expected fields: lineHeightPercent, lineHeightPercentFontSize, or lineHeightPx")
+
         if isinstance(style_raw, dict):
             text_align_vertical_raw = style_raw.get("textAlignVertical", "")
             if isinstance(text_align_vertical_raw, str):
@@ -552,25 +563,17 @@ class FigmaExtractor:
                 font_weight_raw = style_raw["fontWeight"]
                 styles["weight"] = self.normalize_font_weight(font_weight_raw)
 
-            # Extract line height from Figma API
-            if "lineHeightPx" in style_raw:
-                line_height_raw = style_raw["lineHeightPx"]
-                if isinstance(line_height_raw, (int, float)):
-                    styles["lineHeight"] = round(line_height_raw)
-            elif "lineHeightPercent" in style_raw:
-                line_height_percent_raw = style_raw["lineHeightPercent"]
-                if isinstance(line_height_percent_raw, (int, float)) and "fontSize" in styles:
-                    # Convert percentage to pixels based on font size
-                    font_size = styles["fontSize"]
-                    line_height_px = (line_height_percent_raw / 100.0) * font_size
-                    styles["lineHeight"] = round(line_height_px)
-            elif "lineHeightPercentFontSize" in style_raw:
+            if "lineHeightPercentFontSize" in style_raw:
                 line_height_percent_raw = style_raw["lineHeightPercentFontSize"]
-                if isinstance(line_height_percent_raw, (int, float)) and "fontSize" in styles:
-                    # Convert percentage to pixels based on font size
-                    font_size = styles["fontSize"]
-                    line_height_px = (line_height_percent_raw / 100.0) * font_size
-                    styles["lineHeight"] = round(line_height_px)
+                if isinstance(line_height_percent_raw, (int, float)):
+                    styles["lineHeight"] = f"{round(line_height_percent_raw)}%"
+                    LogUtils.log_block_event(f"[LineHeight] Using lineHeightPercentFontSize: {line_height_percent_raw} -> {styles['lineHeight']}")
+                else:
+                    styles["lineHeight"] = defaults.get("line_height", "120%")
+                    LogUtils.log_block_event(f"[LineHeight] Invalid lineHeightPercentFontSize, using default: {styles['lineHeight']}")
+            else:
+                styles["lineHeight"] = defaults.get("line_height", "120%")
+                LogUtils.log_block_event(f"[LineHeight] No lineHeightPercentFontSize found, using default: {styles['lineHeight']}")
 
         styles["blur"] = self.extract_blur(node)
 
@@ -825,8 +828,9 @@ class FigmaExtractor:
 
                     blur_value = styles.get("blur", 0)
                     blur_info = f" | Blur: {blur_value}px" if isinstance(blur_value, (int, float)) and blur_value > 0 else ""
+                    line_height_info = f" | LineHeight: {styles.get('lineHeight', 'N/A')}" if styles.get('lineHeight') else ""
                     LogUtils.log_block_event(
-                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{blur_info}",
+                        f"Block processed | Slide: {slide_number} | Container: {parent_container} | Type: {sql_type} | Name: {name} | Dimensions: {dimensions} | Styles: {styles} | Text: {text_content if text_content else ''}{blur_info}{line_height_info}",
                         level="debug",
                     )
 

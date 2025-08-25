@@ -51,9 +51,6 @@ FIGMA_CONFIG = {
     "OUTPUT_FILE": "extracted_data",
 }
 
-# Valid font weights - ONLY these are allowed
-VALID_FONT_WEIGHTS = [300, 400, 700]
-
 
 # ========================
 #  TypedDicts for Structured Configs
@@ -67,18 +64,17 @@ class PrecompiledImagesConfig(TypedDict):
 
 
 PRECOMPILED_IMAGES: PrecompiledImagesConfig = {
-    "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/sbermarketing/images",
+    "base_url": "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/business/images",
     "default_colors": [
-        "#030d1d", # темный
-        "#eef3ff", # светлый
+        "##4a3aff",  # темный
     ],
-    "prefix": ["Dark", 'Light'],
+    "prefix": ["Dark"],
 }
 
 # ========================
 #  Defaults and Templates
 # ========================
-MINIATURES_BASE_PATH: str = "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/sbermarketing/miniatures"
+MINIATURES_BASE_PATH: str = "https://storage.yandexcloud.net/presentsimple-dev-s3/layouts/business/miniatures"
 DEFAULT_COLOR_SETTINGS_ID: str = "019565bd-99ce-792c-86fd-0188712beb9b"
 DEFAULT_COLOR: str = "#ffffff"
 MINIATURE_EXTENSION: str = ".png"
@@ -86,7 +82,7 @@ MINIATURE_EXTENSION: str = ".png"
 DEFAULT_VALUES: dict[str, object] = {
     "slide_layout_name": "grid_cards_horizontal",
     "slide_layout_number": 9,
-    "presentation_layout_id": "01919910-cc3c-7404-bfce-a2ca8feb3538",
+    "presentation_layout_id": "01989db8-b17d-78ec-b9d6-04e42c8bede2",
     "slide_layout_type": "classic",
     "num_blocks": 5,
 }
@@ -121,7 +117,7 @@ VALUES
 {block_layout_values}
 RETURNING *;""",
     "block_styles": """-- Create BlockLayoutStyles
-INSERT INTO "BlockLayoutStyles" ("blockLayoutId", "textVertical", "textHorizontal", "fontSize", "weight", "zIndex", "color", "opacity", "textTransform", "borderRadius", "colorSettingsId")
+INSERT INTO "BlockLayoutStyles" ("blockLayoutId", "textVertical", "textHorizontal", "fontSize", "weight", "lineHeight", "zIndex", "color", "opacity", "textTransform", "borderRadius", "colorSettingsId")
 VALUES
 {styles_values}
 RETURNING *;""",
@@ -162,7 +158,7 @@ INSERT INTO "SlideLayoutDimensions" (
     {y},
     {w},
     {h}
-)
+)x
 RETURNING *;""",
     "slide_layout_styles": """-- Create SlideLayoutStyles
 INSERT INTO "SlideLayoutStyles" (
@@ -187,6 +183,11 @@ VALUES
 RETURNING *;""",
     "block_layout_limit": """-- Create BlockLayoutLimit\nINSERT INTO "BlockLayoutLimit" ("minWords", "maxWords", "blockLayoutId")\nVALUES\n{block_layout_limit_values}\nRETURNING *;""",
 }
+
+# ========================
+#  Font Configuration
+# ========================
+VALID_FONT_WEIGHTS: list[int] = [100, 200, 300, 400, 500, 600, 700, 800, 900]
 
 # ========================
 #  Mappings and Lookups
@@ -313,6 +314,7 @@ DEFAULT_STYLES: dict[str, dict[str, object]] = {
         "text_horizontal": "left",
         "font_size": 50,
         "weight": 700,
+        "line_height": "120%",
         "text_transform": "none",
     },
     "subTitle": {
@@ -320,6 +322,7 @@ DEFAULT_STYLES: dict[str, dict[str, object]] = {
         "text_horizontal": "left",
         "font_size": 25,
         "weight": 400,
+        "line_height": "120%",
         "text_transform": "none",
     },
     "blockTitle": {
@@ -327,6 +330,7 @@ DEFAULT_STYLES: dict[str, dict[str, object]] = {
         "text_horizontal": "left",
         "font_size": 25,
         "weight": 700,
+        "line_height": "120%",
         "text_transform": "none",
     },
     "text": {
@@ -334,6 +338,7 @@ DEFAULT_STYLES: dict[str, dict[str, object]] = {
         "text_horizontal": "left",
         "font_size": 20,
         "weight": 400,
+        "line_height": "120%",
         "text_transform": "none",
     },
     "number": {
@@ -341,6 +346,7 @@ DEFAULT_STYLES: dict[str, dict[str, object]] = {
         "text_horizontal": "center",
         "font_size": 50,
         "weight": 700,
+        "line_height": "120%",
         "text_transform": "none",
     },
     "default": {
@@ -348,6 +354,7 @@ DEFAULT_STYLES: dict[str, dict[str, object]] = {
         "text_horizontal": "left",
         "font_size": 20,
         "weight": 400,
+        "line_height": "120%",
         "text_transform": "none",
     },
 }
