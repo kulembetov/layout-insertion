@@ -6,7 +6,7 @@ from typing import Any
 
 import uuid_utils as uuid
 
-from db_work import constants
+import configuration as config
 
 
 def generate_uuid() -> str:
@@ -90,10 +90,10 @@ class SlideLayoutUtils:
     """Slide Layout Utils."""
 
     def __init__(self):
-        self.miniatures_base_path = constants.MINIATURES_BASE_PATH
-        self.slide_nimber_to_path = constants.SLIDE_NUMBER_TO_TYPE
-        self.slide_number_to_number = constants.SLIDE_NUMBER_TO_NUMBER
-        self.miniature_extension = constants.MINIATURE_EXTENSION
+        self.miniatures_base_path = config.MINIATURES_BASE_PATH
+        self.slide_nimber_to_path = config.SLIDE_NUMBER_TO_TYPE
+        self.slide_number_to_number = config.SLIDE_NUMBER_TO_NUMBER
+        self.miniature_extension = config.MINIATURE_EXTENSION
 
     def build_slide_icon_url(self, slide_type: str, slide_name: str, columns: int | None) -> str:
         """Generate icon URL for slide layout."""
@@ -119,7 +119,7 @@ class BlockLayoutUtils:
     """Block Layout Utils."""
 
     def __init__(self):
-        self.miniatures_base_path = constants.MINIATURES_BASE_PATH
+        self.miniatures_base_path = config.MINIATURES_BASE_PATH
 
     def normalize_name(self, name: str) -> str:
         """
