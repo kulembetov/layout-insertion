@@ -7,7 +7,7 @@ from sqlalchemy import delete, func, insert, null, select, update
 from sqlalchemy.engine.row import Row
 from sqlalchemy.sql.elements import ColumnElement
 
-from db_work import constants
+import configuration as fconfig
 from db_work.database import BaseManager
 from db_work.utils import BlockLayoutUtils, ColorUtils, SlideLayoutUtils, generate_uuid, get_slide_layout_data_from_cache
 from log_utils import logs, setup_logger
@@ -1280,7 +1280,7 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                             percentes += 1
 
                     slide_infographics_type = None
-                    for pattern, config_data in constants.SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE.items():
+                    for pattern, config_data in fconfig.SLIDE_LAYOUT_TO_INFOGRAPHICS_TYPE.items():
                         if pattern in slide_layout_name:
                             slide_infographics_type = config_data["infographicsType"]
                             break
@@ -1291,11 +1291,11 @@ class SlideLayoutAdditionalInfoManager(BaseManager):
                         "slideLayoutId": slide_layout_id,
                         "percentesCount": percentes,
                         "hasHeaders": has_headers,
-                        "maxSymbolsInBlock": constants.MAX_SYMBOLS_IN_BLOCK,
+                        "maxSymbolsInBlock": 200,
                         "type": slide_layout_type,
                         "iconUrl": slide_layout_icon_url,
                         "infographicsType": slide_infographics_type,
-                        "contentType": constants.CONTENT_TYPE,
+                        "contentType": None,
                     }
 
                     existing_query = select(slide_layout_additional_info).where(slide_layout_additional_info.c.slideLayoutId == slide_layout_id)
@@ -1563,8 +1563,8 @@ class BlockLayoutStylesManager(BaseManager):
         def logic():
             data = []
 
-            default_color = constants.DEFAULT_COLOR
-            color_settings_id = constants.DEFAULT_COLOR_SETTINGS_ID
+            default_color = fconfig.DEFAULT_COLOR
+            color_settings_id = fconfig.DEFAULT_COLOR_SETTINGS_ID
 
             for block_layout in block_layouts:
                 block_layout_styles = block_layout.get("styles")
@@ -1654,7 +1654,7 @@ class BlockLayoutLimitManager(BaseManager):
     def __init__(self):
         super().__init__()
         self.table = "BlockLayoutLimit"
-        self.block_layout_min_words = constants.BLOCK_TYPE_MIN_WORDS
+        self.block_layout_min_words = fconfig.BLOCK_TYPE_MIN_WORDS
 
     def insert(self, block_layouts: list[dict]) -> list[dict]:
         """Insert an entry in BlockLayoutLimit Table."""
