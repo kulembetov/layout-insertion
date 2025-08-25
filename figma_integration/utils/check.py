@@ -1,7 +1,7 @@
-from django_app.api_v1.constants import CONSTANTS
+import configuration as config
 
 
-class Checker:
+class CheckUtils:
     @staticmethod
     def check_z_index(name: str) -> bool:
         """Checks if the frame name contains a Z-index."""
@@ -10,8 +10,8 @@ class Checker:
     @staticmethod
     def check_dimensions(absolute_bounding_box: dict) -> bool:
         """Checks whether the frame size matches the target width and height."""
-        width_diff = abs(absolute_bounding_box["width"] - CONSTANTS.FIGMA_CONFIG["TARGET_WIDTH"])
-        height_diff = abs(absolute_bounding_box["height"] - CONSTANTS.FIGMA_CONFIG["TARGET_HEIGHT"])
+        width_diff = abs(absolute_bounding_box["width"] - config.FIGMA_CONFIG.TARGET_WIDTH)
+        height_diff = abs(absolute_bounding_box["height"] - config.FIGMA_CONFIG.TARGET_HEIGHT)
         return width_diff < 1 and height_diff < 1
 
     @staticmethod

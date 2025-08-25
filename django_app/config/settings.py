@@ -120,5 +120,3 @@ if CACHE_ENABLED:
             "KEY_PREFIX": "figma",
         }
     }
-
-LOGGING_ON = True

@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from db_work.services import BlockLayoutToDeleteManager, PresentationLayoutManager, SlideLayoutManager
-from django_app.api_v1.services.filters.filter_settings import FilterMode
-from django_app.api_v1.utils.helpers import json_dump
+from figma_integration.filters import FilterMode
+from figma_integration.utils.helper import HelpUtils
 from log_utils import logs, setup_logger
 
 logger = setup_logger(__name__)
@@ -15,7 +15,7 @@ class ReceiveFigmaJsonAPIView(APIView):
 
     @logs(logger, on=True)
     def get(self, request):
-        from .implemented import figma_instance
+        from figma_integration.implemented import figma_api
 
         try:
             file_id = request.data["file_id"]
@@ -23,10 +23,10 @@ class ReceiveFigmaJsonAPIView(APIView):
         except KeyError:
             return Response(data={"message": "Request doesn't contain 'file_id'. Bad request."}, status=status.HTTP_400_BAD_REQUEST)
 
-        figma_instance.file_id = file_id
-        data = figma_instance.extract()
+        figma_api.session.file_id = file_id
+        data = figma_api.extract_data()
 
-        json_dump(data, "output.json")
+        HelpUtils.json_dump(data, "output.json")
         return Response(data=data, status=status.HTTP_200_OK)
 
 
@@ -42,23 +42,24 @@ class FilterFigmaJson(APIView):
             return Response(data={"message": "Request doesn't contain 'file_id'. Bad request."}, status=status.HTTP_400_BAD_REQUEST)
 
         if request.data.get("filter"):
-            from .implemented import filter_figma_instance
+            from figma_integration.implemented import figma_filter_api
 
             filter_type: str = request.data.get("filter").get("type", "")
             filter_names: list[int | str] = request.data.get("filter").get("name", [])
 
-            filter_figma_instance.file_id = file_id
-            filter_figma_instance.filter_names = filter_names
+            figma_filter_api.session.file_id = file_id  # type: ignore[misc]
 
             match filter_type:
                 case FilterMode.SLIDE_GROUP.value:
-                    data = filter_figma_instance.extract_slide_group()
+                    slides: list[int] = [slide for slide in filter_names]  # type: ignore[misc]
+                    data = figma_filter_api.extract_slide_group(slides)
 
                 case FilterMode.SLIDE_NAME.value:
-                    data = filter_figma_instance.extract_slide_name()
+                    names: list[str] = [name for name in filter_names]  # type: ignore[misc]
+                    data = figma_filter_api.extract_slide_names(names)
 
                 case FilterMode.STATUS.value:
-                    data = filter_figma_instance.extract_status()
+                    data = figma_filter_api.extract_status()
 
                 case _:
                     raise ValueError(f"Unknown filter type: {filter_type}")
@@ -118,31 +119,6 @@ class ReceiveFigmaPresentationLayoutFullData(APIView):
                 return Response(data={"message": f"Presentation layout with ID {id} not found"}, status=status.HTTP_404_NOT_FOUND)
 
             logger.info(f"Successfully retrieved structure for presentation layout ID: {id}")
-
-            # Получаем output_dir из query параметров (опционально)
-            output_dir = request.GET.get("output_dir", "my_output")
-
-            # Автоматически сохраняем структуру в файл
-            try:
-                filepath = presentation_manager.save_presentation_layout_structure_to_file(str(id), output_dir=output_dir)
-
-                if filepath:
-                    # Получаем информацию о файле
-                    import os
-
-                    file_size = os.path.getsize(filepath)
-                    filename = os.path.basename(filepath)
-
-                    # Добавляем информацию о сохраненном файле в ответ
-                    structure_data["file_info"] = {"filepath": filepath, "filename": filename, "file_size_bytes": file_size, "file_size_human": f"{file_size:,} байт", "saved_at": structure_data["metadata"]["extracted_at"]}
-
-                    logger.info(f"Structure automatically saved to file: {filepath}")
-                else:
-                    logger.warning("Failed to save structure to file, but continuing with response")
-
-            except Exception as file_error:
-                logger.warning(f"Failed to save to file: {str(file_error)}, continuing with response")
-                # Не прерываем выполнение, просто логируем ошибку сохранения
 
             return Response(data=structure_data, status=status.HTTP_200_OK)
 

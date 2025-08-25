@@ -1,7 +1,7 @@
 import configuration as config
 
 
-class Validator:
+class ValidateUtils:
     """Utility class for data validation"""
 
     @staticmethod
