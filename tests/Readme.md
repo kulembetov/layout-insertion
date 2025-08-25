@@ -49,6 +49,10 @@ db_work
 
     SlideLayoutStylesManager
         insert_or_update
+            test_insert_or_update_insert_new_items
+            test_insert_or_update_mixed_items
+            test_insert_or_update_all_exist
+            test_insert_or_update_empty_list
 
     SlideLayoutAdditionalInfoManager
         insert_or_update

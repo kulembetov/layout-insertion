@@ -3,7 +3,7 @@ from unittest.mock import Mock, call, patch
 import pytest
 from sqlalchemy.engine.row import Row
 
-from db_work.services import ColorSettingsManager, LayoutRolesManager, PresentationLayoutManager, PresentationLayoutStylesManager, PresentationPaletteManager, SlideLayoutManager
+from db_work.services import ColorSettingsManager, LayoutRolesManager, PresentationLayoutManager, PresentationLayoutStylesManager, PresentationPaletteManager, SlideLayoutManager, SlideLayoutStylesManager
 from db_work.utils import generate_uuid
 
 
@@ -922,26 +922,149 @@ class TestSlideLayoutManager:
         assert result == []
 
 
-# class TestPresentationPaletteManager:
+class TestSlideLayoutStylesManager:
 
-#     @pytest.fixture
-#     def manager(self):
-#         """Фикстура для создания экземпляра менеджера."""
-#         return PresentationPaletteManager()
+    @pytest.fixture
+    def manager(self):
+        """Фикстура для создания экземпляра менеджера."""
+        return SlideLayoutStylesManager()
 
-#     @pytest.fixture
-#     def mock_session(self):
-#         """Фикстура для мока сессии."""
-#         return Mock()
+    @pytest.fixture
+    def mock_session(self):
+        """Фикстура для мока сессии."""
+        return Mock()
 
-#     @pytest.fixture
-#     def mock_table(self):
-#         """Фикстура для мока таблицы."""
-#         mock_table = Mock()
-#         mock_table.c = Mock()
-#         mock_table.c.name = Mock()
-#         return mock_table
+    @pytest.fixture
+    def mock_table(self):
+        """Фикстура для мока таблицы."""
+        mock_table = Mock()
+        mock_table.c = Mock()
+        mock_table.c.slideLayoutId = Mock()
+        return mock_table
 
-#     def test_init(self, manager):
-#         """Тест инициализации менеджера."""
-#         assert manager.table == ""
+    def test_init(self, manager):
+        """Тест инициализации менеджера."""
+        assert manager.table == "SlideLayoutStyles"
+
+    @patch("db_work.services.select")
+    @patch("db_work.services.insert")
+    @patch("db_work.services.logger")
+    def test_insert_or_update_insert_new_items(self, mock_logger, mock_insert, mock_select, manager, mock_session, mock_table):
+        """Тест вставки новых элементов."""
+
+        slide_layouts = [{"id": "layout-1", "name": "Layout 1"}, {"id": "layout-2", "name": "Layout 2"}, {"id": "layout-3", "name": "Layout 3"}]
+
+        manager.open_session = Mock(return_value=(mock_table, mock_session))
+
+        mock_select_query = Mock()
+        mock_select.return_value = mock_select_query
+        mock_where_query = Mock()
+        mock_select_query.where.return_value = mock_where_query
+
+        mock_session.execute.return_value.scalar_one_or_none.side_effect = [None, None, None]
+
+        mock_insert_query = Mock()
+        mock_insert.return_value = mock_insert_query
+        mock_insert_query.values.return_value = mock_insert_query
+
+        result = manager.insert_or_upate(slide_layouts)
+        manager.open_session.assert_called_once_with("SlideLayoutStyles")
+
+        assert mock_select.call_count == 3
+        assert mock_select_query.where.call_count == 3
+        assert mock_session.execute.call_count == 6
+
+        expected_values_calls = [call({"slideLayoutId": "layout-1"}), call({"slideLayoutId": "layout-2"}), call({"slideLayoutId": "layout-3"})]
+        mock_insert_query.values.assert_has_calls(expected_values_calls, any_order=True)
+
+        assert mock_session.execute.return_value.scalar_one_or_none.call_count == 3
+
+        mock_session.commit.assert_called_once()
+        mock_logger.info.assert_called_once_with("SlideLayoutStylesManager: insert 3 items. \n")
+
+        expected_result = [{"slideLayoutId": "layout-1"}, {"slideLayoutId": "layout-2"}, {"slideLayoutId": "layout-3"}]
+        assert result == expected_result
+
+    @patch("db_work.services.select")
+    @patch("db_work.services.insert")
+    @patch("db_work.services.logger")
+    def test_insert_or_update_mixed_items(self, mock_logger, mock_insert, mock_select, manager, mock_session, mock_table):
+        """Тест смешанного сценария: некоторые элементы есть, некоторых нет."""
+
+        slide_layouts = [{"id": "layout-1", "name": "Layout 1"}, {"id": "layout-2", "name": "Layout 2"}, {"id": "layout-3", "name": "Layout 3"}]
+
+        manager.open_session = Mock(return_value=(mock_table, mock_session))
+
+        mock_select_query = Mock()
+        mock_select.return_value = mock_select_query
+        mock_where_query = Mock()
+        mock_select_query.where.return_value = mock_where_query
+
+        mock_session.execute.return_value.scalar_one_or_none.side_effect = ["layout-1", None, "layout-3"]
+
+        mock_insert_query = Mock()
+        mock_insert.return_value = mock_insert_query
+        mock_insert_query.values.return_value = mock_insert_query
+
+        result = manager.insert_or_upate(slide_layouts)
+
+        manager.open_session.assert_called_once_with("SlideLayoutStyles")
+
+        assert mock_select.call_count == 3
+
+        assert mock_insert.call_count == 1
+        mock_insert_query.values.assert_called_once_with({"slideLayoutId": "layout-2"})
+
+        assert mock_session.execute.call_count == 4
+
+        mock_session.commit.assert_called_once()
+        mock_logger.info.assert_called_once_with("SlideLayoutStylesManager: insert 1 items. \n")
+
+        expected_result = [{"slideLayoutId": "layout-2"}]
+        assert result == expected_result
+
+    @patch("db_work.services.select")
+    @patch("db_work.services.insert")
+    @patch("db_work.services.logger")
+    def test_insert_or_update_all_exist(self, mock_logger, mock_insert, mock_select, manager, mock_session, mock_table):
+        """Тест сценария, когда все элементы уже существуют."""
+
+        slide_layouts = [{"id": "layout-1", "name": "Layout 1"}, {"id": "layout-2", "name": "Layout 2"}]
+
+        manager.open_session = Mock(return_value=(mock_table, mock_session))
+
+        mock_session.execute.return_value.scalar_one_or_none.side_effect = ["layout-1", "layout-2"]
+
+        result = manager.insert_or_upate(slide_layouts)
+
+        manager.open_session.assert_called_once_with("SlideLayoutStyles")
+
+        assert mock_select.call_count == 2
+
+        mock_insert.assert_not_called()
+
+        mock_session.commit.assert_called_once()
+        mock_logger.info.assert_called_once_with("SlideLayoutStylesManager: insert 0 items. \n")
+
+        assert result == []
+
+    @patch("db_work.services.select")
+    @patch("db_work.services.insert")
+    @patch("db_work.services.logger")
+    def test_insert_or_update_empty_list(self, mock_logger, mock_insert, mock_select, manager, mock_session, mock_table):
+        """Тест с пустым списком."""
+        slide_layouts = []
+
+        manager.open_session = Mock(return_value=(mock_table, mock_session))
+
+        result = manager.insert_or_upate(slide_layouts)
+
+        manager.open_session.assert_called_once_with("SlideLayoutStyles")
+
+        mock_select.assert_not_called()
+        mock_insert.assert_not_called()
+
+        mock_session.commit.assert_called_once()
+        mock_logger.info.assert_called_once_with("SlideLayoutStylesManager: insert 0 items. \n")
+
+        assert result == []
